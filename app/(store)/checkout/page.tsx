@@ -1,8 +1,9 @@
-"use client" // form state, ViaCEP fetch, payment method selection, router redirect
+"use client" // form state, ViaCEP fetch, MP.js tokenization, router redirect
 
-import { useState, useEffect, type FormEvent, type ReactNode } from "react"
+import { useState, useEffect, useRef, type FormEvent, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import Script from "next/script"
 import { Loader2, QrCode, CreditCard, FileText, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,8 +11,8 @@ import { Separator } from "@/components/ui/separator"
 import { cn, formatPrice } from "@/lib/utils"
 import { useCart } from "@/lib/cart-context"
 import { fetchAddressByCEP } from "@/lib/integrations/viacep"
-import { createMockPayment } from "@/lib/integrations/mercadopago"
-import type { PaymentMethod } from "@/lib/integrations/mercadopago"
+import { createPayment } from "@/lib/actions/payments"
+import type { PaymentMethod } from "@/lib/actions/payments"
 
 // ─── Masks ────────────────────────────────────────────────────────────────────
 
@@ -91,7 +92,12 @@ const PAYMENT_OPTIONS: Array<{ id: PaymentMethod; label: string; description: st
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
-function validate(p: Personal, a: Address, method: PaymentMethod | null, card: Card): Errors {
+function validate(
+  p: Personal,
+  a: Address,
+  method: PaymentMethod | null,
+  card: Card
+): Errors {
   const e: Errors = {}
   if (!p.name.trim()) e.name = "Nome obrigatório"
   if (!p.email.trim()) e.email = "E-mail obrigatório"
@@ -104,6 +110,7 @@ function validate(p: Personal, a: Address, method: PaymentMethod | null, card: C
   if (!a.city.trim()) e.city = "Cidade obrigatória"
   if (!a.state.trim()) e.state = "Estado obrigatório"
   if (!method) e.method = "Selecione a forma de pagamento"
+  if (method === "boleto" && !p.cpf.trim()) e.cpf = "CPF obrigatório para boleto"
   if (method === "credit_card") {
     if (card.number.replace(/\s/g, "").length < 16) e.card_number = "Número inválido"
     if (!card.holder.trim()) e.card_holder = "Nome obrigatório"
@@ -119,10 +126,12 @@ export default function CheckoutPage() {
   const router = useRouter()
   const { cart, hydrated, clearCart } = useCart()
 
+  const mpRef = useRef<any>(null)
   const [personal, setPersonal] = useState<Personal>(EMPTY_PERSONAL)
   const [address, setAddress] = useState<Address>(EMPTY_ADDRESS)
   const [card, setCard] = useState<Card>(EMPTY_CARD)
   const [method, setMethod] = useState<PaymentMethod | null>(null)
+  const [paymentMethodId, setPaymentMethodId] = useState("")
   const [errors, setErrors] = useState<Errors>({})
   const [cepLoading, setCepLoading] = useState(false)
   const [cepError, setCepError] = useState("")
@@ -131,6 +140,20 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (hydrated && cart.items.length === 0) router.replace("/carrinho")
   }, [hydrated, cart.items.length, router])
+
+  // Detect card brand from BIN (first 6 digits) via MP SDK
+  useEffect(() => {
+    const bin = card.number.replace(/\s/g, "").substring(0, 6)
+    if (bin.length === 6 && mpRef.current) {
+      mpRef.current
+        .getPaymentMethods({ bin })
+        .then((res: any) => {
+          const id = res?.results?.[0]?.id
+          if (id) setPaymentMethodId(id)
+        })
+        .catch(() => {})
+    }
+  }, [card.number])
 
   if (!hydrated || cart.items.length === 0) return null
 
@@ -164,369 +187,449 @@ export default function CheckoutPage() {
       return
     }
     setLoading(true)
+
     try {
-      const payment = await createMockPayment(method!, cart.total)
+      let cardToken: string | undefined
+
+      if (method === "credit_card") {
+        if (!mpRef.current) throw new Error("SDK de pagamento não carregado. Aguarde e tente novamente.")
+        const [expMonth, expYear] = card.expiry.split("/")
+        const tokenResult = await mpRef.current.createCardToken({
+          cardNumber: card.number.replace(/\s/g, ""),
+          cardholderName: card.holder,
+          cardExpirationMonth: expMonth.padStart(2, "0"),
+          cardExpirationYear: `20${expYear}`,
+          securityCode: card.cvv,
+          identificationType: "CPF",
+          identificationNumber: personal.cpf.replace(/\D/g, "") || "00000000000",
+        })
+        cardToken = tokenResult.id
+      }
+
+      const result = await createPayment({
+        method: method!,
+        amount: cart.total,
+        payer: {
+          name: personal.name,
+          email: personal.email,
+          cpf: personal.cpf || undefined,
+        },
+        cardToken,
+        paymentMethodId: paymentMethodId || undefined,
+      })
+
+      if (!result.ok) throw new Error(result.error)
+
+      sessionStorage.setItem("mp_payment", JSON.stringify(result.data))
       clearCart()
-      router.push(`/pedido/${payment.id}?method=${method}`)
-    } catch {
-      setErrors({ submit: "Erro ao processar. Tente novamente." })
+      router.push(`/pedido/${result.data.id}`)
+    } catch (err) {
+      setErrors({
+        submit: err instanceof Error ? err.message : "Erro ao processar. Tente novamente.",
+      })
       setLoading(false)
     }
   }
 
   return (
-    <div className="mx-auto max-w-container px-margin-mobile py-8 md:px-margin-desktop md:py-12">
-      {/* Breadcrumb */}
-      <nav className="mb-6 flex items-center gap-1 font-caption text-caption text-on-surface-variant">
-        <Link href="/" className="transition-colors hover:text-on-surface">Início</Link>
-        <ChevronRight className="h-3 w-3" />
-        <Link href="/carrinho" className="transition-colors hover:text-on-surface">Carrinho</Link>
-        <ChevronRight className="h-3 w-3" />
-        <span className="text-on-surface">Finalizar Compra</span>
-      </nav>
+    <>
+      <Script
+        src="https://sdk.mercadopago.com/js/v2"
+        onLoad={() => {
+          mpRef.current = new (window as any).MercadoPago(
+            process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY,
+            { locale: "pt-BR" }
+          )
+        }}
+      />
 
-      <h1 className="mb-8 font-headline-md text-headline-md text-on-surface">Finalizar Compra</h1>
+      <div className="mx-auto max-w-container px-margin-mobile py-8 md:px-margin-desktop md:py-12">
+        {/* Breadcrumb */}
+        <nav className="mb-6 flex items-center gap-1 font-caption text-caption text-on-surface-variant">
+          <Link href="/" className="transition-colors hover:text-on-surface">Início</Link>
+          <ChevronRight className="h-3 w-3" />
+          <Link href="/carrinho" className="transition-colors hover:text-on-surface">Carrinho</Link>
+          <ChevronRight className="h-3 w-3" />
+          <span className="text-on-surface">Finalizar Compra</span>
+        </nav>
 
-      <form onSubmit={handleSubmit} noValidate>
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_360px]">
+        <h1 className="mb-8 font-headline-md text-headline-md text-on-surface">Finalizar Compra</h1>
 
-          {/* ── Formulário ── */}
-          <div className="flex flex-col gap-8">
+        <form onSubmit={handleSubmit} noValidate>
+          <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_360px]">
 
-            {/* Dados pessoais */}
-            <section>
-              <h2 className="mb-4 font-headline-sm text-headline-sm text-on-surface">
-                Dados Pessoais
-              </h2>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <Label htmlFor="name">Nome completo</Label>
-                  <Input
-                    id="name"
-                    value={personal.name}
-                    onChange={(e) => setPersonal((p) => ({ ...p, name: e.target.value }))}
-                    autoComplete="name"
-                    className={cn(errors.name && "border-error")}
-                  />
-                  <FieldError msg={errors.name} />
-                </div>
-                <div>
-                  <Label htmlFor="email">E-mail</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={personal.email}
-                    onChange={(e) => setPersonal((p) => ({ ...p, email: e.target.value }))}
-                    autoComplete="email"
-                    inputMode="email"
-                    className={cn(errors.email && "border-error")}
-                  />
-                  <FieldError msg={errors.email} />
-                </div>
-                <div>
-                  <Label htmlFor="phone">Telefone / WhatsApp</Label>
-                  <Input
-                    id="phone"
-                    value={personal.phone}
-                    onChange={(e) => setPersonal((p) => ({ ...p, phone: maskPhone(e.target.value) }))}
-                    autoComplete="tel"
-                    inputMode="tel"
-                    placeholder="(11) 99999-9999"
-                    className={cn(errors.phone && "border-error")}
-                  />
-                  <FieldError msg={errors.phone} />
-                </div>
-                <div>
-                  <Label htmlFor="cpf">CPF <span className="text-on-surface-variant/60">(opcional)</span></Label>
-                  <Input
-                    id="cpf"
-                    value={personal.cpf}
-                    onChange={(e) => setPersonal((p) => ({ ...p, cpf: maskCPF(e.target.value) }))}
-                    inputMode="numeric"
-                    placeholder="000.000.000-00"
-                  />
-                </div>
-              </div>
-            </section>
+            {/* ── Formulário ── */}
+            <div className="flex flex-col gap-8">
 
-            <Separator />
-
-            {/* Endereço */}
-            <section>
-              <h2 className="mb-4 font-headline-sm text-headline-sm text-on-surface">
-                Endereço de Entrega
-              </h2>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
-                <div className="sm:col-span-2">
-                  <Label htmlFor="cep">CEP</Label>
-                  <div className="relative">
+              {/* Dados pessoais */}
+              <section>
+                <h2 className="mb-4 font-headline-sm text-headline-sm text-on-surface">
+                  Dados Pessoais
+                </h2>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <Label htmlFor="name">Nome completo</Label>
                     <Input
-                      id="cep"
-                      value={address.cep}
-                      onChange={(e) => handleCEPChange(e.target.value)}
-                      inputMode="numeric"
-                      placeholder="00000-000"
-                      className={cn((errors.cep || cepError) && "border-error")}
+                      id="name"
+                      value={personal.name}
+                      onChange={(e) => setPersonal((p) => ({ ...p, name: e.target.value }))}
+                      autoComplete="name"
+                      className={cn(errors.name && "border-error")}
                     />
-                    {cepLoading && (
-                      <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-on-surface-variant" />
-                    )}
+                    <FieldError msg={errors.name} />
                   </div>
-                  <FieldError msg={cepError || errors.cep} />
+                  <div>
+                    <Label htmlFor="email">E-mail</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={personal.email}
+                      onChange={(e) => setPersonal((p) => ({ ...p, email: e.target.value }))}
+                      autoComplete="email"
+                      inputMode="email"
+                      className={cn(errors.email && "border-error")}
+                    />
+                    <FieldError msg={errors.email} />
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">Telefone / WhatsApp</Label>
+                    <Input
+                      id="phone"
+                      value={personal.phone}
+                      onChange={(e) => setPersonal((p) => ({ ...p, phone: maskPhone(e.target.value) }))}
+                      autoComplete="tel"
+                      inputMode="tel"
+                      placeholder="(11) 99999-9999"
+                      className={cn(errors.phone && "border-error")}
+                    />
+                    <FieldError msg={errors.phone} />
+                  </div>
+                  <div>
+                    <Label htmlFor="cpf">
+                      CPF{" "}
+                      {method === "boleto" ? (
+                        <span className="text-error">*</span>
+                      ) : (
+                        <span className="text-on-surface-variant/60">(opcional)</span>
+                      )}
+                    </Label>
+                    <Input
+                      id="cpf"
+                      value={personal.cpf}
+                      onChange={(e) => setPersonal((p) => ({ ...p, cpf: maskCPF(e.target.value) }))}
+                      inputMode="numeric"
+                      placeholder="000.000.000-00"
+                      className={cn(errors.cpf && "border-error")}
+                    />
+                    <FieldError msg={errors.cpf} />
+                  </div>
                 </div>
-                <div className="sm:col-span-4">
-                  <Label htmlFor="street">Rua / Avenida</Label>
-                  <Input
-                    id="street"
-                    value={address.street}
-                    onChange={(e) => setAddress((a) => ({ ...a, street: e.target.value }))}
-                    autoComplete="street-address"
-                    className={cn(errors.street && "border-error")}
-                  />
-                  <FieldError msg={errors.street} />
-                </div>
-                <div className="sm:col-span-2">
-                  <Label htmlFor="number">Número</Label>
-                  <Input
-                    id="number"
-                    value={address.number}
-                    onChange={(e) => setAddress((a) => ({ ...a, number: e.target.value }))}
-                    inputMode="numeric"
-                    className={cn(errors.number && "border-error")}
-                  />
-                  <FieldError msg={errors.number} />
-                </div>
-                <div className="sm:col-span-4">
-                  <Label htmlFor="complement">Complemento <span className="text-on-surface-variant/60">(opcional)</span></Label>
-                  <Input
-                    id="complement"
-                    value={address.complement}
-                    onChange={(e) => setAddress((a) => ({ ...a, complement: e.target.value }))}
-                    placeholder="Apto, bloco, referência..."
-                  />
-                </div>
-                <div className="sm:col-span-3">
-                  <Label htmlFor="neighborhood">Bairro</Label>
-                  <Input
-                    id="neighborhood"
-                    value={address.neighborhood}
-                    onChange={(e) => setAddress((a) => ({ ...a, neighborhood: e.target.value }))}
-                    className={cn(errors.neighborhood && "border-error")}
-                  />
-                  <FieldError msg={errors.neighborhood} />
-                </div>
-                <div className="sm:col-span-2">
-                  <Label htmlFor="city">Cidade</Label>
-                  <Input
-                    id="city"
-                    value={address.city}
-                    onChange={(e) => setAddress((a) => ({ ...a, city: e.target.value }))}
-                    readOnly={!!address.city}
-                    className={cn(
-                      errors.city && "border-error",
-                      address.city && "bg-surface-container-low"
-                    )}
-                  />
-                  <FieldError msg={errors.city} />
-                </div>
-                <div className="sm:col-span-1">
-                  <Label htmlFor="state">UF</Label>
-                  <Input
-                    id="state"
-                    value={address.state}
-                    onChange={(e) => setAddress((a) => ({ ...a, state: e.target.value.toUpperCase().slice(0, 2) }))}
-                    readOnly={!!address.state}
-                    maxLength={2}
-                    className={cn(
-                      errors.state && "border-error",
-                      address.state && "bg-surface-container-low"
-                    )}
-                  />
-                  <FieldError msg={errors.state} />
-                </div>
-              </div>
-            </section>
+              </section>
 
-            <Separator />
+              <Separator />
 
-            {/* Pagamento */}
-            <section>
+              {/* Endereço */}
+              <section>
+                <h2 className="mb-4 font-headline-sm text-headline-sm text-on-surface">
+                  Endereço de Entrega
+                </h2>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+                  <div className="sm:col-span-2">
+                    <Label htmlFor="cep">CEP</Label>
+                    <div className="relative">
+                      <Input
+                        id="cep"
+                        value={address.cep}
+                        onChange={(e) => handleCEPChange(e.target.value)}
+                        inputMode="numeric"
+                        placeholder="00000-000"
+                        className={cn((errors.cep || cepError) && "border-error")}
+                      />
+                      {cepLoading && (
+                        <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-on-surface-variant" />
+                      )}
+                    </div>
+                    <FieldError msg={cepError || errors.cep} />
+                  </div>
+                  <div className="sm:col-span-4">
+                    <Label htmlFor="street">Rua / Avenida</Label>
+                    <Input
+                      id="street"
+                      value={address.street}
+                      onChange={(e) => setAddress((a) => ({ ...a, street: e.target.value }))}
+                      autoComplete="street-address"
+                      className={cn(errors.street && "border-error")}
+                    />
+                    <FieldError msg={errors.street} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label htmlFor="number">Número</Label>
+                    <Input
+                      id="number"
+                      value={address.number}
+                      onChange={(e) => setAddress((a) => ({ ...a, number: e.target.value }))}
+                      inputMode="numeric"
+                      className={cn(errors.number && "border-error")}
+                    />
+                    <FieldError msg={errors.number} />
+                  </div>
+                  <div className="sm:col-span-4">
+                    <Label htmlFor="complement">
+                      Complemento{" "}
+                      <span className="text-on-surface-variant/60">(opcional)</span>
+                    </Label>
+                    <Input
+                      id="complement"
+                      value={address.complement}
+                      onChange={(e) => setAddress((a) => ({ ...a, complement: e.target.value }))}
+                      placeholder="Apto, bloco, referência..."
+                    />
+                  </div>
+                  <div className="sm:col-span-3">
+                    <Label htmlFor="neighborhood">Bairro</Label>
+                    <Input
+                      id="neighborhood"
+                      value={address.neighborhood}
+                      onChange={(e) => setAddress((a) => ({ ...a, neighborhood: e.target.value }))}
+                      className={cn(errors.neighborhood && "border-error")}
+                    />
+                    <FieldError msg={errors.neighborhood} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label htmlFor="city">Cidade</Label>
+                    <Input
+                      id="city"
+                      value={address.city}
+                      onChange={(e) => setAddress((a) => ({ ...a, city: e.target.value }))}
+                      readOnly={!!address.city}
+                      className={cn(
+                        errors.city && "border-error",
+                        address.city && "bg-surface-container-low"
+                      )}
+                    />
+                    <FieldError msg={errors.city} />
+                  </div>
+                  <div className="sm:col-span-1">
+                    <Label htmlFor="state">UF</Label>
+                    <Input
+                      id="state"
+                      value={address.state}
+                      onChange={(e) =>
+                        setAddress((a) => ({
+                          ...a,
+                          state: e.target.value.toUpperCase().slice(0, 2),
+                        }))
+                      }
+                      readOnly={!!address.state}
+                      maxLength={2}
+                      className={cn(
+                        errors.state && "border-error",
+                        address.state && "bg-surface-container-low"
+                      )}
+                    />
+                    <FieldError msg={errors.state} />
+                  </div>
+                </div>
+              </section>
+
+              <Separator />
+
+              {/* Pagamento */}
+              <section>
+                <h2 className="mb-4 font-headline-sm text-headline-sm text-on-surface">
+                  Forma de Pagamento
+                </h2>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {PAYMENT_OPTIONS.map(({ id, label, description }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => {
+                        setMethod(id)
+                        setErrors((prev) => ({ ...prev, method: "", cpf: "" }))
+                      }}
+                      className={cn(
+                        "flex flex-col gap-1 rounded-lg border p-4 text-left transition-colors",
+                        method === id
+                          ? "border-primary bg-primary/5"
+                          : "border-outline-variant hover:border-primary/50"
+                      )}
+                    >
+                      {id === "pix" && (
+                        <QrCode className={cn("h-5 w-5", method === id ? "text-primary" : "text-on-surface-variant")} />
+                      )}
+                      {id === "credit_card" && (
+                        <CreditCard className={cn("h-5 w-5", method === id ? "text-primary" : "text-on-surface-variant")} />
+                      )}
+                      {id === "boleto" && (
+                        <FileText className={cn("h-5 w-5", method === id ? "text-primary" : "text-on-surface-variant")} />
+                      )}
+                      <span className={cn("font-label-md text-label-md", method === id ? "text-on-surface" : "text-on-surface-variant")}>
+                        {label}
+                      </span>
+                      <span className="font-caption text-caption text-on-surface-variant">
+                        {description}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <FieldError msg={errors.method} />
+
+                {/* Campos do cartão */}
+                {method === "credit_card" && (
+                  <div className="mt-4 grid grid-cols-1 gap-4 rounded-lg border border-outline-variant bg-surface-container-low p-4 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <Label htmlFor="card_number">Número do cartão</Label>
+                      <Input
+                        id="card_number"
+                        value={card.number}
+                        onChange={(e) =>
+                          setCard((c) => ({ ...c, number: maskCardNumber(e.target.value) }))
+                        }
+                        inputMode="numeric"
+                        placeholder="0000 0000 0000 0000"
+                        maxLength={19}
+                        className={cn(errors.card_number && "border-error")}
+                      />
+                      <FieldError msg={errors.card_number} />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Label htmlFor="card_holder">Nome no cartão</Label>
+                      <Input
+                        id="card_holder"
+                        value={card.holder}
+                        onChange={(e) =>
+                          setCard((c) => ({ ...c, holder: e.target.value.toUpperCase() }))
+                        }
+                        autoComplete="cc-name"
+                        placeholder="NOME COMO NO CARTÃO"
+                        className={cn(errors.card_holder && "border-error")}
+                      />
+                      <FieldError msg={errors.card_holder} />
+                    </div>
+                    <div>
+                      <Label htmlFor="card_expiry">Validade</Label>
+                      <Input
+                        id="card_expiry"
+                        value={card.expiry}
+                        onChange={(e) =>
+                          setCard((c) => ({ ...c, expiry: maskExpiry(e.target.value) }))
+                        }
+                        inputMode="numeric"
+                        placeholder="MM/AA"
+                        maxLength={5}
+                        className={cn(errors.card_expiry && "border-error")}
+                      />
+                      <FieldError msg={errors.card_expiry} />
+                    </div>
+                    <div>
+                      <Label htmlFor="card_cvv">CVV</Label>
+                      <Input
+                        id="card_cvv"
+                        value={card.cvv}
+                        onChange={(e) =>
+                          setCard((c) => ({
+                            ...c,
+                            cvv: e.target.value.replace(/\D/g, "").slice(0, 4),
+                          }))
+                        }
+                        inputMode="numeric"
+                        placeholder="123"
+                        maxLength={4}
+                        className={cn(errors.card_cvv && "border-error")}
+                      />
+                      <FieldError msg={errors.card_cvv} />
+                    </div>
+                  </div>
+                )}
+
+                {method === "pix" && (
+                  <p className="mt-4 font-body-md text-body-md text-on-surface-variant">
+                    O QR Code PIX será gerado após confirmar o pedido. Você terá 30 minutos para pagar.
+                  </p>
+                )}
+
+                {method === "boleto" && (
+                  <p className="mt-4 font-body-md text-body-md text-on-surface-variant">
+                    O boleto será gerado após confirmar o pedido. Vence em 3 dias úteis — o pedido só é processado após confirmação do pagamento.
+                  </p>
+                )}
+              </section>
+            </div>
+
+            {/* ── Resumo ── */}
+            <div className="self-start rounded-xl border border-outline-variant bg-surface-container-low p-6">
               <h2 className="mb-4 font-headline-sm text-headline-sm text-on-surface">
-                Forma de Pagamento
+                Resumo
               </h2>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {PAYMENT_OPTIONS.map(({ id, label, description }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => {
-                      setMethod(id)
-                      setErrors((prev) => ({ ...prev, method: "" }))
-                    }}
-                    className={cn(
-                      "flex flex-col gap-1 rounded-lg border p-4 text-left transition-colors",
-                      method === id
-                        ? "border-primary bg-primary/5"
-                        : "border-outline-variant hover:border-primary/50"
-                    )}
-                  >
-                    {id === "pix" && <QrCode className={cn("h-5 w-5", method === id ? "text-primary" : "text-on-surface-variant")} />}
-                    {id === "credit_card" && <CreditCard className={cn("h-5 w-5", method === id ? "text-primary" : "text-on-surface-variant")} />}
-                    {id === "boleto" && <FileText className={cn("h-5 w-5", method === id ? "text-primary" : "text-on-surface-variant")} />}
-                    <span className={cn("font-label-md text-label-md", method === id ? "text-on-surface" : "text-on-surface-variant")}>
-                      {label}
+
+              <div className="flex flex-col gap-2 mb-4">
+                {cart.items.map((item) => (
+                  <div key={item.variant.id} className="flex justify-between gap-2 font-body-md text-body-md">
+                    <span className="text-on-surface-variant truncate">
+                      {item.quantity}× {item.variant.product.name}
                     </span>
-                    <span className="font-caption text-caption text-on-surface-variant">
-                      {description}
+                    <span className="flex-shrink-0 text-on-surface">
+                      {formatPrice(item.variant.product.base_price * item.quantity)}
                     </span>
-                  </button>
+                  </div>
                 ))}
               </div>
-              <FieldError msg={errors.method} />
 
-              {/* Campos do cartão */}
-              {method === "credit_card" && (
-                <div className="mt-4 grid grid-cols-1 gap-4 rounded-lg border border-outline-variant bg-surface-container-low p-4 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <Label htmlFor="card_number">Número do cartão</Label>
-                    <Input
-                      id="card_number"
-                      value={card.number}
-                      onChange={(e) => setCard((c) => ({ ...c, number: maskCardNumber(e.target.value) }))}
-                      inputMode="numeric"
-                      placeholder="0000 0000 0000 0000"
-                      maxLength={19}
-                      className={cn(errors.card_number && "border-error")}
-                    />
-                    <FieldError msg={errors.card_number} />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Label htmlFor="card_holder">Nome no cartão</Label>
-                    <Input
-                      id="card_holder"
-                      value={card.holder}
-                      onChange={(e) => setCard((c) => ({ ...c, holder: e.target.value.toUpperCase() }))}
-                      autoComplete="cc-name"
-                      placeholder="NOME COMO NO CARTÃO"
-                      className={cn(errors.card_holder && "border-error")}
-                    />
-                    <FieldError msg={errors.card_holder} />
-                  </div>
-                  <div>
-                    <Label htmlFor="card_expiry">Validade</Label>
-                    <Input
-                      id="card_expiry"
-                      value={card.expiry}
-                      onChange={(e) => setCard((c) => ({ ...c, expiry: maskExpiry(e.target.value) }))}
-                      inputMode="numeric"
-                      placeholder="MM/AA"
-                      maxLength={5}
-                      className={cn(errors.card_expiry && "border-error")}
-                    />
-                    <FieldError msg={errors.card_expiry} />
-                  </div>
-                  <div>
-                    <Label htmlFor="card_cvv">CVV</Label>
-                    <Input
-                      id="card_cvv"
-                      value={card.cvv}
-                      onChange={(e) => setCard((c) => ({ ...c, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) }))}
-                      inputMode="numeric"
-                      placeholder="123"
-                      maxLength={4}
-                      className={cn(errors.card_cvv && "border-error")}
-                    />
-                    <FieldError msg={errors.card_cvv} />
-                  </div>
+              <Separator />
+
+              <div className="mt-4 flex flex-col gap-3 font-body-md text-body-md">
+                <div className="flex justify-between text-on-surface-variant">
+                  <span>Subtotal</span>
+                  <span>{formatPrice(cart.subtotal)}</span>
                 </div>
-              )}
-
-              {method === "pix" && (
-                <p className="mt-4 font-body-md text-body-md text-on-surface-variant">
-                  O QR Code PIX será gerado após confirmar o pedido. Você terá 30 minutos para pagar.
-                </p>
-              )}
-
-              {method === "boleto" && (
-                <p className="mt-4 font-body-md text-body-md text-on-surface-variant">
-                  O boleto será gerado após confirmar o pedido. Vence em 3 dias úteis — o pedido só é processado após confirmação do pagamento.
-                </p>
-              )}
-            </section>
-          </div>
-
-          {/* ── Resumo ── */}
-          <div className="self-start rounded-xl border border-outline-variant bg-surface-container-low p-6">
-            <h2 className="mb-4 font-headline-sm text-headline-sm text-on-surface">
-              Resumo
-            </h2>
-
-            <div className="flex flex-col gap-2 mb-4">
-              {cart.items.map((item) => (
-                <div key={item.variant.id} className="flex justify-between gap-2 font-body-md text-body-md">
-                  <span className="text-on-surface-variant truncate">
-                    {item.quantity}× {item.variant.product.name}
-                  </span>
-                  <span className="flex-shrink-0 text-on-surface">
-                    {formatPrice(item.variant.product.base_price * item.quantity)}
-                  </span>
+                {cart.discount_amount > 0 && (
+                  <div className="flex justify-between text-tertiary">
+                    <span>Desconto</span>
+                    <span>− {formatPrice(cart.discount_amount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-on-surface-variant">
+                  <span>Frete</span>
+                  <span className="italic">A calcular</span>
                 </div>
-              ))}
-            </div>
-
-            <Separator />
-
-            <div className="mt-4 flex flex-col gap-3 font-body-md text-body-md">
-              <div className="flex justify-between text-on-surface-variant">
-                <span>Subtotal</span>
-                <span>{formatPrice(cart.subtotal)}</span>
               </div>
-              {cart.discount_amount > 0 && (
-                <div className="flex justify-between text-tertiary">
-                  <span>Desconto</span>
-                  <span>− {formatPrice(cart.discount_amount)}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-on-surface-variant">
-                <span>Frete</span>
-                <span className="italic">A calcular</span>
+
+              <Separator className="my-4" />
+
+              <div className="mb-6 flex justify-between font-headline-sm text-headline-sm text-on-surface">
+                <span>Total</span>
+                <span>{formatPrice(cart.total)}</span>
               </div>
-            </div>
 
-            <Separator className="my-4" />
-
-            <div className="mb-6 flex justify-between font-headline-sm text-headline-sm text-on-surface">
-              <span>Total</span>
-              <span>{formatPrice(cart.total)}</span>
-            </div>
-
-            {errors.submit && (
-              <p className="mb-3 font-caption text-caption text-error">{errors.submit}</p>
-            )}
-
-            <Button
-              type="submit"
-              size="lg"
-              className="w-full"
-              disabled={loading}
-              id="btn-finalizar-compra"
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Processando...
-                </span>
-              ) : (
-                "Finalizar Compra"
+              {errors.submit && (
+                <p className="mb-3 font-caption text-caption text-error">{errors.submit}</p>
               )}
-            </Button>
 
-            <p className="mt-3 text-center font-caption text-caption text-on-surface-variant">
-              Seus dados estão protegidos e seguros.
-            </p>
+              <Button
+                type="submit"
+                size="lg"
+                className="w-full"
+                disabled={loading}
+                id="btn-finalizar-compra"
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Processando...
+                  </span>
+                ) : (
+                  "Finalizar Compra"
+                )}
+              </Button>
+
+              <p className="mt-3 text-center font-caption text-caption text-on-surface-variant">
+                Seus dados estão protegidos e seguros.
+              </p>
+            </div>
           </div>
-        </div>
-      </form>
-    </div>
+        </form>
+      </div>
+    </>
   )
 }

@@ -1,28 +1,28 @@
-"use client" // useSearchParams + copy to clipboard
+"use client" // sessionStorage, useSearchParams, copy to clipboard
 
-import { Suspense, useState } from "react"
-import { useParams, useSearchParams } from "next/navigation"
+import { Suspense, useState, useEffect } from "react"
+import { useParams } from "next/navigation"
 import Link from "next/link"
-import { CheckCircle2, Copy, Check, Clock, AlertCircle } from "lucide-react"
+import Image from "next/image"
+import { CheckCircle2, Copy, Check, Clock, AlertCircle, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-
-const MOCK_PIX_CODE =
-  "00020126580014BR.GOV.BCB.PIX0136a1b2c3d4-e5f6-7890-abcd-ef1234567890" +
-  "5204000053039865406100.005802BR5916Patricia Carreira6009Arraial do" +
-  "6304ABCD"
-
-const MOCK_BARCODE = "34191.79001 01043.510047 91020.150008 8 91230000010000"
-
-type PaymentMethod = "pix" | "credit_card" | "boleto"
+import type { PaymentData } from "@/lib/actions/payments"
 
 function PedidoContent() {
   const params = useParams()
-  const searchParams = useSearchParams()
   const orderId = params.id as string
-  const method = (searchParams.get("method") ?? "pix") as PaymentMethod
+  const [payment, setPayment] = useState<PaymentData | null>(null)
   const [pixCopied, setPixCopied] = useState(false)
   const [barcodeCopied, setBarcodeCopied] = useState(false)
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem("mp_payment")
+    if (stored) {
+      setPayment(JSON.parse(stored))
+      sessionStorage.removeItem("mp_payment")
+    }
+  }, [])
 
   function copyToClipboard(text: string, setter: (v: boolean) => void) {
     navigator.clipboard.writeText(text).then(() => {
@@ -31,19 +31,22 @@ function PedidoContent() {
     })
   }
 
+  const method = payment?.method ?? "pix"
+  const isApproved = payment?.status === "approved"
+
   return (
     <div className="mx-auto max-w-container px-margin-mobile py-12 md:px-margin-desktop">
       <div className="mx-auto max-w-lg">
 
         {/* Header */}
         <div className="mb-8 text-center">
-          {method === "credit_card" ? (
+          {isApproved ? (
             <CheckCircle2 className="mx-auto h-14 w-14 text-tertiary" />
           ) : (
             <Clock className="mx-auto h-14 w-14 text-primary" />
           )}
           <h1 className="mt-4 font-headline-md text-headline-md text-on-surface">
-            {method === "credit_card" ? "Pagamento aprovado!" : "Pedido criado!"}
+            {isApproved ? "Pagamento aprovado!" : "Pedido criado!"}
           </h1>
           <p className="mt-2 font-body-md text-body-md text-on-surface-variant">
             Pedido <span className="font-label-md text-on-surface">#{orderId}</span>
@@ -67,32 +70,47 @@ function PedidoContent() {
               </p>
             </div>
 
-            <div>
-              <p className="mb-2 font-label-md text-label-md text-on-surface-variant">
-                Código PIX (Copia e Cola)
-              </p>
-              <div className="flex items-start gap-2 rounded-lg border border-outline-variant bg-surface-container-lowest p-3">
-                <p className="flex-1 break-all font-caption text-caption text-on-surface-variant leading-relaxed">
-                  {MOCK_PIX_CODE}
-                </p>
+            {payment?.pixQrBase64 && (
+              <div className="flex justify-center">
+                <div className="relative h-48 w-48 rounded-lg border border-outline-variant bg-white p-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`data:image/png;base64,${payment.pixQrBase64}`}
+                    alt="QR Code PIX"
+                    className="h-full w-full"
+                  />
+                </div>
               </div>
-              <Button
-                variant="outline"
-                className="mt-2 w-full"
-                onClick={() => copyToClipboard(MOCK_PIX_CODE, setPixCopied)}
-                id="btn-copiar-pix"
-              >
-                {pixCopied ? (
-                  <span className="flex items-center gap-2">
-                    <Check className="h-4 w-4" /> Copiado!
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <Copy className="h-4 w-4" /> Copiar código PIX
-                  </span>
-                )}
-              </Button>
-            </div>
+            )}
+
+            {payment?.pixCode && (
+              <div>
+                <p className="mb-2 font-label-md text-label-md text-on-surface-variant">
+                  Código PIX (Copia e Cola)
+                </p>
+                <div className="flex items-start gap-2 rounded-lg border border-outline-variant bg-surface-container-lowest p-3">
+                  <p className="flex-1 break-all font-caption text-caption text-on-surface-variant leading-relaxed">
+                    {payment.pixCode}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="mt-2 w-full"
+                  onClick={() => copyToClipboard(payment.pixCode!, setPixCopied)}
+                  id="btn-copiar-pix"
+                >
+                  {pixCopied ? (
+                    <span className="flex items-center gap-2">
+                      <Check className="h-4 w-4" /> Copiado!
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Copy className="h-4 w-4" /> Copiar código PIX
+                    </span>
+                  )}
+                </Button>
+              </div>
+            )}
 
             <p className="font-caption text-caption text-on-surface-variant text-center">
               Abra o app do seu banco → PIX → Copia e Cola → cole o código acima
@@ -115,40 +133,47 @@ function PedidoContent() {
               </p>
             </div>
 
-            <div>
-              <p className="mb-2 font-label-md text-label-md text-on-surface-variant">
-                Linha digitável
-              </p>
-              <div className="rounded-lg border border-outline-variant bg-surface-container-lowest p-3">
-                <p className="font-caption text-caption text-on-surface tracking-wider">
-                  {MOCK_BARCODE}
+            {payment?.boletoBarcode && (
+              <div>
+                <p className="mb-2 font-label-md text-label-md text-on-surface-variant">
+                  Linha digitável
                 </p>
+                <div className="rounded-lg border border-outline-variant bg-surface-container-lowest p-3">
+                  <p className="font-caption text-caption text-on-surface tracking-wider break-all">
+                    {payment.boletoBarcode}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="mt-2 w-full"
+                  onClick={() => copyToClipboard(payment.boletoBarcode!, setBarcodeCopied)}
+                  id="btn-copiar-boleto"
+                >
+                  {barcodeCopied ? (
+                    <span className="flex items-center gap-2">
+                      <Check className="h-4 w-4" /> Copiado!
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Copy className="h-4 w-4" /> Copiar linha digitável
+                    </span>
+                  )}
+                </Button>
               </div>
-              <Button
-                variant="outline"
-                className="mt-2 w-full"
-                onClick={() => copyToClipboard(MOCK_BARCODE, setBarcodeCopied)}
-                id="btn-copiar-boleto"
-              >
-                {barcodeCopied ? (
-                  <span className="flex items-center gap-2">
-                    <Check className="h-4 w-4" /> Copiado!
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <Copy className="h-4 w-4" /> Copiar código de barras
-                  </span>
-                )}
-              </Button>
-            </div>
+            )}
 
-            <Button className="w-full" id="btn-baixar-boleto">
-              Baixar boleto (PDF)
-            </Button>
+            {payment?.boletoUrl && (
+              <Button asChild className="w-full" id="btn-baixar-boleto">
+                <a href={payment.boletoUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Abrir boleto (PDF)
+                </a>
+              </Button>
+            )}
           </div>
         )}
 
-        {/* Cartão */}
+        {/* Cartão aprovado */}
         {method === "credit_card" && (
           <div className="mt-8 rounded-lg border border-outline-variant bg-surface-container-low p-6">
             <p className="font-body-md text-body-md text-on-surface-variant">
