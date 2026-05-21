@@ -58,7 +58,7 @@ export default function SobrePage() {
             <p>
               O que era uma coleção pequena vendida pelo Instagram virou uma marca com
               identidade própria: peças que carregam a alma do artesanato mineiro e chegam
-              até Arraial d'Ajuda, BA — e a mais de 23 cidades em todo o Brasil.
+              até Arraial d&apos;Ajuda, BA — e a mais de 23 cidades em todo o Brasil.
             </p>
           </div>
         </div>
@@ -86,23 +86,23 @@ export default function SobrePage() {
 
       <Separator className="my-14" />
 
-      {/* Arraial d'Ajuda */}
+      {/* Arraial d&apos;Ajuda */}
       <div className="mx-auto grid max-w-4xl grid-cols-1 gap-12 md:grid-cols-2 md:items-center">
         {/* Placeholder para foto futura */}
         <div className="aspect-[4/3] rounded-xl bg-tertiary-fixed order-last md:order-first" />
 
         <div>
           <h2 className="font-headline-sm text-headline-sm text-on-surface">
-            Arraial d'Ajuda, BA
+            Arraial d&apos;Ajuda, BA
           </h2>
           <div className="mt-4 space-y-4 font-body-lg text-body-lg text-on-surface-variant">
             <p>
-              Nossa loja fica em Arraial d'Ajuda — um dos destinos mais encantadores
+              Nossa loja fica em Arraial d&apos;Ajuda — um dos destinos mais encantadores
               da Bahia. A beleza local inspira cada coleção: as cores vibrantes,
               a leveza do litoral baiano, a energia de quem vive com autenticidade.
             </p>
             <p>
-              As peças são criadas em Minas Gerais e chegam até Arraial d'Ajuda carregando
+              As peças são criadas em Minas Gerais e chegam até Arraial d&apos;Ajuda carregando
               o melhor dos dois mundos: a tradição artesanal mineira e o espírito livre do nordeste.
             </p>
           </div>

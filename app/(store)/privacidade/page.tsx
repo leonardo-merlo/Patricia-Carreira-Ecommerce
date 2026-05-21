@@ -39,7 +39,7 @@ export default function PrivacidadePage() {
           </h2>
           <p>
             A <strong className="text-on-surface">Patrícia Carreira</strong> é uma marca de moda
-            artesanal sediada em Minas Gerais, com loja física em Arraial d'Ajuda (BA) e
+            artesanal sediada em Minas Gerais, com loja física em Arraial d&apos;Ajuda (BA) e
             comércio eletrônico em todo o Brasil. Para os fins desta política, somos o
             <strong className="text-on-surface"> controlador dos dados</strong> coletados neste
             site, em conformidade com a

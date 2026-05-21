@@ -79,6 +79,7 @@ export default function CarrinhoPage() {
                         }
                       />
                     ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={PLACEHOLDER}
                         alt=""

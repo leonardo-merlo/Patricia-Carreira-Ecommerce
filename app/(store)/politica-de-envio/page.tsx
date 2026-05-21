@@ -143,7 +143,7 @@ export default function PoliticaDeEnvioPage() {
           <ul className="ml-5 mt-3 list-disc space-y-2">
             <li>Pelo site dos Correios (rastreamento.correios.com.br) ou da transportadora</li>
             <li>Pela página de status do pedido neste site</li>
-            <li>Pela aba "Meus pedidos" na sua conta (quando disponível)</li>
+            <li>Pela aba &ldquo;Meus pedidos&rdquo; na sua conta (quando disponível)</li>
           </ul>
         </section>
 

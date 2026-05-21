@@ -22,6 +22,7 @@ export function ProductImage({
 
   if (hasError) {
     // next/image não otimiza SVG — usa img nativo para o placeholder
+    // eslint-disable-next-line @next/next/no-img-element
     return (
       <img
         src={PLACEHOLDER}
