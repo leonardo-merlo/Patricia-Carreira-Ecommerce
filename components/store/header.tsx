@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { Menu, ShoppingBag, User, Heart } from "lucide-react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
@@ -26,10 +27,17 @@ export function Header() {
         {/* Logo */}
         <Link
           href="/"
-          className="font-headline-sm text-headline-sm text-on-surface transition-colors hover:text-primary"
+          className="flex items-center transition-opacity hover:opacity-80"
           aria-label="Patrícia Carreira — página inicial"
         >
-          Patrícia Carreira
+          <Image
+            src="/images/logo/logo oficial.png"
+            alt="Patrícia Carreira"
+            width={80}
+            height={64}
+            className="h-14 w-auto object-contain"
+            priority
+          />
         </Link>
 
         {/* Desktop nav */}

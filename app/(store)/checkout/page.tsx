@@ -136,10 +136,11 @@ export default function CheckoutPage() {
   const [cepLoading, setCepLoading] = useState(false)
   const [cepError, setCepError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [sdkLoaded, setSdkLoaded] = useState(false)
 
   useEffect(() => {
-    if (hydrated && cart.items.length === 0) router.replace("/carrinho")
-  }, [hydrated, cart.items.length, router])
+    if (hydrated && cart.items.length === 0 && !loading) router.replace("/carrinho")
+  }, [hydrated, cart.items.length, router, loading])
 
   // Detect card brand from BIN (first 6 digits) via MP SDK
   useEffect(() => {
@@ -216,13 +217,39 @@ export default function CheckoutPage() {
         },
         cardToken,
         paymentMethodId: paymentMethodId || undefined,
+        orderData: {
+          formData: {
+            name: personal.name,
+            email: personal.email,
+            phone: personal.phone,
+            cpf: personal.cpf,
+            address: {
+              street: address.street,
+              number: address.number,
+              complement: address.complement || null,
+              neighborhood: address.neighborhood,
+              city: address.city,
+              state: address.state,
+              zip: address.cep,
+            },
+          },
+          lineItems: cart.items.map((item) => ({
+            variantId: item.variant.id,
+            productName: item.variant.product.name,
+            basePrice: item.variant.product.base_price,
+            quantity: item.quantity,
+          })),
+          discountAmount: cart.discount_amount,
+          shippingAmount: cart.shipping_amount,
+          couponId: null,
+        },
       })
 
       if (!result.ok) throw new Error(result.error)
 
       sessionStorage.setItem("mp_payment", JSON.stringify(result.data))
       clearCart()
-      router.push(`/pedido/${result.data.id}`)
+      router.push(`/pedido/${result.orderId}`)
     } catch (err) {
       setErrors({
         submit: err instanceof Error ? err.message : "Erro ao processar. Tente novamente.",
@@ -240,6 +267,7 @@ export default function CheckoutPage() {
             process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY,
             { locale: "pt-BR" }
           )
+          setSdkLoaded(true)
         }}
       />
 
@@ -476,7 +504,13 @@ export default function CheckoutPage() {
                 <FieldError msg={errors.method} />
 
                 {/* Campos do cartão */}
-                {method === "credit_card" && (
+                {method === "credit_card" && !sdkLoaded && (
+                  <p className="mt-3 flex items-center gap-2 font-caption text-caption text-on-surface-variant">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Carregando sistema de pagamento...
+                  </p>
+                )}
+                {method === "credit_card" && sdkLoaded && (
                   <div className="mt-4 grid grid-cols-1 gap-4 rounded-lg border border-outline-variant bg-surface-container-low p-4 sm:grid-cols-2">
                     <div className="sm:col-span-2">
                       <Label htmlFor="card_number">Número do cartão</Label>
@@ -610,7 +644,7 @@ export default function CheckoutPage() {
                 type="submit"
                 size="lg"
                 className="w-full"
-                disabled={loading}
+                disabled={loading || (method === "credit_card" && !sdkLoaded)}
                 id="btn-finalizar-compra"
               >
                 {loading ? (
@@ -623,9 +657,14 @@ export default function CheckoutPage() {
                 )}
               </Button>
 
-              <p className="mt-3 text-center font-caption text-caption text-on-surface-variant">
-                Seus dados estão protegidos e seguros.
-              </p>
+              <div className="mt-3 flex items-center justify-center gap-1.5 font-caption text-caption text-on-surface-variant">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 2L4 5v6c0 5.25 3.5 10.15 8 11.5C16.5 21.15 20 16.25 20 11V5l-8-3z" fill="currentColor" opacity="0.3"/>
+                  <path d="M12 2L4 5v6c0 5.25 3.5 10.15 8 11.5C16.5 21.15 20 16.25 20 11V5l-8-3z" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Pagamento seguro via Mercado Pago
+              </div>
             </div>
           </div>
         </form>

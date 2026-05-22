@@ -3,6 +3,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ProductGrid } from "@/components/store/product-grid"
 import { HeroCarousel } from "@/components/store/hero-carousel"
+import { CitiesMap } from "@/components/store/cities-map"
 import { MOCK_PRODUCTS } from "@/lib/mock-data"
 
 const CATEGORIES = [
@@ -34,13 +35,6 @@ const CATEGORIES = [
     image: "/images/products/imagens/produto_pagina_79_bata_asteca_0.jpeg",
     overlay: "bg-amber-900/62",
   },
-]
-
-const STATES_PRESENT = [
-  "MG", "SP", "RJ", "BA", "ES", "PR", "SC",
-  "RS", "GO", "DF", "PE", "CE", "PA", "MT",
-  "MS", "PB", "RN", "AL", "SE", "TO", "MA",
-  "PI", "AM",
 ]
 
 const FEATURED = MOCK_PRODUCTS.filter((p) => p.is_active && p.category !== "bazar").slice(0, 4)
@@ -110,16 +104,7 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              {STATES_PRESENT.map((state) => (
-                <span
-                  key={state}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-on-primary/20 font-label-sm text-label-sm text-on-primary"
-                >
-                  {state}
-                </span>
-              ))}
-            </div>
+            <CitiesMap />
           </div>
         </div>
       </section>

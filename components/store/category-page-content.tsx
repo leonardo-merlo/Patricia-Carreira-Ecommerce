@@ -11,6 +11,7 @@ import type { FilterState, Product } from "@/lib/types"
 interface CategoryPageContentProps {
   products: Product[]
   title: string
+  description?: string
   availableSubcategories?: string[]
 }
 
@@ -72,6 +73,7 @@ function applyFilters(products: Product[], filters: FilterState): Product[] {
 export function CategoryPageContent({
   products,
   title,
+  description,
   availableSubcategories = [],
 }: CategoryPageContentProps) {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
@@ -109,10 +111,14 @@ export function CategoryPageContent({
       {/* Page header */}
       <div className="flex items-center justify-between pb-6">
         <div>
-          <h1 className="font-headline-md text-headline-md text-on-surface">{title}</h1>
-          <p className="mt-1 font-body-md text-body-md text-on-surface-variant">
-            {filtered.length} {filtered.length === 1 ? "produto" : "produtos"}
-          </p>
+          <h1 className="font-display-lg text-display-lg-mobile text-primary md:text-display-lg">
+            {title}
+          </h1>
+          {description && (
+            <p className="mt-2 max-w-xl font-body-md text-body-md text-on-surface-variant">
+              {description}
+            </p>
+          )}
         </div>
 
         {/* Mobile filter button */}

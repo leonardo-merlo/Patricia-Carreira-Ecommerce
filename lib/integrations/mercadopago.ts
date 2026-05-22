@@ -4,6 +4,12 @@ const mpConfig = new MercadoPagoConfig({
   accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN!,
 })
 
+function notificationUrl(): string | undefined {
+  const base = process.env.NEXT_PUBLIC_APP_URL
+  if (!base || base.includes('localhost') || base.includes('127.0.0.1')) return undefined
+  return `${base}/api/webhooks/payment`
+}
+
 const paymentClient = new Payment(mpConfig)
 
 export type MPPayer = {
@@ -36,9 +42,7 @@ export async function createPixPayment(
         last_name: payer.lastName,
       },
       description: 'Pedido Patrícia Carreira',
-      notification_url: process.env.NEXT_PUBLIC_APP_URL
-        ? `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/payment`
-        : undefined,
+      notification_url: notificationUrl(),
     },
   })
 
@@ -68,9 +72,7 @@ export async function createBoletoPayment(
         },
       },
       description: 'Pedido Patrícia Carreira',
-      notification_url: process.env.NEXT_PUBLIC_APP_URL
-        ? `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/payment`
-        : undefined,
+      notification_url: notificationUrl(),
     },
   })
 
@@ -104,9 +106,7 @@ export async function createCardPayment(
         }),
       },
       description: 'Pedido Patrícia Carreira',
-      notification_url: process.env.NEXT_PUBLIC_APP_URL
-        ? `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/payment`
-        : undefined,
+      notification_url: notificationUrl(),
     },
   })
 

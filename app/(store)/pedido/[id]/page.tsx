@@ -31,7 +31,7 @@ function PedidoContent() {
     })
   }
 
-  const method = payment?.method ?? "pix"
+  const method = payment?.method
   const isApproved = payment?.status === "approved"
 
   return (
@@ -49,11 +49,11 @@ function PedidoContent() {
             {isApproved ? "Pagamento aprovado!" : "Pedido criado!"}
           </h1>
           <p className="mt-2 font-body-md text-body-md text-on-surface-variant">
-            Pedido <span className="font-label-md text-on-surface">#{orderId}</span>
+            Pedido <span className="font-label-md text-on-surface">#{orderId.slice(0, 8).toUpperCase()}</span>
           </p>
         </div>
 
-        <Separator />
+        {method && <Separator />}
 
         {/* PIX */}
         {method === "pix" && (

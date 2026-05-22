@@ -1,0 +1,77 @@
+import { Resend } from 'resend'
+
+const resend = new Resend(process.env.RESEND_API_KEY)
+
+export type OrderConfirmationInput = {
+  to: string
+  customerName: string
+  orderId: string
+  totalAmount: number
+  paymentMethod: string
+  items: { product_name: string; quantity: number; unit_price: number }[]
+}
+
+const METHOD_LABEL: Record<string, string> = {
+  pix: 'PIX',
+  credit_card: 'Cartão de Crédito',
+  boleto: 'Boleto Bancário',
+}
+
+export async function sendOrderConfirmation(input: OrderConfirmationInput): Promise<void> {
+  const shortId = input.orderId.slice(0, 8).toUpperCase()
+  const total = input.totalAmount.toFixed(2).replace('.', ',')
+  const method = METHOD_LABEL[input.paymentMethod] ?? input.paymentMethod
+  const orderUrl = `${process.env.NEXT_PUBLIC_APP_URL}/pedido/${input.orderId}`
+
+  const itemsHtml = input.items
+    .map(
+      (i) =>
+        `<tr>
+          <td style="padding:6px 0">${i.product_name}</td>
+          <td style="padding:6px 0;text-align:center">${i.quantity}</td>
+          <td style="padding:6px 0;text-align:right">R$ ${(i.unit_price * i.quantity).toFixed(2).replace('.', ',')}</td>
+        </tr>`
+    )
+    .join('')
+
+  const from = process.env.RESEND_FROM || 'onboarding@resend.dev'
+
+  await resend.emails.send({
+    from,
+    to: input.to,
+    subject: `Pedido #${shortId} confirmado — Patrícia Carreira`,
+    html: `
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <body style="font-family:sans-serif;color:#1c1c1e;max-width:560px;margin:0 auto;padding:24px">
+        <h2 style="color:#1c1c1e">Olá, ${input.customerName}! 👋</h2>
+        <p>Seu pedido foi recebido com sucesso.</p>
+
+        <table width="100%" style="border-top:1px solid #e0e0e0;border-bottom:1px solid #e0e0e0;margin:16px 0;padding:12px 0;border-collapse:collapse">
+          <tr style="color:#666;font-size:13px">
+            <th style="text-align:left;padding-bottom:8px">Produto</th>
+            <th style="text-align:center;padding-bottom:8px">Qtd</th>
+            <th style="text-align:right;padding-bottom:8px">Valor</th>
+          </tr>
+          ${itemsHtml}
+        </table>
+
+        <p><strong>Total:</strong> R$ ${total}</p>
+        <p><strong>Pagamento:</strong> ${method}</p>
+        <p><strong>Pedido:</strong> #${shortId}</p>
+
+        <p style="margin-top:24px">
+          <a href="${orderUrl}" style="background:#1c1c1e;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block">
+            Acompanhar pedido
+          </a>
+        </p>
+
+        <p style="margin-top:32px;font-size:13px;color:#999">
+          Qualquer dúvida, entre em contato pelo Instagram
+          <a href="https://instagram.com/patriciacarreira" style="color:#999">@patriciacarreira</a>.
+        </p>
+      </body>
+      </html>
+    `,
+  })
+}

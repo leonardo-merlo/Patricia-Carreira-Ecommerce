@@ -1,6 +1,5 @@
 import type { Metadata } from "next"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
+import Image from "next/image"
 import { Separator } from "@/components/ui/separator"
 
 export const metadata: Metadata = {
@@ -63,8 +62,14 @@ export default function SobrePage() {
           </div>
         </div>
 
-        {/* Placeholder para foto futura */}
-        <div className="aspect-[4/3] rounded-xl bg-primary-fixed" />
+        <div className="relative aspect-[4/3] overflow-hidden rounded-xl">
+          <Image
+            src="/images/refs/otoquedotempoimage.png"
+            alt="O Toque do Tempo — Patrícia Carreira"
+            fill
+            className="object-cover"
+          />
+        </div>
       </div>
 
       <Separator className="my-14" />
@@ -88,8 +93,14 @@ export default function SobrePage() {
 
       {/* Arraial d&apos;Ajuda */}
       <div className="mx-auto grid max-w-4xl grid-cols-1 gap-12 md:grid-cols-2 md:items-center">
-        {/* Placeholder para foto futura */}
-        <div className="aspect-[4/3] rounded-xl bg-tertiary-fixed order-last md:order-first" />
+        <div className="relative aspect-[4/3] overflow-hidden rounded-xl order-last md:order-first">
+          <Image
+            src="/images/refs/arraial.jpg"
+            alt="Arraial d'Ajuda, BA"
+            fill
+            className="object-cover"
+          />
+        </div>
 
         <div>
           <h2 className="font-headline-sm text-headline-sm text-on-surface">
@@ -109,28 +120,6 @@ export default function SobrePage() {
         </div>
       </div>
 
-      <Separator className="my-14" />
-
-      {/* CTA */}
-      <div className="mx-auto max-w-2xl text-center">
-        <h2 className="font-headline-sm text-headline-sm text-on-surface">
-          Conheça a coleção
-        </h2>
-        <p className="mt-2 font-body-lg text-body-lg text-on-surface-variant">
-          Cada peça é feita em quantidade limitada. Quando acaba, não volta.
-        </p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Button asChild size="lg">
-            <Link href="/bolsas">Bolsas</Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <Link href="/vestidos">Vestidos</Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <Link href="/batas">Batas</Link>
-          </Button>
-        </div>
-      </div>
     </div>
   )
 }

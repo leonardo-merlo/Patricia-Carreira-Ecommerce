@@ -1,6 +1,7 @@
 "use client" // filter state mutations require React state + event handlers
 
-import { cn } from "@/lib/utils"
+import { Check } from "lucide-react"
+import { cn, getColorHex, isLightColor } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -158,22 +159,44 @@ export function CategoryFilters({
           <Separator />
           <div className="flex flex-col gap-3">
             <p className="font-label-md text-label-md text-on-surface-variant">Cor</p>
-            {availableColors.map((color) => (
-              <label key={color} className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={filters.colors.includes(color)}
-                  onChange={() =>
-                    onChange({
-                      ...filters,
-                      colors: toggleArray(filters.colors, color),
-                    })
-                  }
-                  className="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"
-                />
-                <span className="font-body-md text-body-md text-on-surface">{color}</span>
-              </label>
-            ))}
+            <div className="flex flex-wrap gap-2">
+              {availableColors.map((color) => {
+                const isActive = filters.colors.includes(color)
+                const hex = getColorHex(color)
+                const useLight = !isLightColor(hex)
+                return (
+                  <button
+                    key={color}
+                    type="button"
+                    title={color}
+                    aria-label={color}
+                    aria-pressed={isActive}
+                    onClick={() =>
+                      onChange({
+                        ...filters,
+                        colors: toggleArray(filters.colors, color),
+                      })
+                    }
+                    className={cn(
+                      "relative h-8 w-8 rounded-lg border-2 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+                      isActive
+                        ? "border-primary ring-2 ring-primary ring-offset-1"
+                        : "border-surface-container-highest hover:border-outline"
+                    )}
+                    style={{ backgroundColor: hex }}
+                  >
+                    {isActive && (
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        <Check
+                          className="h-3.5 w-3.5"
+                          style={{ color: useLight ? "#ffffff" : "#1e1b13" }}
+                        />
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </>
       )}

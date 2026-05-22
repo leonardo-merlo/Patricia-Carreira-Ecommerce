@@ -67,6 +67,7 @@ export default function CategoriaPage({ params }: PageProps) {
       <CategoryPageContent
         products={products}
         title={meta.title}
+        description={meta.description}
       />
     </div>
   )

@@ -313,7 +313,7 @@ const BOLSAS: Product[] = [
     measurements: null,
     created_at: daysAgo(40),
     variants: [
-      { id: uuid(1061), product_id: uuid(107), sku: "BOL-ROMA-NAT-UNICO", size: "Único", color: "Natural", stock_quantity: 4, created_at: daysAgo(40) },
+      { id: uuid(1061), product_id: uuid(107), sku: "BOL-ROMA-NAT-UNICO", size: "Único", color: "Natural", stock_quantity: 0, created_at: daysAgo(40) },
     ],
   },
 
