@@ -1,43 +1,78 @@
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ProductGrid } from "@/components/store/product-grid"
+import { ProductCard } from "@/components/store/product-card"
 import { HeroCarousel } from "@/components/store/hero-carousel"
-import { CitiesMap } from "@/components/store/cities-map"
+import { CitySection } from "@/components/store/city-section"
 import { MOCK_PRODUCTS } from "@/lib/mock-data"
 
 const CATEGORIES = [
   {
-    name: "Bazar",
-    href: "/bazar",
-    description: "Peças especiais",
-    image: "/images/products/imagens/bolsa_nirvana_marinho_0.jpeg",
-    overlay: "bg-orange-900/62",
+    name: "Lançamentos",
+    href: "/lancamentos",
+    description: "Novidades da coleção",
+    image: "/images/products/imagens/produto_pagina_48_vestido_dani_0.jpeg",
+    overlay: "bg-amber-900/35",
   },
   {
     name: "Bolsas",
     href: "/bolsas",
     description: "Tiracolo, tote, clutch",
     image: "/images/products/imagens/bolsa_flora_vinho_0.jpeg",
-    overlay: "bg-red-900/62",
+    overlay: "bg-red-900/35",
   },
   {
-    name: "Vestidos",
-    href: "/vestidos",
-    description: "Linho, algodão, bordados",
-    image: "/images/products/imagens/produto_pagina_57_vestido_fiji_0.jpeg",
-    overlay: "bg-blue-900/62",
-  },
-  {
-    name: "Batas",
-    href: "/batas",
-    description: "Soltas, confortáveis, únicas",
+    name: "Vestuário",
+    href: "/vestuario",
+    description: "Vestidos, batas e mais",
     image: "/images/products/imagens/produto_pagina_79_bata_asteca_0.jpeg",
-    overlay: "bg-amber-900/62",
+    overlay: "bg-blue-900/35",
+  },
+  {
+    name: "Infantil",
+    href: "/infantil",
+    description: "Para os pequenos",
+    image: "/images/products/imagens/produto_pagina_100_bata_bia_0.jpeg",
+    overlay: "bg-pink-900/35",
+  },
+  {
+    name: "Almofadas",
+    href: "/almofadas",
+    description: "Artesanato para o lar",
+    image: "/images/products/imagens/produto_pagina_45_vestido_havana_0.jpeg",
+    overlay: "bg-green-900/35",
+  },
+  {
+    name: "Bazar",
+    href: "/bazar",
+    description: "Peças especiais",
+    image: "/images/products/imagens/bolsa_nirvana_marinho_0.jpeg",
+    overlay: "bg-orange-900/35",
   },
 ]
 
-const FEATURED = MOCK_PRODUCTS.filter((p) => p.is_active && p.category !== "bazar").slice(0, 4)
+const FEATURED_SLUGS = [
+  "bolsa-briana",
+  "bolsa-maia",
+  "bolsa-nirvana",
+  "bolsa-romana",
+  "pochete",
+  "bolsa-liberty",
+  "bolsa-mandala",
+  "mochila-wood-stock",
+  "vestido-havana",
+  "vestido-dani",
+  "vestido-fiji",
+  "vestido-maia",
+  "vestido-viena",
+  "bata-asteca",
+  "bata-yoko",
+]
+
+const slugOrder = new Map(FEATURED_SLUGS.map((s, i) => [s, i]))
+const FEATURED = MOCK_PRODUCTS.filter((p) => FEATURED_SLUGS.includes(p.slug)).sort(
+  (a, b) => (slugOrder.get(a.slug) ?? 99) - (slugOrder.get(b.slug) ?? 99),
+)
 
 export default function HomePage() {
   return (
@@ -47,9 +82,9 @@ export default function HomePage() {
 
       {/* Categorias */}
       <section className="mx-auto max-w-container px-margin-mobile py-16 md:px-margin-desktop">
-        <h2 className="mb-8 font-headline-sm text-headline-sm text-on-surface">Categorias</h2>
+        <h2 className="mb-8 font-headline-sm text-headline-sm font-bold text-on-surface">Categorias</h2>
 
-        <div className="grid grid-cols-2 gap-gutter md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-gutter md:grid-cols-3">
           {CATEGORIES.map(({ name, href, description, image, overlay }) => (
             <Link
               key={href}
@@ -67,47 +102,32 @@ export default function HomePage() {
               <div className={`absolute inset-0 ${overlay}`} />
               {/* Gradient at bottom to make text pop */}
               <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/70 to-transparent" />
-              <div className="relative z-10 mt-auto p-4 text-left">
-                <p className="font-headline-sm text-headline-sm text-white">{name}</p>
-                <p className="mt-1 font-caption text-caption text-white/80">{description}</p>
+              <div className="relative z-10 mt-auto p-3 text-left md:p-4">
+                <p className="font-headline-sm text-sm uppercase text-white md:text-headline-sm">{name}</p>
+                <p className="mt-1 hidden font-label-md text-label-md text-white/80 md:block">{description}</p>
               </div>
             </Link>
           ))}
         </div>
       </section>
 
-      {/* Destaques */}
+      {/* Destaques — 3 colunas × 5 linhas */}
       <section className="mx-auto max-w-container px-margin-mobile pb-20 md:px-margin-desktop">
         <div className="mb-8 flex items-center justify-between">
-          <h2 className="font-headline-sm text-headline-sm text-on-surface">Destaques</h2>
+          <h2 className="font-headline-sm text-headline-sm font-bold text-on-surface">Destaques</h2>
           <Button variant="outline" asChild size="sm">
             <Link href="/bolsas">Ver tudo</Link>
           </Button>
         </div>
-        <ProductGrid products={FEATURED} />
+        <div className="grid grid-cols-3 gap-2 md:grid-cols-5">
+          {FEATURED.map((product) => (
+            <ProductCard key={product.id} product={product} compact />
+          ))}
+        </div>
       </section>
 
       {/* Presença nacional */}
-      <section className="bg-primary">
-        <div className="mx-auto max-w-container px-margin-mobile py-14 md:px-margin-desktop">
-          <div className="grid grid-cols-1 gap-10 md:grid-cols-2 md:items-center">
-            <div>
-              <p className="font-display-lg text-display-lg-mobile text-on-primary md:text-display-lg">
-                23
-              </p>
-              <p className="mt-1 font-headline-sm text-headline-sm text-on-primary">
-                cidades alcançadas
-              </p>
-              <p className="mt-4 max-w-sm font-body-lg text-body-lg text-on-primary/80">
-                Peças artesanais confeccionadas em Minas Gerais e presentes em todo o Brasil.
-                Cada compra leva um pedaço do artesanato mineiro para a sua casa.
-              </p>
-            </div>
-
-            <CitiesMap />
-          </div>
-        </div>
-      </section>
+      <CitySection />
     </>
   )
 }

@@ -69,7 +69,8 @@ const uuid = (n: number) =>
   `00000000-0000-0000-0000-${String(n).padStart(12, "0")}`;
 const daysAgo = (d: number) => new Date(Date.now() - d * 864e5).toISOString();
 
-const img = (filename: string) => `/images/products/imagens/${filename}`;
+const img = (filename: string) => `/images/products/imagens/${filename}`
+const img3 = (filename: string) => `/images/refs3/${filename}`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PERFIS DE USUÁRIO
@@ -112,6 +113,7 @@ const BOLSAS: Product[] = [
     wholesale_price: 287,
     is_active: true,
     images: [
+      img3("bolsa-briana.jpeg"),
       img("bolsa_briana_azul_turquesa_0.jpeg"),
       img("bolsa_briana_mostarda_0.jpeg"),
       img("bolsa_briana_vinho_0.jpeg"),
@@ -272,6 +274,7 @@ const BOLSAS: Product[] = [
     wholesale_price: 341,
     is_active: true,
     images: [
+      img3("bolsa-nirvana.jpeg"),
       img("bolsa_nirvana_azul_turquesa_0.jpeg"),
       img("bolsa_nirvana_marinho_0.jpeg"),
       img("bolsa_nirvana_mostarda_0.jpeg"),
@@ -304,6 +307,7 @@ const BOLSAS: Product[] = [
     wholesale_price: 281,
     is_active: true,
     images: [
+      img3("bolsa-romana.jpeg"),
       img("produto_pagina_37_romana_0.jpeg"),
     ],
     weight_grams: 430,
@@ -385,6 +389,7 @@ const BOLSAS: Product[] = [
     wholesale_price: 239,
     is_active: true,
     images: [
+      img3("pochetes.jpeg"),
       img("produto_pagina_41_pochete_0.jpeg"),
       img("produto_pagina_42_pochete_0.jpeg"),
       img("produto_pagina_43_pochete_0.jpeg"),
@@ -400,6 +405,38 @@ const BOLSAS: Product[] = [
       { id: uuid(1092), product_id: uuid(110), sku: "POCH-V2-UNICO", size: "Único", color: "Variante 2", stock_quantity: 3, created_at: daysAgo(50) },
       { id: uuid(1093), product_id: uuid(110), sku: "POCH-V3-UNICO", size: "Único", color: "Variante 3", stock_quantity: 5, created_at: daysAgo(50) },
       { id: uuid(1094), product_id: uuid(110), sku: "POCH-V4-UNICO", size: "Único", color: "Variante 4", stock_quantity: 2, created_at: daysAgo(50) },
+    ],
+  },
+
+  // ── Bolsa Maia ────────────────────────────────────────────────────────────
+  {
+    id: uuid(111),
+    name: "Bolsa Maia",
+    slug: "bolsa-maia",
+    description:
+      "A Bolsa Maia é uma peça atemporal que une beleza artesanal e funcionalidade. Confeccionada em lona com detalhes em couro legítimo e bordado delicado, é a escolha perfeita para o dia a dia. Alça ajustável, bolso interno e externo — tudo pensado para quem não abre mão de estilo.",
+    category: "bolsas",
+    subcategory: null,
+    base_price: 519,
+    wholesale_price: 311,
+    is_active: true,
+    images: [
+      img3("bolsa-maya..jpeg"),
+      img3("bolsa-maya2.jpeg"),
+      img3("bolsa-maya3.jpeg"),
+      img3("bolsa-maya4.jpeg"),
+      img3("bolsa-maya5.jpeg"),
+    ],
+    weight_grams: 440,
+    length_cm: 28,
+    width_cm: 9,
+    height_cm: 21,
+    measurements: null,
+    created_at: daysAgo(3),
+    variants: [
+      { id: uuid(1101), product_id: uuid(111), sku: "BOL-MAIA-V1-UNICO", size: "Único", color: "Variante 1", stock_quantity: 5, created_at: daysAgo(3) },
+      { id: uuid(1102), product_id: uuid(111), sku: "BOL-MAIA-V2-UNICO", size: "Único", color: "Variante 2", stock_quantity: 4, created_at: daysAgo(3) },
+      { id: uuid(1103), product_id: uuid(111), sku: "BOL-MAIA-V3-UNICO", size: "Único", color: "Variante 3", stock_quantity: 3, created_at: daysAgo(3) },
     ],
   },
 ];
@@ -1544,9 +1581,43 @@ export function getProductBySlug(slug: string): Product | null {
 }
 
 export function getProductsByCategory(
-  category: "bolsas" | "vestidos" | "batas" | "acessorios" | "bazar",
+  category:
+    | "bolsas"
+    | "vestidos"
+    | "batas"
+    | "acessorios"
+    | "bazar"
+    | "vestuario"
+    | "lancamentos"
+    | "infantil"
+    | "almofadas",
   onlyActive = true,
 ): Product[] {
+  if (category === "vestuario") {
+    return MOCK_PRODUCTS.filter(
+      (p) => (!onlyActive || p.is_active) && p.category === "roupas",
+    );
+  }
+
+  if (category === "lancamentos") {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 864e5);
+    const recent = MOCK_PRODUCTS.filter(
+      (p) =>
+        (!onlyActive || p.is_active) &&
+        p.category !== "bazar" &&
+        new Date(p.created_at) > thirtyDaysAgo,
+    );
+    return recent.length > 0
+      ? recent
+      : MOCK_PRODUCTS.filter(
+          (p) => (!onlyActive || p.is_active) && p.category !== "bazar",
+        ).slice(0, 8);
+  }
+
+  if (category === "infantil" || category === "almofadas") {
+    return [];
+  }
+
   const filter: Partial<
     Record<string, { category: string; subcategory: string | null }>
   > = {

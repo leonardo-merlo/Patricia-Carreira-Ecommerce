@@ -10,11 +10,12 @@ import { Separator } from "@/components/ui/separator"
 import { useCart } from "@/lib/cart-context"
 
 const NAV_LINKS = [
-  { label: "Bazar",    href: "/bazar" },
-  { label: "Bolsas",   href: "/bolsas" },
-  { label: "Vestidos", href: "/vestidos" },
-  { label: "Batas",    href: "/batas" },
-  { label: "Sobre nós", href: "/sobre" },
+  { label: "Lançamentos", href: "/lancamentos" },
+  { label: "Bolsas",      href: "/bolsas" },
+  { label: "Vestuário",   href: "/vestuario" },
+  { label: "Bazar",       href: "/bazar" },
+  { label: "Afiliados",   href: "/afiliadas" },
+  { label: "Sobre nós",   href: "/sobre" },
 ] as const
 
 export function Header() {
@@ -23,7 +24,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-outline-variant bg-background/90 backdrop-blur-sm">
-      <div className="mx-auto flex h-16 max-w-container items-center justify-between px-margin-mobile md:px-margin-desktop">
+      <div className="mx-auto flex h-20 max-w-container items-center justify-between px-margin-mobile md:px-margin-desktop">
         {/* Logo */}
         <Link
           href="/"
@@ -46,7 +47,7 @@ export function Header() {
             <Link
               key={href}
               href={href}
-              className="font-label-md text-label-md text-on-surface-variant transition-colors hover:text-on-surface"
+              className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant transition-colors hover:text-on-surface"
             >
               {label}
             </Link>

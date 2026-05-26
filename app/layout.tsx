@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
-import { Playfair_Display, Be_Vietnam_Pro, Work_Sans } from 'next/font/google'
+import { Cormorant_Garamond, DM_Sans } from 'next/font/google'
 import './globals.css'
 
-const playfair = Playfair_Display({
+const cormorant = Cormorant_Garamond({
   subsets: ['latin'],
   weight: ['400', '600', '700'],
   style: ['normal', 'italic'],
@@ -10,17 +10,10 @@ const playfair = Playfair_Display({
   display: 'swap',
 })
 
-const beVietnam = Be_Vietnam_Pro({
+const dmSans = DM_Sans({
   subsets: ['latin'],
   weight: ['400', '600'],
   variable: '--font-be-vietnam',
-  display: 'swap',
-})
-
-const workSans = Work_Sans({
-  subsets: ['latin'],
-  weight: ['600'],
-  variable: '--font-work-sans',
   display: 'swap',
 })
 
@@ -40,7 +33,7 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${playfair.variable} ${beVietnam.variable} ${workSans.variable}`}
+      className={`${cormorant.variable} ${dmSans.variable}`}
     >
       <body className="antialiased">
         {children}

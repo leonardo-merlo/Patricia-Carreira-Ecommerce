@@ -25,58 +25,89 @@ const VALUES = [
 
 export default function SobrePage() {
   return (
-    <div className="mx-auto max-w-container px-margin-mobile py-16 md:px-margin-desktop">
-      {/* Hero da página */}
-      <div className="mx-auto max-w-2xl text-center">
-        <p className="font-label-md text-label-md uppercase tracking-widest text-primary">
-          Nossa História
-        </p>
-        <h1 className="mt-3 font-display-lg text-display-lg-mobile text-on-surface md:text-display-lg">
-          Cada peça,{" "}
-          <span className="italic text-primary">uma história.</span>
-        </h1>
-        <p className="mt-5 font-body-lg text-body-lg text-on-surface-variant">
-          Patrícia Carreira nasceu da vontade de unir técnica e alma em cada ponto.
-          Uma marca de moda artesanal criada em Minas Gerais — onde as mãos habilidosas
-          e a tradição do bordado mineiro inspiram cada coleção.
-        </p>
-      </div>
+    <div>
+      {/* Hero */}
+      <section className="mx-auto max-w-container px-margin-mobile py-16 md:px-margin-desktop">
+        <div className="text-center">
+          <p className="font-label-md text-label-md uppercase tracking-widest text-primary">
+            Nossa História
+          </p>
+          <h1 className="mt-3 font-display-lg text-display-lg-mobile text-on-surface md:text-display-lg">
+            Cada peça,{" "}
+            <span className="italic text-primary">uma história.</span>
+          </h1>
+          <p className="mx-auto mt-5 max-w-2xl font-body-lg text-body-lg text-on-surface-variant">
+            Patrícia Carreira nasceu da vontade de unir técnica e alma em cada ponto.
+            Uma marca de moda artesanal criada em Minas Gerais — onde as mãos habilidosas
+            e a tradição do bordado mineiro inspiram cada coleção.
+          </p>
+        </div>
+      </section>
 
-      <Separator className="my-14" />
+      <Separator />
 
-      {/* A origem */}
-      <div className="mx-auto grid max-w-4xl grid-cols-1 gap-12 md:grid-cols-2 md:items-center">
-        <div>
-          <h2 className="font-headline-sm text-headline-sm text-on-surface">A origem</h2>
-          <div className="mt-4 space-y-4 font-body-lg text-body-lg text-on-surface-variant">
-            <p>
-              Tudo começou com agulha, linha e a recusa em comprar o que todo mundo já tinha.
-              Patrícia aprendeu a bordar com a avó, costurar com a mãe, e com o tempo
-              transformou esse saber em arte — e a arte em profissão.
-            </p>
-            <p>
-              O que era uma coleção pequena vendida pelo Instagram virou uma marca com
-              identidade própria: peças que carregam a alma do artesanato mineiro e chegam
-              até Arraial d&apos;Ajuda, BA — e a mais de 23 cidades em todo o Brasil.
+      {/* Nossa Essência */}
+      <section className="mx-auto max-w-container px-margin-mobile py-14 md:px-margin-desktop">
+        <div className="grid grid-cols-1 gap-12 md:grid-cols-2 md:items-center">
+          <div>
+            <h2 className="font-headline-md text-headline-md font-bold uppercase text-on-surface">
+              Nossa Essência
+            </h2>
+            <div className="mt-4 space-y-4 font-body-lg text-body-lg text-on-surface-variant">
+              <p>
+                Mais do que vestir, acreditamos em criar peças com história.
+              </p>
+              <p>
+                Tudo começou por acaso, quando a dentista Patrícia se viu presa por sua alma de estilista. O que começou como um hobby, aos poucos foi se transformando numa marca cheia de arte e personalidade.
+              </p>
+              <p>
+                Cada peça nasce da mistura entre matéria-prima selecionada, desenhos autorais e o cuidado artesanal presente em cada detalhe.
+              </p>
+              <p>
+                Nossas criações remetem aos bordados de Minas com uma pegada asiática e inspirações em artes tribais, trazendo um estilo leve, colorido e cheio de identidade.
+              </p>
+              <p>
+                Há mais de 20 anos desenvolvemos peças que valorizam o feito à mão, o tempo do processo e a beleza das imperfeições que tornam cada criação única e especial.
+              </p>
+              <p>
+                Tudo aqui é feito com amor, inspiração e boas energias. Acreditamos que quando colocamos alma em cada criação, isso se transforma em algo que vai muito além do visual: transmite sentimento, conexão e autenticidade.
+              </p>
+              <p className="font-semibold text-on-surface">
+                Mais que peças, entregamos energia, arte e essência.
+              </p>
+            </div>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <span className="rounded-full border border-primary px-4 py-1.5 font-label-md text-label-md uppercase tracking-wider text-primary">
+                Feito com Amor
+              </span>
+              <span className="rounded-full border border-primary px-4 py-1.5 font-label-md text-label-md uppercase tracking-wider text-primary">
+                Arte que Conecta
+              </span>
+              <span className="rounded-full border border-primary px-4 py-1.5 font-label-md text-label-md uppercase tracking-wider text-primary">
+                Energia que Transforma
+              </span>
+            </div>
+            <p className="mt-6 font-body-lg text-body-lg italic text-on-surface-variant">
+              Patrícia Carreira ♡
             </p>
           </div>
-        </div>
 
-        <div className="relative aspect-[4/3] overflow-hidden rounded-xl">
-          <Image
-            src="/images/refs/otoquedotempoimage.png"
-            alt="O Toque do Tempo — Patrícia Carreira"
-            fill
-            className="object-cover"
-          />
+          <div className="relative aspect-[4/3] overflow-hidden rounded-xl">
+            <Image
+              src="/images/refs/otoquedotempoimage.png"
+              alt="Nossa Essência — Patrícia Carreira"
+              fill
+              className="object-cover"
+            />
+          </div>
         </div>
-      </div>
+      </section>
 
-      <Separator className="my-14" />
+      <Separator />
 
       {/* Valores */}
-      <div className="mx-auto max-w-4xl">
-        <h2 className="mb-10 text-center font-headline-sm text-headline-sm text-on-surface">
+      <section className="mx-auto max-w-container px-margin-mobile py-14 md:px-margin-desktop">
+        <h2 className="mb-10 text-center font-headline-md text-headline-md font-bold uppercase text-on-surface">
           O que acreditamos
         </h2>
         <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
@@ -87,39 +118,87 @@ export default function SobrePage() {
             </div>
           ))}
         </div>
-      </div>
+      </section>
 
-      <Separator className="my-14" />
+      <Separator />
 
-      {/* Arraial d&apos;Ajuda */}
-      <div className="mx-auto grid max-w-4xl grid-cols-1 gap-12 md:grid-cols-2 md:items-center">
-        <div className="relative aspect-[4/3] overflow-hidden rounded-xl order-last md:order-first">
+      {/* Entre Arraial e O Mundo — full bleed */}
+      <section>
+        {/* Foto da loja */}
+        <div className="relative h-[55vh] w-full overflow-hidden">
           <Image
-            src="/images/refs/arraial.jpg"
-            alt="Arraial d'Ajuda, BA"
+            src="/images/refs2/loja-loja.png"
+            alt="Loja Patrícia Carreira em Arraial d'Ajuda"
             fill
-            className="object-cover"
+            className="object-cover object-center"
+            priority
           />
         </div>
 
-        <div>
-          <h2 className="font-headline-sm text-headline-sm text-on-surface">
-            Arraial d&apos;Ajuda, BA
+        {/* Texto centralizado */}
+        <div className="mx-auto max-w-container px-margin-mobile py-14 text-center md:px-margin-desktop">
+          <h2>
+            <span className="block font-display-lg text-4xl font-bold uppercase leading-tight text-on-surface md:text-5xl">
+              Entre
+            </span>
+            <span className="block font-display-lg text-4xl font-bold uppercase leading-tight text-primary md:text-5xl">
+              Arraial e o Mundo
+            </span>
           </h2>
-          <div className="mt-4 space-y-4 font-body-lg text-body-lg text-on-surface-variant">
+          <div className="mx-auto mt-6 max-w-2xl space-y-4 font-body-lg text-body-lg text-on-surface-variant">
+            <p><strong>Desde 2005, Arraial d&apos;Ajuda - BA faz parte da nossa história.</strong></p>
             <p>
-              Nossa loja fica em Arraial d&apos;Ajuda — um dos destinos mais encantadores
-              da Bahia. A beleza local inspira cada coleção: as cores vibrantes,
-              a leveza do litoral baiano, a energia de quem vive com autenticidade.
+              Foi entre ruas coloridas, arte, natureza e encontros especiais com pessoas de
+              diferentes culturas que <strong>nossa identidade ganhou forma.</strong>
             </p>
             <p>
-              As peças são criadas em Minas Gerais e chegam até Arraial d&apos;Ajuda carregando
-              o melhor dos dois mundos: a tradição artesanal mineira e o espírito livre do nordeste.
+              Arraial é <strong>um lugar mágico</strong>, repleto de pessoas incríveis, liberdade, inspiração e
+              uma energia leve, criativa e cheia de vida.
             </p>
+            <p>
+              Durante mais de 10 anos, nossa marca também esteve presente em Búzios - RJ, levando
+              essa mesma essência para diferentes destinos e{" "}
+              <strong>conectando nossas criações a mulheres do mundo inteiro.</strong>
+            </p>
+            <p><strong>Mais do que moda, criamos peças que carregam história, identidade e conexão.</strong></p>
           </div>
         </div>
-      </div>
 
+        {/* Três fotos lado a lado — sem padding, de borda a borda */}
+        <div className="grid grid-cols-3 gap-[3px] bg-white">
+          <div className="relative aspect-[5/3]">
+            <Image
+              src="/images/refs2/loja-mulher1.jpeg"
+              alt="Loja Patrícia Carreira"
+              fill
+              className="object-cover object-[50%_10%]"
+            />
+          </div>
+          <div className="relative aspect-[5/3]">
+            <Image
+              src="/images/refs2/loja-criança.jpeg"
+              alt="Criança na loja Patrícia Carreira"
+              fill
+              className="object-cover object-[50%_35%]"
+            />
+          </div>
+          <div className="relative aspect-[5/3]">
+            <Image
+              src="/images/refs2/loja-mulher2.jpeg"
+              alt="Loja Patrícia Carreira"
+              fill
+              className="object-cover object-center"
+            />
+          </div>
+        </div>
+
+        {/* Faixa escura com endereço */}
+        <div className="bg-neutral-900 py-5 text-center">
+          <p className="font-label-md text-label-md uppercase tracking-widest text-white">
+            ARRAIAL D&apos;AJUDA • BAHIA • RUA MUCUGÊ, 118
+          </p>
+        </div>
+      </section>
     </div>
   )
 }

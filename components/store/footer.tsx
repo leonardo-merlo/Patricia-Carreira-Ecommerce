@@ -4,11 +4,11 @@ import Link from "next/link"
 import { Instagram } from "lucide-react"
 
 const STORE_LINKS = [
-  { label: "Bazar",    href: "/bazar" },
-  { label: "Bolsas",   href: "/bolsas" },
-  { label: "Vestidos", href: "/vestidos" },
-  { label: "Batas",    href: "/batas" },
-  { label: "Sobre nós", href: "/sobre" },
+  { label: "Lançamentos", href: "/lancamentos" },
+  { label: "Bolsas",      href: "/bolsas" },
+  { label: "Vestuário",   href: "/vestuario" },
+  { label: "Bazar",       href: "/bazar" },
+  { label: "Sobre nós",   href: "/sobre" },
 ]
 
 const INFO_LINKS = [

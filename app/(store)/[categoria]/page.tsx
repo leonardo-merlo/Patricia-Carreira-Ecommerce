@@ -2,8 +2,18 @@ import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import { getProductsByCategory } from "@/lib/mock-data"
 import { CategoryPageContent } from "@/components/store/category-page-content"
+import type { Product } from "@/lib/types"
 
-type Categoria = "bazar" | "bolsas" | "vestidos" | "batas" | "acessorios"
+type Categoria =
+  | "bazar"
+  | "bolsas"
+  | "vestidos"
+  | "batas"
+  | "acessorios"
+  | "vestuario"
+  | "lancamentos"
+  | "infantil"
+  | "almofadas"
 
 const CATEGORY_META: Record<Categoria, { title: string; description: string }> = {
   bazar: {
@@ -31,7 +41,36 @@ const CATEGORY_META: Record<Categoria, { title: string; description: string }> =
     description:
       "Colares, brincos e cintos artesanais que completam qualquer look.",
   },
+  vestuario: {
+    title: "Vestuário",
+    description:
+      "Vestidos, batas, macacões, shorts, saias e muito mais — confeccionados à mão com tecidos naturais.",
+  },
+  lancamentos: {
+    title: "Lançamentos",
+    description:
+      "As novidades mais recentes da Patrícia Carreira. Peças exclusivas em quantidade limitada.",
+  },
+  infantil: {
+    title: "Infantil",
+    description:
+      "Peças artesanais especialmente criadas para os pequenos.",
+  },
+  almofadas: {
+    title: "Almofadas",
+    description:
+      "Almofadas artesanais com bordados manuais. Beleza e conforto para o seu lar.",
+  },
 }
+
+const VESTUARIO_SUBCATEGORIES = [
+  "vestidos",
+  "batas",
+  "macacões",
+  "shorts",
+  "saias",
+  "camisas e tops",
+]
 
 const VALID_CATEGORIAS = Object.keys(CATEGORY_META) as Categoria[]
 
@@ -60,7 +99,22 @@ export default function CategoriaPage({ params }: PageProps) {
   }
 
   const meta = CATEGORY_META[categoria]
-  const products = getProductsByCategory(categoria)
+
+  let products: Product[]
+  let subcategories: string[] | undefined
+
+  if (categoria === "vestuario") {
+    products = getProductsByCategory("vestuario")
+    subcategories = VESTUARIO_SUBCATEGORIES
+  } else if (categoria === "lancamentos") {
+    products = getProductsByCategory("lancamentos")
+  } else if (categoria === "infantil" || categoria === "almofadas") {
+    products = []
+  } else {
+    products = getProductsByCategory(
+      categoria as "bolsas" | "vestidos" | "batas" | "acessorios" | "bazar"
+    )
+  }
 
   return (
     <div className="mx-auto max-w-container px-margin-mobile py-10 md:px-margin-desktop">
@@ -68,6 +122,7 @@ export default function CategoriaPage({ params }: PageProps) {
         products={products}
         title={meta.title}
         description={meta.description}
+        availableSubcategories={subcategories}
       />
     </div>
   )

@@ -111,15 +111,15 @@ const config: Config = {
       spacing: {
         'gutter':           '24px',   // gap entre colunas
         'margin-mobile':    '20px',   // padding horizontal mobile
-        'margin-desktop':   '64px',   // padding horizontal desktop
+        'margin-desktop':   '40px',   // padding horizontal desktop
         'unit':             '8px',    // unidade base (múltiplos de 8)
-        'container-max':    '1280px', // largura máxima do conteúdo
+        'container-max':    '1536px', // largura máxima do conteúdo
       },
 
       // ─── Largura máxima ────────────────────────────────────────────────────
       // Necessário para max-w-container funcionar no Tailwind compilado
       maxWidth: {
-        'container': '1280px',
+        'container': '1536px',
       },
 
       // ─── Família tipográfica ───────────────────────────────────────────────
@@ -130,7 +130,7 @@ const config: Config = {
         'display-lg-mobile': ['var(--font-playfair)', 'Georgia', 'serif'],
         'headline-sm':       ['var(--font-playfair)', 'Georgia', 'serif'],
         'headline-md':       ['var(--font-playfair)', 'Georgia', 'serif'],
-        'label-md':          ['var(--font-work-sans)', 'sans-serif'],
+        'label-md':          ['var(--font-be-vietnam)', 'sans-serif'],
         'body-lg':           ['var(--font-be-vietnam)', 'sans-serif'],
         'body-md':           ['var(--font-be-vietnam)', 'sans-serif'],
         'caption':           ['var(--font-be-vietnam)', 'sans-serif'],

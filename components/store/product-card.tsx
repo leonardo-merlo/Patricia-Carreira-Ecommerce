@@ -9,9 +9,10 @@ import type { Product } from "@/lib/types"
 interface ProductCardProps {
   product: Product
   className?: string
+  compact?: boolean
 }
 
-export function ProductCard({ product, className }: ProductCardProps) {
+export function ProductCard({ product, className, compact = false }: ProductCardProps) {
   const badge = getProductBadge(product)
   const firstImage = product.images[0] ?? null
   const isOutOfStock = badge === "Esgotado"
@@ -22,7 +23,10 @@ export function ProductCard({ product, className }: ProductCardProps) {
       className={cn("group block", className)}
       aria-label={`Ver ${product.name}`}
     >
-      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-surface-container-high">
+      <div className={cn(
+        "relative w-full overflow-hidden rounded-lg bg-surface-container-high",
+        compact ? "aspect-[4/5]" : "aspect-[3/4]"
+      )}>
         {firstImage && (
           <ProductImage
             src={firstImage}

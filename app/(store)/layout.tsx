@@ -2,6 +2,8 @@ import { Header } from '@/components/store/header'
 import { Footer } from '@/components/store/footer'
 import { CartProvider } from '@/lib/cart-context'
 import { AnnouncementBanner } from '@/components/store/announcement-banner'
+import { WhatsAppButton } from '@/components/store/whatsapp-button'
+import { ClientOnlyShell } from '@/components/store/client-only-shell'
 
 export default function StoreLayout({
   children,
@@ -15,6 +17,8 @@ export default function StoreLayout({
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />
+        <WhatsAppButton />
+        <ClientOnlyShell />
       </div>
     </CartProvider>
   )
