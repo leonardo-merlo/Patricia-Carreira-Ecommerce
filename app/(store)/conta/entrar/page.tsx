@@ -1,13 +1,13 @@
 "use client" // form state, supabase auth, router redirect
 
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-export default function EntrarPage() {
+function EntrarForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams.get("next") ?? "/conta"
@@ -36,6 +36,72 @@ export default function EntrarPage() {
   }
 
   return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div>
+        <label
+          htmlFor="email"
+          className="mb-1.5 block font-label-sm text-label-sm text-on-surface"
+        >
+          Email
+        </label>
+        <Input
+          id="email"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          placeholder="seu@email.com"
+        />
+      </div>
+
+      <div>
+        <div className="mb-1.5 flex items-center justify-between">
+          <label
+            htmlFor="password"
+            className="font-label-sm text-label-sm text-on-surface"
+          >
+            Senha
+          </label>
+          <Link
+            href="/conta/recuperar-senha"
+            className="font-label-sm text-label-sm text-primary underline underline-offset-2"
+          >
+            Esqueci minha senha
+          </Link>
+        </div>
+        <Input
+          id="password"
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          placeholder="••••••••"
+        />
+      </div>
+
+      {error && (
+        <p role="alert" className="text-sm text-red-600">
+          {error}
+        </p>
+      )}
+
+      <Button
+        type="submit"
+        size="lg"
+        className="mt-2 w-full"
+        disabled={loading}
+        id="btn-entrar"
+      >
+        {loading ? "Entrando…" : "Entrar"}
+      </Button>
+    </form>
+  )
+}
+
+export default function EntrarPage() {
+  return (
     <div className="mx-auto max-w-container px-margin-mobile py-16 md:px-margin-desktop">
       <div className="mx-auto max-w-md">
         <div className="mb-8 text-center">
@@ -56,67 +122,9 @@ export default function EntrarPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div>
-            <label
-              htmlFor="email"
-              className="mb-1.5 block font-label-sm text-label-sm text-on-surface"
-            >
-              Email
-            </label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="seu@email.com"
-            />
-          </div>
-
-          <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <label
-                htmlFor="password"
-                className="font-label-sm text-label-sm text-on-surface"
-              >
-                Senha
-              </label>
-              <Link
-                href="/conta/recuperar-senha"
-                className="font-label-sm text-label-sm text-primary underline underline-offset-2"
-              >
-                Esqueci minha senha
-              </Link>
-            </div>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-            />
-          </div>
-
-          {error && (
-            <p role="alert" className="text-sm text-red-600">
-              {error}
-            </p>
-          )}
-
-          <Button
-            type="submit"
-            size="lg"
-            className="mt-2 w-full"
-            disabled={loading}
-            id="btn-entrar"
-          >
-            {loading ? "Entrando…" : "Entrar"}
-          </Button>
-        </form>
+        <Suspense>
+          <EntrarForm />
+        </Suspense>
       </div>
     </div>
   )
