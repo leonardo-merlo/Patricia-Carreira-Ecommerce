@@ -30,7 +30,7 @@ export function Footer() {
               Patrícia Carreira
             </p>
             <p className="mt-2 max-w-xs font-body-md text-body-md text-on-surface-variant">
-              Moda artesanal feita à mão em Minas Gerais. Cada peça é única.
+              Arte em movimento. Cada peça é única.
             </p>
             <div className="mt-6 flex items-center gap-4">
               <a

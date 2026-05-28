@@ -25,13 +25,13 @@ export function CitySection() {
       {/* Counter header */}
       <div className="px-margin-mobile text-center md:px-margin-desktop">
         <p className="font-display-lg text-[80px] font-bold leading-none text-on-surface md:text-[108px]">
-          +23
+          BRASIL
         </p>
         <h2 className="mt-2 font-headline-sm text-headline-sm uppercase tracking-widest text-primary">
-          cidades alcançadas
+          entregamos em todo o país
         </h2>
         <p className="mx-auto mt-4 max-w-md font-body-lg text-body-lg text-on-surface-variant">
-          Peças artesanais nascidas em Arraial d&apos;Ajuda presentes por todo o Brasil.
+          Peças nascidas em Minas Gerais, presentes de norte a sul do Brasil.
         </p>
       </div>
 

@@ -17,6 +17,16 @@ export function ProductCard({ product, className, compact = false }: ProductCard
   const firstImage = product.images[0] ?? null
   const isOutOfStock = badge === "Esgotado"
 
+  const availableSizes = product.variants
+    ? [...new Set(
+        product.variants
+          .filter((v) => v.stock_quantity > 0 && v.size)
+          .map((v) => v.size as string)
+      )]
+    : []
+
+  const installmentValue = Math.ceil(product.base_price / 6)
+
   return (
     <Link
       href={`/produto/${product.slug}`}
@@ -55,18 +65,34 @@ export function ProductCard({ product, className, compact = false }: ProductCard
         )}
       </div>
 
-      <div className="mt-3 space-y-1 px-1">
+      <div className="mt-3 space-y-1 px-1 text-center">
         <p className="line-clamp-2 font-body-md text-body-md text-on-surface transition-colors group-hover:text-primary">
           {product.name}
         </p>
-        <p
-          className={cn(
-            "font-label-md text-label-md",
-            isOutOfStock ? "text-on-surface-variant" : "text-on-surface"
-          )}
-        >
-          {isOutOfStock ? "Esgotado" : formatPrice(product.base_price)}
-        </p>
+        {isOutOfStock ? (
+          <p className="font-label-md text-label-md text-on-surface-variant">Esgotado</p>
+        ) : (
+          <>
+            <p className="font-label-md text-label-md text-on-surface">
+              {formatPrice(product.base_price)}
+            </p>
+            <p className="font-caption text-caption text-on-surface-variant">
+              6x de {formatPrice(installmentValue)} sem juros
+            </p>
+          </>
+        )}
+        {availableSizes.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-1 pt-0.5">
+            {availableSizes.map((size) => (
+              <span
+                key={size}
+                className="rounded border border-outline-variant px-1.5 py-0.5 font-caption text-caption text-on-surface-variant"
+              >
+                {size}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </Link>
   )

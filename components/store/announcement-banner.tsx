@@ -18,7 +18,7 @@ const WhatsAppIcon = () => (
 
 const MESSAGES: Message[] = [
   {
-    content: "Ganhe frete grátis nas compras acima de R$ 599,00",
+    content: "Frete grátis nas compras acima de R$ 599,00",
   },
   {
     content: "Compre no site e retire na loja",
@@ -29,13 +29,17 @@ const MESSAGES: Message[] = [
   {
     content: (
       <>
-        Ganhe 10% OFF na sua primeira compra usando o cupom:{" "}
+        10% OFF na sua primeira compra usando o cupom:{" "}
         <strong className="font-semibold tracking-wide">BEMVINDA10</strong>
       </>
     ),
   },
   {
     content: "5% OFF pagamento via PIX",
+  },
+  {
+    content: "Descubra a história por trás de cada peça",
+    cta: { label: "Sobre nós", href: "/sobre" },
   },
   {
     content: (
@@ -54,7 +58,7 @@ const MESSAGES: Message[] = [
   },
 ]
 
-const INTERVAL_MS = 4000
+const INTERVAL_MS = 6500
 
 export function AnnouncementBanner() {
   const [index, setIndex] = useState(0)

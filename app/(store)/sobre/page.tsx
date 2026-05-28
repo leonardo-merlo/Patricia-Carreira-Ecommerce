@@ -10,8 +10,8 @@ export const metadata: Metadata = {
 
 const VALUES = [
   {
-    title: "Feito à mão",
-    body: "Cada ponto, cada bordado e cada costura é feita manualmente. Não existe linha de produção — existe uma oficina com tempo e intenção.",
+    title: "Design autoral",
+    body: "Cada coleção nasce de desenhos exclusivos criados pela Patrícia — bordados, estampas e formas que carregam identidade e não se repetem em lugar nenhum.",
   },
   {
     title: "Materiais naturais",
