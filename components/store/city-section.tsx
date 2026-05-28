@@ -24,14 +24,11 @@ export function CitySection() {
     <section className="overflow-hidden bg-surface-container-low pt-8 pb-16">
       {/* Counter header */}
       <div className="px-margin-mobile text-center md:px-margin-desktop">
-        <p className="font-display-lg text-[80px] font-bold leading-none text-on-surface md:text-[108px]">
-          BRASIL
-        </p>
-        <h2 className="mt-2 font-headline-sm text-headline-sm uppercase tracking-widest text-primary">
-          entregamos em todo o país
+        <h2 className="font-display-lg text-[28px] font-bold uppercase tracking-widest text-primary md:text-[34px]">
+          Entregamos em todo o país
         </h2>
         <p className="mx-auto mt-4 max-w-md font-body-lg text-body-lg text-on-surface-variant">
-          Peças nascidas em Minas Gerais, presentes de norte a sul do Brasil.
+          Peças nascidas em Minas Gerais, ganhando vida por todo o Brasil.
         </p>
       </div>
 
