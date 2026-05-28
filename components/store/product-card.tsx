@@ -18,11 +18,11 @@ export function ProductCard({ product, className, compact = false }: ProductCard
   const isOutOfStock = badge === "Esgotado"
 
   const availableSizes = product.variants
-    ? [...new Set(
+    ? Array.from(new Set(
         product.variants
           .filter((v) => v.stock_quantity > 0 && v.size)
           .map((v) => v.size as string)
-      )]
+      ))
     : []
 
   const installmentValue = Math.ceil(product.base_price / 6)
