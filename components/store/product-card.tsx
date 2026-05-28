@@ -42,7 +42,7 @@ export function ProductCard({ product, className, compact = false }: ProductCard
             src={firstImage}
             alt={product.name}
             className={cn(
-              "object-cover transform-gpu transition-transform duration-500 group-hover:scale-105",
+              "object-cover transform-gpu will-change-transform transition-transform duration-500 group-hover:scale-105",
               isOutOfStock && "opacity-60"
             )}
           />
