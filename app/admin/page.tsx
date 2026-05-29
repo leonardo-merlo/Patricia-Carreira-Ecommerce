@@ -6,19 +6,13 @@ import {
   getDashboardCriticalStock,
 } from '@/lib/supabase/admin-queries'
 
-const STATUS_MAP: Record<string, { cls: string; txt: string }> = {
-  pending: { cls: 'pendente', txt: 'Pendente' },
-  paid: { cls: 'pago', txt: 'Pago' },
-  separating: { cls: 'pendente', txt: 'Separando' },
-  confirmed: { cls: 'pago', txt: 'Confirmado' },
-  in_production: { cls: 'producao', txt: 'Em Produção' },
-  shipped: { cls: 'enviado', txt: 'Enviado' },
-  delivered: { cls: 'enviado', txt: 'Entregue' },
-  cancelled: { cls: 'cancelado', txt: 'Cancelado' },
-}
-
-function getStatusDisplay(status: string) {
-  return STATUS_MAP[status] ?? { cls: 'neutral', txt: status }
+const ENTREGA_MAP: Record<string, { cls: string; txt: string } | null> = {
+  pending:    null,
+  paid:       null,
+  separating: { cls: 'pendente',  txt: 'Separando' },
+  shipped:    { cls: 'pago',      txt: 'Enviado' },
+  delivered:  { cls: 'enviado',   txt: 'Entregue' },
+  cancelled:  { cls: 'cancelado', txt: 'Cancelado' },
 }
 
 function getCategoryThumb(category: string): string {
@@ -68,10 +62,10 @@ export default async function AdminDashboard() {
       dot: kpiColors[1],
     },
     {
-      label: 'Estoque crítico',
-      value: String(kpis.low_stock_count),
+      label: 'Pedidos em aberto',
+      value: String(kpis.open_orders),
       unit: undefined,
-      trend: { warn: kpis.low_stock_count > 0, text: 'variantes com estoque ≤ 3' },
+      trend: { text: 'aguardando conclusão' },
       dot: kpiColors[2],
     },
     {
@@ -92,7 +86,6 @@ export default async function AdminDashboard() {
         </div>
         <div className="page-actions">
           <button className="btn"><AdminIcon name="download" /> Exportar</button>
-          <button className="btn primary" id="btn-nova-venda"><AdminIcon name="plus" /> Nova venda</button>
         </div>
       </div>
 
@@ -108,13 +101,7 @@ export default async function AdminDashboard() {
               {k.value}
             </div>
             <div className="kpi-trend">
-              {k.trend.warn ? (
-                <span style={{ color: 'var(--yellow)', display: 'flex', gap: 4, alignItems: 'center', fontWeight: 500 }}>
-                  <AdminIcon name="alert" size={11} /> {k.trend.text}
-                </span>
-              ) : (
-                <span>{k.trend.text}</span>
-              )}
+              <span>{k.trend.text}</span>
             </div>
             <svg className="kpi-spark" width="80" height="28" viewBox="0 0 80 28" fill="none">
               <path d={sparkPaths[i]} stroke={k.dot} strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -142,7 +129,7 @@ export default async function AdminDashboard() {
                     <th>Cliente</th>
                     <th style={{ width: 88 }}>Tipo</th>
                     <th style={{ width: 110 }}>Valor</th>
-                    <th style={{ width: 130 }}>Status</th>
+                    <th style={{ width: 120 }}>Entrega</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -153,7 +140,7 @@ export default async function AdminDashboard() {
                       </td>
                     </tr>
                   ) : orders.map((o) => {
-                    const status = getStatusDisplay(o.status)
+                    const entrega = ENTREGA_MAP[o.status] ?? null
                     const initials = o.customer_name.split(' ').map((s) => s[0]).slice(0, 2).join('')
                     const isAtacado = o.type === 'Atacado'
                     return (
@@ -181,10 +168,10 @@ export default async function AdminDashboard() {
                         </td>
                         <td className="num">{formatPrice(o.total)}</td>
                         <td>
-                          <span className={`badge ${status.cls}`}>
-                            <span className="dot" />
-                            {status.txt}
-                          </span>
+                          {entrega
+                            ? <span className={`badge ${entrega.cls}`}><span className="dot" />{entrega.txt}</span>
+                            : <span className="cust-meta">—</span>
+                          }
                         </td>
                       </tr>
                     )

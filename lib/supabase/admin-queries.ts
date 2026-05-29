@@ -6,6 +6,7 @@ import type { ProductWithVariants } from '@/lib/types'
 export type DashboardKPIs = {
   orders_today: number
   revenue_month: number
+  open_orders: number
   low_stock_count: number
   open_ops: number
 }
@@ -35,7 +36,7 @@ export async function getDashboardKPIs(): Promise<DashboardKPIs> {
   today.setHours(0, 0, 0, 0)
   const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
 
-  const [todayRes, revenueRes, opsRes, lowRes] = await Promise.all([
+  const [todayRes, revenueRes, opsRes, lowRes, openRes] = await Promise.all([
     supabase
       .from('orders')
       .select('*', { count: 'exact', head: true })
@@ -56,6 +57,12 @@ export async function getDashboardKPIs(): Promise<DashboardKPIs> {
       .from('product_variants')
       .select('*', { count: 'exact', head: true })
       .lte('stock_quantity', 3),
+
+    supabase
+      .from('orders')
+      .select('*', { count: 'exact', head: true })
+      .neq('status', 'delivered')
+      .neq('status', 'cancelled'),
   ])
 
   const revenue = (revenueRes.data ?? []).reduce(
@@ -66,6 +73,7 @@ export async function getDashboardKPIs(): Promise<DashboardKPIs> {
   return {
     orders_today: todayRes.count ?? 0,
     revenue_month: revenue,
+    open_orders: openRes.count ?? 0,
     low_stock_count: lowRes.count ?? 0,
     open_ops: opsRes.count ?? 0,
   }
