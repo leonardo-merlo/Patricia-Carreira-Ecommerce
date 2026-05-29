@@ -7,6 +7,7 @@ import { signOut } from "@/lib/actions/auth"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { UpdateNameForm } from "./update-name-form"
+import { UpdateAddressForm } from "./update-address-form"
 
 export const metadata: Metadata = {
   title: "Minha Conta | Patrícia Carreira",
@@ -21,13 +22,18 @@ export default async function ContaPage() {
 
   if (!user) redirect("/conta/entrar")
 
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("name")
-    .eq("id", user.id)
-    .single()
+  const [profileRes, customerRes] = await Promise.all([
+    supabase.from("user_profiles").select("name").eq("id", user.id).single(),
+    supabase.from("customers").select("address").eq("user_id", user.id).maybeSingle(),
+  ])
 
-  const displayName = profile?.name ?? user.email
+  const displayName = profileRes.data?.name ?? user.email
+
+  type CustomerAddress = {
+    street: string; number: string; complement: string | null
+    neighborhood: string; city: string; state: string; zip: string
+  }
+  const address = (customerRes.data?.address ?? null) as CustomerAddress | null
 
   return (
     <div className="mx-auto max-w-container px-margin-mobile py-16 md:px-margin-desktop">
@@ -54,6 +60,11 @@ export default async function ContaPage() {
       </div>
 
       <Separator className="my-10" />
+
+      {/* Endereço */}
+      <div className="mb-10 max-w-2xl">
+        <UpdateAddressForm currentAddress={address} />
+      </div>
 
       {/* Atalhos */}
       <div className="grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-2">
