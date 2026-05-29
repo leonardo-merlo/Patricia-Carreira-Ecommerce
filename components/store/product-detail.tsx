@@ -11,11 +11,14 @@ import { cn, formatPrice, getColorHex, isLightColor } from "@/lib/utils"
 import { getProductBadge } from "@/lib/utils"
 import { useCart } from "@/lib/cart-context"
 import { ProductCard } from "@/components/store/product-card"
+import { WishlistButton } from "@/components/store/wishlist-button"
 import type { ProductWithVariants, ProductVariant, Product } from "@/lib/types"
 
 interface ProductDetailProps {
   product: ProductWithVariants
   relatedProducts?: Product[]
+  initialIsFavorited?: boolean
+  isLoggedIn?: boolean
 }
 
 function getCategoryLink(
@@ -31,7 +34,12 @@ function getCategoryLink(
   return { label: "Loja", href: "/" }
 }
 
-export function ProductDetail({ product, relatedProducts = [] }: ProductDetailProps) {
+export function ProductDetail({
+  product,
+  relatedProducts = [],
+  initialIsFavorited = false,
+  isLoggedIn = false,
+}: ProductDetailProps) {
   const [activeImageIndex, setActiveImageIndex] = useState(0)
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({})
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
@@ -327,14 +335,11 @@ export function ProductDetail({ product, relatedProducts = [] }: ProductDetailPr
                   "Adicionar ao carrinho"
                 )}
               </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                className="px-4"
-                aria-label="Adicionar aos favoritos"
-              >
-                <Heart className="h-5 w-5" />
-              </Button>
+              <WishlistButton
+                productId={product.id}
+                initialIsFavorited={initialIsFavorited}
+                isLoggedIn={isLoggedIn}
+              />
             </div>
 
             {/* Tabela de medidas */}

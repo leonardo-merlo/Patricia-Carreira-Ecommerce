@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import { getProductBySlug, getProductsByCategory } from "@/lib/supabase/products"
+import { isProductInWishlist } from "@/lib/actions/wishlist"
+import { createClient } from "@/lib/supabase/server"
 import { ProductDetail } from "@/components/store/product-detail"
 
 interface PageProps {
@@ -35,15 +37,24 @@ export default async function ProdutoPage({ params }: PageProps) {
 
   if (!product) notFound()
 
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const isLoggedIn = !!user
+
   const categoryKey = getCategoryKey(product.category, product.subcategory)
-  const relatedProducts = (await getProductsByCategory(categoryKey))
-    .filter((p) => p.id !== product.id)
-    .slice(0, 4)
+  const [relatedProducts, initialIsFavorited] = await Promise.all([
+    getProductsByCategory(categoryKey).then((ps) =>
+      ps.filter((p) => p.id !== product.id).slice(0, 4)
+    ),
+    isProductInWishlist(product.id),
+  ])
 
   return (
     <ProductDetail
       product={product}
       relatedProducts={relatedProducts}
+      initialIsFavorited={initialIsFavorited}
+      isLoggedIn={isLoggedIn}
     />
   )
 }

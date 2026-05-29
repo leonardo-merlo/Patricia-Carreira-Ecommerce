@@ -1,6 +1,10 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { Heart } from "lucide-react"
+import { createClient } from "@/lib/supabase/server"
+import { getWishlistProducts } from "@/lib/actions/wishlist"
+import { ProductCard } from "@/components/store/product-card"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 
@@ -9,7 +13,16 @@ export const metadata: Metadata = {
   description: "Suas peças favoritas salvas em um só lugar.",
 }
 
-export default function FavoritosPage() {
+export default async function FavoritosPage() {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) redirect("/conta/entrar?redirect=/conta/favoritos")
+
+  const products = await getWishlistProducts()
+
   return (
     <div className="mx-auto max-w-container px-margin-mobile py-16 md:px-margin-desktop">
       {/* Header */}
@@ -21,66 +34,57 @@ export default function FavoritosPage() {
           Suas{" "}
           <span className="italic text-primary">favoritas</span>
         </h1>
-        <p className="mt-5 font-body-lg text-body-lg text-on-surface-variant">
-          Salve as peças que você ama para não perder quando elas esgotarem.
-        </p>
+        {products.length > 0 && (
+          <p className="mt-5 font-body-lg text-body-lg text-on-surface-variant">
+            {products.length === 1
+              ? "1 peça salva"
+              : `${products.length} peças salvas`}
+          </p>
+        )}
       </div>
 
       <Separator className="my-12" />
 
-      {/* Empty state — auth não implementada ainda */}
-      <div className="mx-auto max-w-sm text-center">
-        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary-fixed">
-          <Heart className="h-9 w-9 text-primary" />
+      {products.length === 0 ? (
+        <div className="mx-auto max-w-sm text-center">
+          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary-fixed">
+            <Heart className="h-9 w-9 text-primary" />
+          </div>
+          <h2 className="font-headline-sm text-headline-sm text-on-surface">
+            Nenhum favorito ainda
+          </h2>
+          <p className="mt-3 font-body-md text-body-md text-on-surface-variant">
+            Clique no coração em qualquer produto para salvá-lo aqui.
+          </p>
+          <div className="mt-8 flex flex-col gap-3">
+            <Button asChild size="lg" className="w-full" id="btn-explorar-favoritos">
+              <Link href="/bolsas">Ver bolsas</Link>
+            </Button>
+            <Button asChild variant="outline" size="lg" className="w-full">
+              <Link href="/vestidos">Ver vestidos</Link>
+            </Button>
+            <Button asChild variant="ghost" size="lg" className="w-full">
+              <Link href="/">Ir para a loja</Link>
+            </Button>
+          </div>
         </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-6 lg:grid-cols-4">
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
 
-        <h2 className="font-headline-sm text-headline-sm text-on-surface">
-          Nenhum favorito ainda
-        </h2>
-        <p className="mt-3 font-body-md text-body-md text-on-surface-variant">
-          Para salvar suas peças favoritas, você precisará ter uma conta.
-          O sistema de login estará disponível em breve.
-        </p>
+          <Separator className="my-12" />
 
-        <div className="mt-8 flex flex-col gap-3">
-          <Button asChild size="lg" className="w-full" id="btn-explorar-favoritos">
-            <Link href="/bolsas">Ver bolsas</Link>
-          </Button>
-          <Button asChild variant="outline" size="lg" className="w-full">
-            <Link href="/vestidos">Ver vestidos</Link>
-          </Button>
-          <Button asChild variant="ghost" size="lg" className="w-full">
-            <Link href="/">Ir para a loja</Link>
-          </Button>
-        </div>
-      </div>
-
-      <Separator className="my-12" />
-
-      {/* Sugestão de navegação */}
-      <div className="mx-auto max-w-2xl text-center">
-        <h2 className="font-headline-sm text-headline-sm text-on-surface">
-          Explore a coleção
-        </h2>
-        <p className="mt-2 font-body-md text-body-md text-on-surface-variant">
-          Cada peça é feita em quantidade limitada. Clique no coração
-          em qualquer produto para adicioná-lo aos seus favoritos.
-        </p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Button asChild variant="outline">
-            <Link href="/bazar">Bazar</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/bolsas">Bolsas</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/vestidos">Vestidos</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/batas">Batas</Link>
-          </Button>
-        </div>
-      </div>
+          <div className="text-center">
+            <Button asChild variant="outline">
+              <Link href="/">Continuar explorando</Link>
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
