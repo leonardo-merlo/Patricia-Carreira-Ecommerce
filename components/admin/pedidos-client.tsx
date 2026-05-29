@@ -1,6 +1,6 @@
 "use client" // tabs + expanded order rows state
 
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { AdminIcon } from '@/components/admin/admin-icon'
 import { formatPrice } from '@/lib/utils'
 import type { RetailOrderRow } from '@/lib/supabase/admin-queries'
@@ -148,8 +148,8 @@ export function PedidosClient({ varejo }: PedidosClientProps) {
                     const isExpanded = expandedOrder === o.id
                     const initials = o.customer_name.split(' ').map((s) => s[0]).slice(0, 2).join('')
                     return (
-                      <>
-                        <tr key={o.id} style={isExpanded ? { background: 'var(--surface-2)' } : {}}>
+                      <Fragment key={o.id}>
+                        <tr style={isExpanded ? { background: 'var(--surface-2)' } : {}}>
                           <td>
                             <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11.5, color: 'var(--text-2)' }}>
                               {o.display_num}
@@ -254,7 +254,7 @@ export function PedidosClient({ varejo }: PedidosClientProps) {
                             </td>
                           </tr>
                         )}
-                      </>
+                      </Fragment>
                     )
                   })
                 )}
