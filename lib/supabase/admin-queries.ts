@@ -160,7 +160,11 @@ export type RetailOrderRow = {
   item_count: number
   total: number
   payment_method: string | null
+  payment_status: string
   status: string
+  tracking_code: string | null
+  nfe_url: string | null
+  nfe_number: string | null
   items: RetailOrderItemRow[]
   address: {
     street: string
@@ -179,7 +183,7 @@ export async function getRetailOrders(limit = 50): Promise<RetailOrderRow[]> {
   const { data, error } = await supabase
     .from('orders')
     .select(`
-      id, created_at, total_amount, status, payment_method,
+      id, created_at, total_amount, status, payment_status, payment_method, tracking_code, nfe_url, nfe_number,
       customer:customers(name, address),
       items:order_items(
         id, quantity, unit_price,
@@ -240,9 +244,37 @@ export async function getRetailOrders(limit = 50): Promise<RetailOrderRow[]> {
       item_count: items.length,
       total: Number(o.total_amount),
       payment_method: o.payment_method as string | null,
+      payment_status: (o.payment_status as string) ?? 'pending',
       status: o.status as string,
+      tracking_code: (o.tracking_code as string | null) ?? null,
+      nfe_url: (o.nfe_url as string | null) ?? null,
+      nfe_number: (o.nfe_number as string | null) ?? null,
       items,
       address,
     }
   })
+}
+
+// ─── Sidebar counts ───────────────────────────────────────────────────────────
+
+export async function getSidebarCounts(): Promise<{ open_orders: number; low_stock: number }> {
+  const supabase = createServiceClient()
+
+  const [ordersRes, stockRes] = await Promise.all([
+    supabase
+      .from('orders')
+      .select('*', { count: 'exact', head: true })
+      .neq('status', 'delivered')
+      .neq('status', 'cancelled'),
+
+    supabase
+      .from('product_variants')
+      .select('*', { count: 'exact', head: true })
+      .lte('stock_quantity', 3),
+  ])
+
+  return {
+    open_orders: ordersRes.count ?? 0,
+    low_stock: stockRes.count ?? 0,
+  }
 }

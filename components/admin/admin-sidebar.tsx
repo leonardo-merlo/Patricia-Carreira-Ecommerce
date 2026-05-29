@@ -4,13 +4,10 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { AdminIcon } from './admin-icon'
 
-const primaryNav = [
-  { href: '/admin', label: 'Dashboard', icon: 'home' as const },
-  { href: '/admin/pedidos', label: 'Pedidos', icon: 'bag' as const, badge: '24' },
-  { href: '/admin/estoque', label: 'Estoque', icon: 'box' as const, badge: '3', badgeAlert: true },
-  { href: '/admin/materias', label: 'Matérias-Primas', icon: 'layers' as const },
-  { href: '/admin/producao', label: 'Produção', icon: 'wrench' as const, badge: '8' },
-]
+interface AdminSidebarProps {
+  openOrders: number
+  lowStock: number
+}
 
 const secondaryNav = [
   { href: '/admin/relatorios', label: 'Relatórios', icon: 'trendUp' as const },
@@ -19,13 +16,21 @@ const secondaryNav = [
   { href: '/admin/config', label: 'Configurações', icon: 'settings' as const },
 ]
 
-export function AdminSidebar() {
+export function AdminSidebar({ openOrders, lowStock }: AdminSidebarProps) {
   const pathname = usePathname()
 
   const isActive = (href: string) => {
     if (href === '/admin') return pathname === '/admin'
     return pathname.startsWith(href)
   }
+
+  const primaryNav = [
+    { href: '/admin', label: 'Dashboard', icon: 'home' as const, badge: null, badgeAlert: false },
+    { href: '/admin/pedidos', label: 'Pedidos', icon: 'bag' as const, badge: openOrders > 0 ? String(openOrders) : null, badgeAlert: false },
+    { href: '/admin/estoque', label: 'Estoque', icon: 'box' as const, badge: lowStock > 0 ? String(lowStock) : null, badgeAlert: lowStock > 0 },
+    { href: '/admin/materias', label: 'Matérias-Primas', icon: 'layers' as const, badge: null, badgeAlert: false },
+    { href: '/admin/producao', label: 'Produção', icon: 'wrench' as const, badge: null, badgeAlert: false },
+  ]
 
   return (
     <aside className="sidebar">

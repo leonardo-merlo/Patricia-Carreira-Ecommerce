@@ -9,28 +9,24 @@ interface PedidosClientProps {
   varejo: RetailOrderRow[]
 }
 
-const STATUS_MAP: Record<string, { cls: string; txt: string }> = {
+const PAYMENT_STATUS_MAP: Record<string, { cls: string; txt: string }> = {
   pending: { cls: 'pendente', txt: 'Pendente' },
   paid: { cls: 'pago', txt: 'Pago' },
-  separating: { cls: 'pendente', txt: 'Separando' },
-  confirmed: { cls: 'pago', txt: 'Confirmado' },
-  in_production: { cls: 'producao', txt: 'Em Produção' },
-  shipped: { cls: 'enviado', txt: 'Enviado' },
-  delivered: { cls: 'enviado', txt: 'Entregue' },
-  cancelled: { cls: 'cancelado', txt: 'Cancelado' },
+  failed: { cls: 'cancelado', txt: 'Falhou' },
 }
 
-function getStatusDisplay(status: string) {
-  return STATUS_MAP[status] ?? { cls: 'neutral', txt: status }
+const ENTREGA_MAP: Record<string, { cls: string; txt: string }> = {
+  pending:    { cls: 'neutral',   txt: '—' },
+  paid:       { cls: 'neutral',   txt: 'A preparar' },
+  separating: { cls: 'pendente',  txt: 'Separando' },
+  shipped:    { cls: 'pago',      txt: 'Enviado' },
+  delivered:  { cls: 'enviado',   txt: 'Entregue' },
+  cancelled:  { cls: 'cancelado', txt: 'Cancelado' },
 }
 
-function getPaymentDisplay(method: string | null): string {
+function getPaymentMethodLabel(method: string | null): string {
   if (!method) return '—'
-  const map: Record<string, string> = {
-    pix: 'PIX',
-    credit_card: 'Cartão',
-    boleto: 'Boleto',
-  }
+  const map: Record<string, string> = { pix: 'PIX', credit_card: 'Cartão de crédito', boleto: 'Boleto' }
   return map[method] ?? method
 }
 
@@ -135,8 +131,8 @@ export function PedidosClient({ varejo }: PedidosClientProps) {
                     <th style={{ width: 70 }}>Itens</th>
                     <th style={{ width: 110 }}>Total</th>
                     <th style={{ width: 110 }}>Pagamento</th>
-                    <th style={{ width: 130 }}>Status</th>
-                    <th style={{ width: 80 }}>Ações</th>
+                    <th style={{ width: 110 }}>Entrega</th>
+                    <th style={{ width: 50 }}>Ações</th>
                   </tr>
                 ) : (
                   <tr>
@@ -155,14 +151,15 @@ export function PedidosClient({ varejo }: PedidosClientProps) {
                 {tab === 'varejo' && (
                   filteredVarejo.length === 0 ? (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--text-3)' }}>
+                      <td colSpan={9} style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--text-3)' }}>
                         Nenhum pedido encontrado.
                       </td>
                     </tr>
                   ) : filteredVarejo.map((o) => {
-                    const status = getStatusDisplay(o.status)
                     const isExpanded = expandedOrder === o.id
                     const initials = o.customer_name.split(' ').map((s) => s[0]).slice(0, 2).join('')
+                    const payBadge = PAYMENT_STATUS_MAP[o.payment_status] ?? { cls: 'neutral', txt: o.payment_status }
+                    const entrega = ENTREGA_MAP[o.status] ?? { cls: 'neutral', txt: '—' }
                     return (
                       <Fragment key={o.id}>
                         <tr style={isExpanded ? { background: 'var(--surface-2)' } : {}}>
@@ -188,11 +185,16 @@ export function PedidosClient({ varejo }: PedidosClientProps) {
                           </td>
                           <td className="num">{o.item_count}</td>
                           <td className="num" style={{ fontWeight: 500 }}>{formatPrice(o.total)}</td>
-                          <td className="cust-meta">{getPaymentDisplay(o.payment_method)}</td>
                           <td>
-                            <span className={`badge ${status.cls}`}>
-                              <span className="dot" />{status.txt}
+                            <span className={`badge ${payBadge.cls}`}>
+                              <span className="dot" />{payBadge.txt}
                             </span>
+                          </td>
+                          <td>
+                            {entrega.txt === '—'
+                              ? <span className="cust-meta">—</span>
+                              : <span className={`badge ${entrega.cls}`}><span className="dot" />{entrega.txt}</span>
+                            }
                           </td>
                           <td>
                             <div className="row" style={{ justifyContent: 'flex-end', gap: 4 }}>
@@ -207,16 +209,15 @@ export function PedidosClient({ varejo }: PedidosClientProps) {
                           </td>
                         </tr>
                         {isExpanded && (
-                          <tr key={`${o.id}-detail`} className="child">
-                            <td colSpan={8} style={{ padding: 0, height: 'auto' }}>
+                          <tr>
+                            <td colSpan={9} style={{ padding: 0, borderBottom: 'none' }}>
                               <div style={{
                                 display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr',
                                 background: 'var(--surface)', borderTop: '1px solid var(--border)',
                               }}>
+                                {/* Itens */}
                                 <div style={{ padding: 16, borderRight: '1px solid var(--border)' }}>
-                                  <div className="cust-meta" style={{ marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 500 }}>
-                                    Itens
-                                  </div>
+                                  <div className="cust-meta" style={{ marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 500 }}>Itens</div>
                                   {o.items.length === 0 ? (
                                     <div className="cust-meta" style={{ fontSize: 12 }}>Sem itens registrados.</div>
                                   ) : o.items.map((it, idx) => (
@@ -224,26 +225,25 @@ export function PedidosClient({ varejo }: PedidosClientProps) {
                                       display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0',
                                       borderBottom: idx < o.items.length - 1 ? '1px dashed var(--border)' : 'none',
                                     }}>
-                                      <div className="thumb bag" style={{ width: 28, height: 28 }}>
+                                      <div className="thumb bag" style={{ width: 28, height: 28, flexShrink: 0 }}>
                                         <AdminIcon name="bag" size={12} />
                                       </div>
-                                      <div style={{ flex: 1 }}>
+                                      <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ fontSize: 12.5, fontWeight: 500 }}>{it.name}</div>
                                         <div className="cust-meta tiny">{it.sku} · Qtd. {it.quantity}</div>
                                       </div>
-                                      <div className="num" style={{ fontSize: 12.5 }}>{formatPrice(it.unit_price)}</div>
+                                      <div className="num" style={{ fontSize: 12.5, flexShrink: 0 }}>{formatPrice(it.unit_price)}</div>
                                     </div>
                                   ))}
                                   <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 600 }}>
                                     <span>Total</span><span>{formatPrice(o.total)}</span>
                                   </div>
                                 </div>
+                                {/* Endereço */}
                                 <div style={{ padding: 16, borderRight: '1px solid var(--border)' }}>
-                                  <div className="cust-meta" style={{ marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 500 }}>
-                                    Endereço de envio
-                                  </div>
+                                  <div className="cust-meta" style={{ marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 500 }}>Endereço de envio</div>
                                   {o.address ? (
-                                    <div style={{ fontSize: 12.5, lineHeight: 1.55 }}>
+                                    <div style={{ fontSize: 12.5, lineHeight: 1.6 }}>
                                       <div style={{ fontWeight: 500 }}>{o.customer_name}</div>
                                       <div>{o.address.street}, {o.address.number}{o.address.complement ? `, ${o.address.complement}` : ''}</div>
                                       <div>{o.address.neighborhood} · {o.address.city}/{o.address.state}</div>
@@ -253,17 +253,35 @@ export function PedidosClient({ varejo }: PedidosClientProps) {
                                     <div className="cust-meta" style={{ fontSize: 12 }}>Endereço não disponível.</div>
                                   )}
                                 </div>
-                                <div style={{ padding: 16 }}>
-                                  <div className="cust-meta" style={{ marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 500 }}>
-                                    Pagamento
+                                {/* Pagamento & Envio */}
+                                <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                                  <div>
+                                    <div className="cust-meta" style={{ marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 500 }}>Pagamento</div>
+                                    <div style={{ fontSize: 12.5, fontWeight: 500 }}>{getPaymentMethodLabel(o.payment_method)}</div>
+                                    <div style={{ marginTop: 3 }}>
+                                      {(() => {
+                                        const p = PAYMENT_STATUS_MAP[o.payment_status] ?? { cls: 'neutral', txt: o.payment_status }
+                                        return <span className={`badge ${p.cls}`} style={{ fontSize: 11 }}><span className="dot" />{p.txt}</span>
+                                      })()}
+                                    </div>
                                   </div>
-                                  <div style={{ fontSize: 12.5, lineHeight: 1.55 }}>
-                                    <div><b>{getPaymentDisplay(o.payment_method)}</b></div>
+                                  <div>
+                                    <div className="cust-meta" style={{ marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 500 }}>Rastreio</div>
+                                    {o.tracking_code ? (
+                                      <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, fontWeight: 600, color: 'var(--accent)', letterSpacing: '0.04em' }}>{o.tracking_code}</div>
+                                    ) : (
+                                      <div className="cust-meta" style={{ fontSize: 12 }}>Não disponível</div>
+                                    )}
                                   </div>
-                                  <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                    <button className="btn primary sm"><AdminIcon name="truck" size={11} /> Marcar como Enviado</button>
-                                    <button className="btn sm"><AdminIcon name="eye" size={11} /> Ver detalhes</button>
-                                    <button className="btn sm danger-outline"><AdminIcon name="x" size={11} /> Cancelar pedido</button>
+                                  <div>
+                                    <div className="cust-meta" style={{ marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 500 }}>Nota fiscal</div>
+                                    {o.nfe_url ? (
+                                      <a href={o.nfe_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'underline', fontWeight: 500 }}>
+                                        NF-e {o.nfe_number} — Ver DANFE
+                                      </a>
+                                    ) : (
+                                      <div className="cust-meta" style={{ fontSize: 12 }}>Não emitida</div>
+                                    )}
                                   </div>
                                 </div>
                               </div>
