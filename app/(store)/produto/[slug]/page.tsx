@@ -1,19 +1,14 @@
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
-import { getProductBySlug, getProductsByCategory, MOCK_PRODUCTS } from "@/lib/mock-data"
+import { getProductBySlug, getProductsByCategory } from "@/lib/supabase/products"
 import { ProductDetail } from "@/components/store/product-detail"
-import type { ProductWithVariants } from "@/lib/types"
 
 interface PageProps {
   params: { slug: string }
 }
 
-export function generateStaticParams() {
-  return MOCK_PRODUCTS.map((p) => ({ slug: p.slug }))
-}
-
-export function generateMetadata({ params }: PageProps): Metadata {
-  const product = getProductBySlug(params.slug)
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const product = await getProductBySlug(params.slug)
   if (!product) return {}
   return {
     title: `${product.name} | Patrícia Carreira`,
@@ -27,7 +22,7 @@ export function generateMetadata({ params }: PageProps): Metadata {
 function getCategoryKey(
   category: string,
   subcategory: string | null
-): "bolsas" | "vestidos" | "batas" | "acessorios" | "bazar" {
+): string {
   if (category === "roupas" && subcategory === "vestidos") return "vestidos"
   if (category === "roupas" && subcategory === "batas") return "batas"
   if (category === "bolsas") return "bolsas"
@@ -35,19 +30,19 @@ function getCategoryKey(
   return "acessorios"
 }
 
-export default function ProdutoPage({ params }: PageProps) {
-  const product = getProductBySlug(params.slug)
+export default async function ProdutoPage({ params }: PageProps) {
+  const product = await getProductBySlug(params.slug)
 
   if (!product) notFound()
 
   const categoryKey = getCategoryKey(product.category, product.subcategory)
-  const relatedProducts = getProductsByCategory(categoryKey)
+  const relatedProducts = (await getProductsByCategory(categoryKey))
     .filter((p) => p.id !== product.id)
     .slice(0, 4)
 
   return (
     <ProductDetail
-      product={product as ProductWithVariants}
+      product={product}
       relatedProducts={relatedProducts}
     />
   )

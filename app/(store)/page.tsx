@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { ProductCard } from "@/components/store/product-card"
 import { HeroCarousel } from "@/components/store/hero-carousel"
 import { CitySection } from "@/components/store/city-section"
-import { MOCK_PRODUCTS } from "@/lib/mock-data"
+import { getFeaturedProducts } from "@/lib/supabase/products"
 
 const CATEGORIES = [
   {
@@ -69,12 +69,9 @@ const FEATURED_SLUGS = [
   "bata-yoko",
 ]
 
-const slugOrder = new Map(FEATURED_SLUGS.map((s, i) => [s, i]))
-const FEATURED = MOCK_PRODUCTS.filter((p) => FEATURED_SLUGS.includes(p.slug)).sort(
-  (a, b) => (slugOrder.get(a.slug) ?? 99) - (slugOrder.get(b.slug) ?? 99),
-)
+export default async function HomePage() {
+  const FEATURED = await getFeaturedProducts(FEATURED_SLUGS)
 
-export default function HomePage() {
   return (
     <>
       {/* Hero carousel */}

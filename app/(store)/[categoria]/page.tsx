@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
-import { getProductsByCategory } from "@/lib/mock-data"
+import { getProductsByCategory } from "@/lib/supabase/products"
 import { CategoryPageContent } from "@/components/store/category-page-content"
 import type { Product } from "@/lib/types"
 
@@ -91,7 +91,7 @@ export function generateMetadata({ params }: PageProps): Metadata {
   }
 }
 
-export default function CategoriaPage({ params }: PageProps) {
+export default async function CategoriaPage({ params }: PageProps) {
   const categoria = params.categoria as Categoria
 
   if (!VALID_CATEGORIAS.includes(categoria)) {
@@ -104,16 +104,14 @@ export default function CategoriaPage({ params }: PageProps) {
   let subcategories: string[] | undefined
 
   if (categoria === "vestuario") {
-    products = getProductsByCategory("vestuario")
+    products = await getProductsByCategory("vestuario")
     subcategories = VESTUARIO_SUBCATEGORIES
   } else if (categoria === "lancamentos") {
-    products = getProductsByCategory("lancamentos")
+    products = await getProductsByCategory("lancamentos")
   } else if (categoria === "infantil" || categoria === "almofadas") {
     products = []
   } else {
-    products = getProductsByCategory(
-      categoria as "bolsas" | "vestidos" | "batas" | "acessorios" | "bazar"
-    )
+    products = await getProductsByCategory(categoria)
   }
 
   return (

@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import type { Product, ProductBadge } from '@/lib/types'
 
 export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs))
@@ -43,4 +44,16 @@ export function isLightColor(hex: string): boolean {
   const g = parseInt(clean.slice(2, 4), 16)
   const b = parseInt(clean.slice(4, 6), 16)
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5
+}
+
+export function getProductBadge(product: Product): ProductBadge {
+  const totalStock = (product.variants ?? []).reduce(
+    (sum, v) => sum + v.stock_quantity,
+    0,
+  )
+  if (totalStock === 0) return 'Esgotado'
+  if (totalStock === 1) return 'Última Peça'
+  const sevenDaysAgo = new Date(Date.now() - 7 * 864e5)
+  if (new Date(product.created_at) > sevenDaysAgo) return 'Lançamento'
+  return null
 }

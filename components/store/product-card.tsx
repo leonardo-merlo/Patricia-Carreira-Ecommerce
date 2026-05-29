@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { formatPrice } from "@/lib/utils"
-import { getProductBadge } from "@/lib/mock-data"
+import { getProductBadge } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { ProductImage } from "@/components/store/product-image"
 import type { Product } from "@/lib/types"
