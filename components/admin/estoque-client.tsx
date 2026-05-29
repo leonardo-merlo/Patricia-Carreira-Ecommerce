@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useState, useEffect, useRef } from 'react'
+import { Fragment, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AdminIcon } from '@/components/admin/admin-icon'
 import { formatPrice } from '@/lib/utils'
@@ -36,20 +36,6 @@ function variantLabel(v: ProductVariant): string {
   return v.sku
 }
 
-// ─── Three-dots menu ──────────────────────────────────────────────────────────
-
-type MenuState = { id: string; kind: 'product' | 'variant' } | null
-
-function useOutsideClick(ref: React.RefObject<HTMLElement>, onClose: () => void) {
-  useEffect(() => {
-    function handle(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
-    }
-    document.addEventListener('mousedown', handle)
-    return () => document.removeEventListener('mousedown', handle)
-  }, [ref, onClose])
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function EstoqueClient({ products }: EstoqueClientProps) {
@@ -71,11 +57,6 @@ export function EstoqueClient({ products }: EstoqueClientProps) {
   const [editProduct, setEditProduct] = useState<ProductWithVariants | null>(null)
   const [adjustTarget, setAdjustTarget] = useState<AdjustStockTarget | null>(null)
 
-  // Three-dots menu
-  const [menu, setMenu] = useState<MenuState>(null)
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
-  const menuRef = useRef<HTMLDivElement>(null!)
-  useOutsideClick(menuRef, () => { setMenu(null); setMenuPos(null) })
 
   // ─── Filtering ──────────────────────────────────────────────────────────────
 
@@ -112,16 +93,6 @@ export function EstoqueClient({ products }: EstoqueClientProps) {
     setExpanded((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
-  function openMenu(e: React.MouseEvent, id: string, kind: 'product' | 'variant') {
-    e.stopPropagation()
-    if (menu?.id === id) { setMenu(null); setMenuPos(null); return }
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const menuWidth = 180
-    const left = Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8)
-    setMenuPos({ top: rect.bottom + 4, left })
-    setMenu({ id, kind })
-  }
-
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -130,45 +101,6 @@ export function EstoqueClient({ products }: EstoqueClientProps) {
       {drawer === 'create' && <ProdutoDrawer mode="create" onClose={() => setDrawer(null)} />}
       {editProduct && <ProdutoDrawer mode="edit" product={editProduct} onClose={() => setEditProduct(null)} />}
       {adjustTarget && <AdjustStockModal target={adjustTarget} onClose={() => setAdjustTarget(null)} />}
-
-      {/* Three-dots menu portal */}
-      {menu && (
-        <div
-          ref={menuRef}
-          style={{
-            position: 'fixed', zIndex: 100, background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 8, boxShadow: '0 8px 24px rgba(20,20,30,0.12)', minWidth: 180, padding: '4px 0',
-            top: menuPos?.top ?? 0, left: menuPos?.left ?? 0,
-          }}
-          id="dots-menu"
-        >
-          {menu.kind === 'product' && (() => {
-            const p = products.find((x) => x.id === menu.id)
-            if (!p) return null
-            const isActive = statusOverrides.has(p.id) ? statusOverrides.get(p.id)! : p.is_active
-            return (
-              <>
-                <MenuOption icon="edit" label="Editar produto" onClick={() => { setEditProduct(p); setMenu(null) }} />
-                <MenuOption icon={isActive ? 'xCircle' : 'checkCircle'} label={isActive ? 'Arquivar produto' : 'Ativar produto'} onClick={() => { handleToggle(p.id, isActive); setMenu(null) }} />
-              </>
-            )
-          })()}
-          {menu.kind === 'variant' && (() => {
-            let foundV: ProductVariant | undefined
-            for (const p of products) {
-              foundV = p.variants.find((v) => v.id === menu.id)
-              if (foundV) break
-            }
-            if (!foundV) return null
-            const v = foundV
-            return (
-              <>
-                <MenuOption icon="plus" label="Ajustar estoque" onClick={() => { setAdjustTarget({ variantId: v.id, sku: v.sku, currentStock: v.stock_quantity }); setMenu(null) }} />
-              </>
-            )
-          })()}
-        </div>
-      )}
 
       <div className="page-header">
         <div>
@@ -284,14 +216,6 @@ export function EstoqueClient({ products }: EstoqueClientProps) {
                             <button className="icon-btn" title="Editar" onClick={() => setEditProduct(p)}>
                               <AdminIcon name="edit" size={13} />
                             </button>
-                            <button
-                              className="icon-btn"
-                              title="Mais opções"
-                              onClick={(e) => openMenu(e, p.id, 'product')}
-                              data-menu-id={p.id}
-                            >
-                              <AdminIcon name="moreH" size={14} />
-                            </button>
                           </div>
                         </td>
                       </tr>
@@ -314,18 +238,11 @@ export function EstoqueClient({ products }: EstoqueClientProps) {
                           <td>
                             <div className="row" style={{ justifyContent: 'flex-end', gap: 4 }}>
                               <button
-                                className="btn sm ghost"
+                                className="icon-btn"
                                 title="Ajustar estoque"
                                 onClick={() => setAdjustTarget({ variantId: v.id, sku: v.sku, currentStock: v.stock_quantity })}
                               >
-                                <AdminIcon name="plus" size={11} /> Estoque
-                              </button>
-                              <button
-                                className="icon-btn"
-                                title="Mais opções"
-                                onClick={(e) => openMenu(e, v.id, 'variant')}
-                              >
-                                <AdminIcon name="moreH" size={14} />
+                                <AdminIcon name="edit" size={13} />
                               </button>
                             </div>
                           </td>
@@ -343,29 +260,3 @@ export function EstoqueClient({ products }: EstoqueClientProps) {
   )
 }
 
-// ─── Menu option helper ───────────────────────────────────────────────────────
-
-function MenuOption({ icon, label, onClick, danger }: {
-  icon: Parameters<typeof AdminIcon>[0]['name']
-  label: string
-  onClick: () => void
-  danger?: boolean
-}) {
-  return (
-    <button
-      style={{
-        display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-        padding: '7px 14px', border: 'none', background: 'transparent',
-        textAlign: 'left', fontSize: 12.5, cursor: 'pointer',
-        color: danger ? 'var(--red)' : 'var(--text)',
-        fontFamily: 'inherit',
-      }}
-      onMouseOver={(e) => (e.currentTarget.style.background = 'var(--surface-hover)')}
-      onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
-      onClick={onClick}
-    >
-      <AdminIcon name={icon} size={13} />
-      {label}
-    </button>
-  )
-}

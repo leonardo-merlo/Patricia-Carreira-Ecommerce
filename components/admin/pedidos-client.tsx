@@ -54,8 +54,19 @@ const ATACADO_STATUS: Record<string, { cls: string; txt: string }> = {
 export function PedidosClient({ varejo }: PedidosClientProps) {
   const [tab, setTab] = useState<'varejo' | 'atacado'>('varejo')
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null)
+  const [searchFilter, setSearchFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
 
-  const varejoTotal = varejo.reduce((s, o) => s + o.total, 0)
+  const filteredVarejo = varejo.filter((o) => {
+    if (statusFilter && o.status !== statusFilter) return false
+    if (searchFilter.trim()) {
+      const q = searchFilter.toLowerCase()
+      if (!o.customer_name.toLowerCase().includes(q) && !o.display_num.toLowerCase().includes(q)) return false
+    }
+    return true
+  })
+
+  const varejoTotal = filteredVarejo.reduce((s, o) => s + o.total, 0)
 
   return (
     <div className="page">
@@ -67,7 +78,7 @@ export function PedidosClient({ varejo }: PedidosClientProps) {
           </p>
         </div>
         <div className="page-actions">
-          <button className="btn"><AdminIcon name="download" /> Exportar</button>
+          <button className="btn" onClick={() => alert('Exportar CSV — em breve')}><AdminIcon name="download" /> Exportar</button>
           {tab === 'atacado' && (
             <button className="btn primary" id="btn-novo-pedido-atacado">
               <AdminIcon name="plus" /> Novo pedido atacado
@@ -90,15 +101,20 @@ export function PedidosClient({ varejo }: PedidosClientProps) {
           <div className="row" style={{ gap: 8, flex: 1 }}>
             <div className="search-input" style={{ width: 240 }}>
               <AdminIcon name="search" size={13} />
-              <input placeholder={tab === 'varejo' ? 'Buscar por cliente ou pedido...' : 'Buscar por cliente, CNPJ...'} />
+              <input
+                placeholder={tab === 'varejo' ? 'Buscar por cliente ou pedido...' : 'Buscar por cliente, CNPJ...'}
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+              />
             </div>
-            <select className="select" style={{ width: 'auto' }}>
-              <option>Todos os status</option>
-              <option>Pago</option>
-              <option>Pendente</option>
-              <option>Em Produção</option>
-              <option>Enviado</option>
-              <option>Cancelado</option>
+            <select className="select" style={{ width: 'auto' }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="">Todos os status</option>
+              <option value="paid">Pago</option>
+              <option value="pending">Pendente</option>
+              <option value="separating">Separando</option>
+              <option value="shipped">Enviado</option>
+              <option value="delivered">Entregue</option>
+              <option value="cancelled">Cancelado</option>
             </select>
           </div>
           {tab === 'varejo' && (
@@ -137,13 +153,13 @@ export function PedidosClient({ varejo }: PedidosClientProps) {
               </thead>
               <tbody>
                 {tab === 'varejo' && (
-                  varejo.length === 0 ? (
+                  filteredVarejo.length === 0 ? (
                     <tr>
                       <td colSpan={8} style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--text-3)' }}>
-                        Nenhum pedido de varejo ainda.
+                        Nenhum pedido encontrado.
                       </td>
                     </tr>
-                  ) : varejo.map((o) => {
+                  ) : filteredVarejo.map((o) => {
                     const status = getStatusDisplay(o.status)
                     const isExpanded = expandedOrder === o.id
                     const initials = o.customer_name.split(' ').map((s) => s[0]).slice(0, 2).join('')
@@ -182,11 +198,11 @@ export function PedidosClient({ varejo }: PedidosClientProps) {
                             <div className="row" style={{ justifyContent: 'flex-end', gap: 4 }}>
                               <button
                                 className="icon-btn"
+                                title={isExpanded ? 'Fechar detalhes' : 'Ver detalhes'}
                                 onClick={() => setExpandedOrder(isExpanded ? null : o.id)}
                               >
                                 <AdminIcon name={isExpanded ? 'chevUp' : 'chevDown'} size={12} />
                               </button>
-                              <button className="icon-btn"><AdminIcon name="moreH" size={14} /></button>
                             </div>
                           </td>
                         </tr>
