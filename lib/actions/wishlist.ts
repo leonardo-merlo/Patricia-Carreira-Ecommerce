@@ -12,7 +12,10 @@ export async function toggleWishlist(
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) return { ok: false, error: 'login_required' }
+  if (!user) {
+    console.error('[wishlist] user not authenticated')
+    return { ok: false, error: 'login_required' }
+  }
 
   const { data: existing } = await supabase
     .from('wishlists')
@@ -23,7 +26,10 @@ export async function toggleWishlist(
 
   if (existing) {
     const { error } = await supabase.from('wishlists').delete().eq('id', existing.id)
-    if (error) return { ok: false, error: 'Erro ao remover favorito' }
+    if (error) {
+      console.error('[wishlist] delete error:', error)
+      return { ok: false, error: 'Erro ao remover favorito' }
+    }
     revalidatePath('/conta/favoritos')
     return { ok: true, isFavorited: false }
   }
@@ -31,7 +37,10 @@ export async function toggleWishlist(
   const { error } = await supabase
     .from('wishlists')
     .insert({ user_id: user.id, product_id: productId })
-  if (error) return { ok: false, error: 'Erro ao salvar favorito' }
+  if (error) {
+    console.error('[wishlist] insert error:', error)
+    return { ok: false, error: 'Erro ao salvar favorito' }
+  }
   revalidatePath('/conta/favoritos')
   return { ok: true, isFavorited: true }
 }
