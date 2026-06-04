@@ -12,6 +12,7 @@ interface AdminSidebarProps {
 const secondaryNav = [
   { href: '/admin/relatorios', label: 'Relatórios', icon: 'trendUp' as const },
   { href: '/admin/afiliados', label: 'Afiliadas', icon: 'tag' as const },
+  { href: '/admin/cupons', label: 'Cupons', icon: 'creditCard' as const },
   { href: '/admin/clientes', label: 'Clientes', icon: 'users' as const },
   { href: '/admin/fornecedores', label: 'Fornecedores', icon: 'truck' as const },
   { href: '/admin/config', label: 'Configurações', icon: 'settings' as const },

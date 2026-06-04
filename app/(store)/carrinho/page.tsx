@@ -1,6 +1,6 @@
 "use client" // cart state via useCart()
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { ShoppingBag, Trash2, Plus, Minus, Tag, X } from "lucide-react"
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useCart } from "@/lib/cart-context"
 import { formatPrice } from "@/lib/utils"
+import { validateCoupon } from "@/lib/actions/coupons"
 
 const PLACEHOLDER = "/images/placeholder-product.svg"
 
@@ -17,13 +18,25 @@ export default function CarrinhoPage() {
   const { cart, hydrated, removeItem, updateQuantity, applyCoupon, removeCoupon } = useCart()
   const [couponInput, setCouponInput] = useState("")
   const [couponError, setCouponError] = useState("")
+  const [couponPending, startCouponTransition] = useTransition()
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({})
 
   if (!hydrated) return null
 
   function handleCoupon() {
-    // Placeholder — coupon validation will call Supabase in a future session
-    setCouponError("Cupom inválido ou expirado.")
+    if (!couponInput.trim()) return
+    startCouponTransition(async () => {
+      const { coupon, error } = await validateCoupon(couponInput.trim(), cart.subtotal)
+      if (error) {
+        setCouponError(error)
+        return
+      }
+      if (coupon) {
+        applyCoupon(coupon)
+        setCouponInput("")
+        setCouponError("")
+      }
+    })
   }
 
   const isEmpty = cart.items.length === 0
@@ -228,10 +241,10 @@ export default function CarrinhoPage() {
                   <Button
                     variant="outline"
                     onClick={handleCoupon}
-                    disabled={!couponInput.trim()}
+                    disabled={!couponInput.trim() || couponPending}
                     id="btn-aplicar-cupom"
                   >
-                    Aplicar
+                    {couponPending ? "..." : "Aplicar"}
                   </Button>
                 </div>
                 {couponError && (
