@@ -466,3 +466,54 @@ export type ShippingQuote = {
     height_cm: number;
   };
 };
+
+// ─── Financeiro ───────────────────────────────────────────────────────────────
+
+export const EXPENSE_CATEGORIES = [
+  'Aluguel',
+  'Matéria-Prima',
+  'Marketing',
+  'Frete / Logística',
+  'Fornecedores',
+  'Serviços / Software',
+  'Impostos',
+  'Salários',
+  'Outros',
+] as const
+
+export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number]
+
+export type PaymentMethod =
+  | 'pix'
+  | 'boleto'
+  | 'cartao'
+  | 'dinheiro'
+  | 'transferencia'
+
+export type RecurrenceMonths = 1 | 12
+
+export type AccountPayable = {
+  id: string
+  description: string
+  amount: number
+  due_date: string
+  paid_at: string | null
+  category: ExpenseCategory
+  creditor: string | null
+  payment_method: PaymentMethod | null
+  is_recurring: boolean
+  recurrence_months: RecurrenceMonths | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type AccountPayableStatus = 'pending' | 'overdue' | 'paid'
+
+export function getAccountStatus(account: AccountPayable): AccountPayableStatus {
+  if (account.paid_at !== null) return 'paid'
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const due = new Date(account.due_date + 'T00:00:00')
+  return due < today ? 'overdue' : 'pending'
+}
