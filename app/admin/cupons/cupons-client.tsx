@@ -21,6 +21,7 @@ type DraftCoupon = {
   description: string
   min_order_value: string
   max_uses: string
+  max_uses_per_user: string
   valid_from: string
   valid_until: string
   is_active: boolean
@@ -33,6 +34,7 @@ const emptyDraft = (): DraftCoupon => ({
   description: '',
   min_order_value: '0',
   max_uses: '',
+  max_uses_per_user: '',
   valid_from: new Date().toISOString().slice(0, 10),
   valid_until: '',
   is_active: true,
@@ -101,6 +103,7 @@ export function CuponsClient({ initialCoupons }: Props) {
       description: c.description ?? '',
       min_order_value: String(c.min_order_value),
       max_uses: c.max_uses !== null ? String(c.max_uses) : '',
+      max_uses_per_user: c.max_uses_per_user !== null ? String(c.max_uses_per_user) : '',
       valid_from: isoToInputDate(c.valid_from),
       valid_until: isoToInputDate(c.valid_until),
       is_active: c.is_active,
@@ -123,6 +126,7 @@ export function CuponsClient({ initialCoupons }: Props) {
       description: draft.description || null,
       min_order_value: parseFloat(draft.min_order_value) || 0,
       max_uses: draft.max_uses ? parseInt(draft.max_uses) : null,
+      max_uses_per_user: draft.max_uses_per_user ? parseInt(draft.max_uses_per_user) : null,
       valid_from: couponToISODate(draft.valid_from),
       valid_until: draft.valid_until ? couponToISODate(draft.valid_until) : null,
       is_active: draft.is_active,
@@ -425,7 +429,7 @@ export function CuponsClient({ initialCoupons }: Props) {
               </div>
 
               <div className="field">
-                <label>Limite de usos</label>
+                <label>Limite de usos <span style={{ fontSize: 10.5, color: 'var(--text-3)' }}>(total geral)</span></label>
                 <input
                   className="input"
                   type="number"
@@ -436,6 +440,20 @@ export function CuponsClient({ initialCoupons }: Props) {
                   id="input-cupom-max-usos"
                 />
               </div>
+            </div>
+
+            <div className="field">
+              <label>Limite por usuário <span style={{ fontSize: 10.5, color: 'var(--text-3)' }}>(vazio = sem limite)</span></label>
+              <input
+                className="input"
+                type="number"
+                min={1}
+                value={draft.max_uses_per_user}
+                onChange={e => setDraft({ ...draft, max_uses_per_user: e.target.value })}
+                placeholder="Ex: 1 (cada cliente usa uma vez)"
+                id="input-cupom-max-usos-por-usuario"
+                data-testid="input-cupom-max-usos-por-usuario"
+              />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

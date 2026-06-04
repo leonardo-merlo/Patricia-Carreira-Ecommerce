@@ -169,7 +169,8 @@ export type Coupon = {
   type: CouponType;
   value: number; // 50 = 50% ou R$50,00 dependendo do type
   min_order_value: number; // pedido mínimo para aplicar (0 = sem mínimo)
-  max_uses: number | null; // null = ilimitado
+  max_uses: number | null; // null = ilimitado (global)
+  max_uses_per_user: number | null; // null = sem limite por usuário
   uses_count: number;
   valid_from: string;
   valid_until: string | null; // null = sem expiração

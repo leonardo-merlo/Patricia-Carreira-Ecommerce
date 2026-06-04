@@ -1,6 +1,7 @@
 'use server'
 
 import { createServiceClient } from '@/lib/supabase/service'
+import { createClient } from '@/lib/supabase/server'
 import { getCouponByCode } from '@/lib/supabase/coupons'
 import type { Coupon } from '@/lib/types'
 import { revalidatePath } from 'next/cache'
@@ -12,6 +13,7 @@ type CouponInput = {
   description: string | null
   min_order_value: number
   max_uses: number | null
+  max_uses_per_user: number | null
   valid_from: string
   valid_until: string | null
   is_active: boolean
@@ -34,7 +36,47 @@ export async function validateCoupon(
     }
   }
 
+  if (coupon.max_uses_per_user !== null) {
+    try {
+      const supabaseAuth = createClient()
+      const { data: { user } } = await supabaseAuth.auth.getUser()
+
+      if (user) {
+        const supabase = createServiceClient()
+        const { count } = await supabase
+          .from('coupon_usages')
+          .select('*', { count: 'exact', head: true })
+          .eq('coupon_id', coupon.id)
+          .eq('user_id', user.id)
+
+        if ((count ?? 0) >= coupon.max_uses_per_user) {
+          return { coupon: null, error: 'Você já utilizou este cupom.' }
+        }
+      }
+    } catch {
+      // Se não conseguir verificar a sessão, permite prosseguir — a verificação definitiva ocorre no pedido
+    }
+  }
+
   return { coupon, error: null }
+}
+
+export async function recordCouponUsage(
+  couponId: string,
+  orderId: string,
+  userId: string | null,
+  email: string | null,
+): Promise<void> {
+  const supabase = createServiceClient()
+
+  await supabase.from('coupon_usages').insert({
+    coupon_id: couponId,
+    order_id: orderId,
+    user_id: userId,
+    email: email ?? null,
+  })
+
+  await supabase.rpc('increment_coupon_uses', { p_coupon_id: couponId })
 }
 
 export async function createCoupon(input: CouponInput): Promise<{ error: string | null }> {

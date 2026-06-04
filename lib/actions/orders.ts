@@ -2,6 +2,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import type { PaymentMethod } from '@/lib/types'
+import { recordCouponUsage } from '@/lib/actions/coupons'
 
 export type OrderFormData = {
   name: string
@@ -174,6 +175,14 @@ export async function saveOrder(
       const msg = err instanceof Error ? err.message : 'Erro ao decrementar estoque'
       console.error('[saveOrder] stock decrement error:', msg)
       // Order already saved — log but don't fail
+    }
+
+    if (input.couponId) {
+      try {
+        await recordCouponUsage(input.couponId, order.id, input.userId, input.formData.email)
+      } catch (err) {
+        console.error('[saveOrder] recordCouponUsage error:', err)
+      }
     }
   }
 

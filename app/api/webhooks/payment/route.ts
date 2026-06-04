@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHmac } from 'crypto'
 import { createServiceClient } from '@/lib/supabase/service'
 import { decrementStockByOrderId } from '@/lib/actions/orders'
+import { recordCouponUsage } from '@/lib/actions/coupons'
 
 function validateMPSignature(req: NextRequest, dataId: string): boolean {
   const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   const { data: order } = await supabase
     .from('orders')
-    .select('id, payment_status')
+    .select('id, payment_status, coupon_id, customer_id')
     .eq('payment_id', paymentId)
     .maybeSingle()
 
@@ -83,6 +84,25 @@ export async function POST(req: NextRequest) {
       await decrementStockByOrderId(order.id)
     } catch (err) {
       console.error('[MP Webhook] erro ao decrementar estoque:', err)
+    }
+
+    if (order.coupon_id) {
+      try {
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('user_id, email')
+          .eq('id', order.customer_id)
+          .maybeSingle()
+
+        await recordCouponUsage(
+          order.coupon_id,
+          order.id,
+          customer?.user_id ?? null,
+          customer?.email ?? null,
+        )
+      } catch (err) {
+        console.error('[MP Webhook] erro ao registrar uso de cupom:', err)
+      }
     }
 
     console.log('[MP Webhook] pedido aprovado:', order.id)
