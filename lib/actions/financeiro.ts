@@ -2,6 +2,12 @@
 
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/service'
+import { getMonthlyRevenue } from '@/lib/supabase/financeiro'
+
+export async function fetchMonthlyRevenue(year: number, month: number): Promise<{ revenue: number }> {
+  const revenue = await getMonthlyRevenue(year, month)
+  return { revenue }
+}
 import type {
   AccountPayable,
   ExpenseCategory,

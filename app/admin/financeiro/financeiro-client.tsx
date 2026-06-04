@@ -8,6 +8,7 @@ import {
   updateAccountPayable,
   deleteAccountPayable,
   markAccountAsPaid,
+  fetchMonthlyRevenue,
 } from '@/lib/actions/financeiro'
 import {
   type AccountPayable,
@@ -81,7 +82,12 @@ export function FinanceiroClient({
   initialAccounts: AccountPayable[]
   monthlyRevenue: number
 }) {
+  const nowInit = new Date()
+  const initPeriod = `${nowInit.getFullYear()}-${String(nowInit.getMonth() + 1).padStart(2, '0')}`
+
   const [accounts, setAccounts] = useState<AccountPayable[]>(initialAccounts)
+  const [selectedPeriod, setSelectedPeriod] = useState(initPeriod)
+  const [displayRevenue, setDisplayRevenue] = useState(monthlyRevenue)
   const [activeTab, setActiveTab] = useState<FilterTab>('todas')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -97,16 +103,10 @@ export function FinanceiroClient({
   const in7days = new Date(today)
   in7days.setDate(in7days.getDate() + 7)
   const in7daysStr = in7days.toISOString().split('T')[0]
-  const currentMonth = new Date().getMonth()
-  const currentYear = new Date().getFullYear()
 
   const kpis = useMemo(() => {
     const totalPaidThisMonth = accounts
-      .filter(a => {
-        if (!a.paid_at) return false
-        const d = new Date(a.paid_at + 'T00:00:00')
-        return d.getMonth() === currentMonth && d.getFullYear() === currentYear
-      })
+      .filter(a => a.paid_at?.startsWith(selectedPeriod))
       .reduce((s, a) => s + a.amount, 0)
 
     return {
@@ -118,19 +118,29 @@ export function FinanceiroClient({
       dueSoon: accounts.filter(
         a => !a.paid_at && a.due_date >= todayStr && a.due_date <= in7daysStr
       ).length,
-      resultado: monthlyRevenue - totalPaidThisMonth,
+      resultado: displayRevenue - totalPaidThisMonth,
     }
-  }, [accounts, todayStr, in7daysStr, currentMonth, currentYear, monthlyRevenue])
+  }, [accounts, todayStr, in7daysStr, selectedPeriod, displayRevenue])
 
   const filtered = useMemo(() => {
     return accounts.filter(a => {
       const s = getAccountStatus(a)
+      // Período: para contas pagas filtra por paid_at; para as demais, por due_date
+      const dateForPeriod = s === 'paid' ? a.paid_at : a.due_date
+      if (!dateForPeriod?.startsWith(selectedPeriod)) return false
       if (activeTab === 'pendentes') return s === 'pending'
       if (activeTab === 'em_atraso') return s === 'overdue'
       if (activeTab === 'pagas') return s === 'paid'
       return true
     })
-  }, [accounts, activeTab])
+  }, [accounts, activeTab, selectedPeriod])
+
+  async function handlePeriodChange(period: string) {
+    setSelectedPeriod(period)
+    const [y, m] = period.split('-').map(Number)
+    const { revenue } = await fetchMonthlyRevenue(y, m - 1)
+    setDisplayRevenue(revenue)
+  }
 
   function openCreate() {
     setEditingId(null)
@@ -287,9 +297,9 @@ export function FinanceiroClient({
         <div className="kpi">
           <div className="kpi-label">
             <span className="dot" style={{ background: 'var(--green)' }} />
-            Receitas do mês
+            Receitas do período
           </div>
-          <div className="kpi-value">{fmtCurrency(monthlyRevenue)}</div>
+          <div className="kpi-value">{fmtCurrency(displayRevenue)}</div>
           <div className="kpi-trend"><span className="subtle">pedidos pagos</span></div>
         </div>
         <div className="kpi">
@@ -344,20 +354,32 @@ export function FinanceiroClient({
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="tabs" style={{ marginTop: 24 }}>
-        {(['todas', 'pendentes', 'em_atraso', 'pagas'] as FilterTab[]).map(tab => (
-          <button
-            key={tab}
-            className={`tab ${activeTab === tab ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab)}
-          >
-            {tab === 'todas' ? 'Todas'
-              : tab === 'pendentes' ? 'Pendentes'
-              : tab === 'em_atraso' ? 'Em atraso'
-              : 'Pagas'}
-          </button>
-        ))}
+      {/* Tabs + seletor de período */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', borderBottom: '1px solid var(--border)', marginTop: 24, marginBottom: 18 }}>
+        <div className="tabs" style={{ marginTop: 0, marginBottom: 0, borderBottom: 'none', flex: 1 }}>
+          {(['todas', 'pendentes', 'em_atraso', 'pagas'] as FilterTab[]).map(tab => (
+            <button
+              key={tab}
+              className={`tab ${activeTab === tab ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab === 'todas' ? 'Todas'
+                : tab === 'pendentes' ? 'Pendentes'
+                : tab === 'em_atraso' ? 'Em atraso'
+                : 'Pagas'}
+            </button>
+          ))}
+        </div>
+        <div style={{ paddingBottom: 8 }}>
+          <input
+            type="month"
+            className="input"
+            style={{ width: 132, height: 26, fontSize: 12, padding: '3px 8px' }}
+            value={selectedPeriod}
+            onChange={e => e.target.value && handlePeriodChange(e.target.value)}
+            title="Filtrar por período"
+          />
+        </div>
       </div>
 
       {/* Tabela */}
