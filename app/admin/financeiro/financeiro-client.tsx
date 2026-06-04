@@ -2,6 +2,7 @@
 // Client component: state, transitions, browser interactions
 
 import { useState, useTransition, useMemo } from 'react'
+import { AdminIcon } from '@/components/admin/admin-icon'
 import {
   createAccountPayable,
   updateAccountPayable,
@@ -28,23 +29,17 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: 'transferencia', label: 'Transferência' },
 ]
 
-const STATUS_LABELS: Record<AccountPayableStatus, string> = {
-  pending: 'Pendente',
-  overdue: 'Em atraso',
-  paid: 'Pago',
+function statusBadge(status: AccountPayableStatus): { label: string; cls: string } {
+  if (status === 'paid') return { label: 'Pago', cls: 'badge pago' }
+  if (status === 'overdue') return { label: 'Em atraso', cls: 'badge alert' }
+  return { label: 'Pendente', cls: 'badge pendente' }
 }
 
-const STATUS_CLASS: Record<AccountPayableStatus, string> = {
-  pending: 'badge badge-yellow',
-  overdue: 'badge badge-red',
-  paid: 'badge badge-green',
+function fmtCurrency(v: number): string {
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
-function formatCurrency(value: number): string {
-  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-}
-
-function formatDate(iso: string): string {
+function fmtDate(iso: string): string {
   const [y, m, d] = iso.split('-')
   return `${d}/${m}/${y}`
 }
@@ -93,7 +88,7 @@ export function FinanceiroClient({
   const [form, setForm] = useState<FormState>(emptyForm)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [markPaid, setMarkPaid] = useState<MarkPaidState | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const today = new Date()
@@ -115,9 +110,7 @@ export function FinanceiroClient({
       .reduce((s, a) => s + a.amount, 0)
 
     return {
-      totalPending: accounts
-        .filter(a => !a.paid_at)
-        .reduce((s, a) => s + a.amount, 0),
+      totalPending: accounts.filter(a => !a.paid_at).reduce((s, a) => s + a.amount, 0),
       totalOverdue: accounts
         .filter(a => !a.paid_at && a.due_date < todayStr)
         .reduce((s, a) => s + a.amount, 0),
@@ -131,10 +124,10 @@ export function FinanceiroClient({
 
   const filtered = useMemo(() => {
     return accounts.filter(a => {
-      const status = getAccountStatus(a)
-      if (activeTab === 'pendentes') return status === 'pending'
-      if (activeTab === 'em_atraso') return status === 'overdue'
-      if (activeTab === 'pagas') return status === 'paid'
+      const s = getAccountStatus(a)
+      if (activeTab === 'pendentes') return s === 'pending'
+      if (activeTab === 'em_atraso') return s === 'overdue'
+      if (activeTab === 'pagas') return s === 'paid'
       return true
     })
   }, [accounts, activeTab])
@@ -142,7 +135,7 @@ export function FinanceiroClient({
   function openCreate() {
     setEditingId(null)
     setForm(emptyForm)
-    setError(null)
+    setFormError(null)
     setDrawerOpen(true)
   }
 
@@ -159,8 +152,14 @@ export function FinanceiroClient({
       recurrence_months: account.recurrence_months ?? 1,
       notes: account.notes ?? '',
     })
-    setError(null)
+    setFormError(null)
     setDrawerOpen(true)
+  }
+
+  function closeDrawer() {
+    setDrawerOpen(false)
+    setEditingId(null)
+    setFormError(null)
   }
 
   function handleField<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -168,19 +167,16 @@ export function FinanceiroClient({
   }
 
   function handleSave() {
-    if (!form.description || !form.amount || !form.due_date || !form.category) {
-      setError('Preencha os campos obrigatórios: descrição, valor, vencimento e categoria.')
-      return
-    }
+    if (!form.description.trim()) { setFormError('Informe a descrição.'); return }
+    if (!form.amount) { setFormError('Informe o valor.'); return }
+    if (!form.due_date) { setFormError('Informe o vencimento.'); return }
+    if (!form.category) { setFormError('Selecione a categoria.'); return }
     const amount = parseFloat(form.amount.replace(',', '.'))
-    if (isNaN(amount) || amount <= 0) {
-      setError('Valor inválido.')
-      return
-    }
+    if (isNaN(amount) || amount <= 0) { setFormError('Valor inválido.'); return }
 
     startTransition(async () => {
       const input = {
-        description: form.description,
+        description: form.description.trim(),
         amount,
         due_date: form.due_date,
         category: form.category as ExpenseCategory,
@@ -196,7 +192,7 @@ export function FinanceiroClient({
         : await createAccountPayable(input)
 
       if (!result.success) {
-        setError(result.error ?? 'Erro ao salvar.')
+        setFormError(result.error ?? 'Erro ao salvar.')
         return
       }
 
@@ -204,7 +200,7 @@ export function FinanceiroClient({
         setAccounts(prev =>
           prev.map(a =>
             a.id === editingId
-              ? { ...a, ...input, category: input.category, updated_at: new Date().toISOString() }
+              ? { ...a, ...input, updated_at: new Date().toISOString() }
               : a
           )
         )
@@ -214,14 +210,13 @@ export function FinanceiroClient({
           {
             id: crypto.randomUUID(),
             ...input,
-            category: input.category,
             paid_at: null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           } as AccountPayable,
         ])
       }
-      setDrawerOpen(false)
+      closeDrawer()
     })
   }
 
@@ -229,15 +224,9 @@ export function FinanceiroClient({
     if (!deleteId) return
     startTransition(async () => {
       const result = await deleteAccountPayable(deleteId)
-      if (result.success) {
-        setAccounts(prev => prev.filter(a => a.id !== deleteId))
-      }
+      if (result.success) setAccounts(prev => prev.filter(a => a.id !== deleteId))
       setDeleteId(null)
     })
-  }
-
-  function openMarkPaid(account: AccountPayable) {
-    setMarkPaid({ account, paidAt: todayStr, paymentMethod: '' })
   }
 
   function handleMarkPaid() {
@@ -277,328 +266,376 @@ export function FinanceiroClient({
     })
   }
 
+  const resultadoColor = kpis.resultado >= 0 ? 'var(--green)' : 'var(--red)'
+
   return (
-    <div className="page-content">
+    <div className="page">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Financeiro</h1>
-          <p className="page-subtitle">Controle de contas a pagar</p>
+          <h2 className="page-title">Financeiro</h2>
+          <p className="page-sub">Contas a pagar e resultado do mês</p>
         </div>
-        <button id="btn-nova-conta" className="btn btn-primary" onClick={openCreate}>
-          + Nova Conta
-        </button>
-      </div>
-
-      {/* Resultado do mês */}
-      <div className="stats-grid" style={{ marginBottom: 12 }}>
-        <div className="stat-card">
-          <p className="stat-label">Receitas do mês</p>
-          <p className="stat-value">{formatCurrency(monthlyRevenue)}</p>
-          <p className="stat-description">pedidos pagos</p>
-        </div>
-        <div className="stat-card">
-          <p className="stat-label">Despesas pagas</p>
-          <p className="stat-value">{formatCurrency(kpis.totalPaidThisMonth)}</p>
-          <p className="stat-description">saídas confirmadas</p>
-        </div>
-        <div className={`stat-card ${kpis.resultado >= 0 ? 'stat-card-success' : 'stat-card-alert'}`}>
-          <p className="stat-label">Resultado do mês</p>
-          <p className="stat-value">{formatCurrency(kpis.resultado)}</p>
-          <p className="stat-description">{kpis.resultado >= 0 ? 'positivo' : 'negativo'}</p>
+        <div className="page-actions">
+          <button className="btn primary" id="btn-nova-conta" onClick={openCreate}>
+            <AdminIcon name="plus" /> Nova conta
+          </button>
         </div>
       </div>
 
-      {/* Contas a pagar */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <p className="stat-label">Total a Pagar</p>
-          <p className="stat-value">{formatCurrency(kpis.totalPending)}</p>
-          <p className="stat-description">contas pendentes</p>
+      {/* Resultado do mês — 3 colunas */}
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 16 }}>
+        <div className="kpi">
+          <div className="kpi-label">
+            <span className="dot" style={{ background: 'var(--green)' }} />
+            Receitas do mês
+          </div>
+          <div className="kpi-value">{fmtCurrency(monthlyRevenue)}</div>
+          <div className="kpi-trend"><span className="subtle">pedidos pagos</span></div>
         </div>
-        <div className="stat-card stat-card-alert">
-          <p className="stat-label">Em Atraso</p>
-          <p className="stat-value">{formatCurrency(kpis.totalOverdue)}</p>
-          <p className="stat-description">vencimento passado</p>
+        <div className="kpi">
+          <div className="kpi-label">
+            <span className="dot" style={{ background: 'var(--red)' }} />
+            Despesas pagas
+          </div>
+          <div className="kpi-value">{fmtCurrency(kpis.totalPaidThisMonth)}</div>
+          <div className="kpi-trend"><span className="subtle">saídas confirmadas</span></div>
         </div>
-        <div className="stat-card">
-          <p className="stat-label">Vencem em 7 dias</p>
-          <p className="stat-value">{kpis.dueSoon}</p>
-          <p className="stat-description">contas próximas</p>
+        <div className="kpi" style={{ borderLeft: `3px solid ${resultadoColor}` }}>
+          <div className="kpi-label">
+            <span className="dot" style={{ background: resultadoColor }} />
+            Resultado do mês
+          </div>
+          <div className="kpi-value" style={{ color: resultadoColor }}>
+            {fmtCurrency(kpis.resultado)}
+          </div>
+          <div className="kpi-trend">
+            <span className="subtle">{kpis.resultado >= 0 ? 'positivo' : 'negativo'}</span>
+          </div>
         </div>
       </div>
 
-      <div className="tabs">
+      {/* Contas a pagar — 3 colunas */}
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        <div className="kpi">
+          <div className="kpi-label">
+            <span className="dot" style={{ background: 'var(--accent)' }} />
+            Total a pagar
+          </div>
+          <div className="kpi-value">{fmtCurrency(kpis.totalPending)}</div>
+          <div className="kpi-trend"><span className="subtle">contas pendentes</span></div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">
+            <span className="dot" style={{ background: 'var(--red)' }} />
+            Em atraso
+          </div>
+          <div className="kpi-value" style={{ color: kpis.totalOverdue > 0 ? 'var(--red)' : undefined }}>
+            {fmtCurrency(kpis.totalOverdue)}
+          </div>
+          <div className="kpi-trend"><span className="subtle">vencimento passado</span></div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">
+            <span className="dot" style={{ background: 'var(--yellow)' }} />
+            Vencem em 7 dias
+          </div>
+          <div className="kpi-value">{kpis.dueSoon}</div>
+          <div className="kpi-trend"><span className="subtle">contas próximas</span></div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="tabs" style={{ marginTop: 24 }}>
         {(['todas', 'pendentes', 'em_atraso', 'pagas'] as FilterTab[]).map(tab => (
           <button
             key={tab}
-            className={`tab ${activeTab === tab ? 'tab-active' : ''}`}
+            className={`tab ${activeTab === tab ? 'active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab === 'todas'
-              ? 'Todas'
-              : tab === 'pendentes'
-              ? 'Pendentes'
-              : tab === 'em_atraso'
-              ? 'Em atraso'
+            {tab === 'todas' ? 'Todas'
+              : tab === 'pendentes' ? 'Pendentes'
+              : tab === 'em_atraso' ? 'Em atraso'
               : 'Pagas'}
           </button>
         ))}
       </div>
 
-      <div className="table-container">
-        <table className="table" data-testid="accounts-table">
-          <thead>
-            <tr>
-              <th>Descrição</th>
-              <th>Categoria</th>
-              <th>Credor</th>
-              <th>Valor</th>
-              <th>Vencimento</th>
-              <th>Forma de Pgto</th>
-              <th>Status</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={8} className="table-empty">
-                  Nenhuma conta encontrada.
-                </td>
-              </tr>
-            )}
-            {filtered.map(account => {
-              const status = getAccountStatus(account)
-              return (
-                <tr key={account.id}>
-                  <td>
-                    {account.description}
-                    {account.is_recurring && (
-                      <span className="badge badge-blue" style={{ marginLeft: 6 }}>
-                        {account.recurrence_months === 1 ? 'Mensal' : 'Anual'}
-                      </span>
-                    )}
-                  </td>
-                  <td>{account.category}</td>
-                  <td>{account.creditor ?? '—'}</td>
-                  <td>{formatCurrency(account.amount)}</td>
-                  <td>{formatDate(account.due_date)}</td>
-                  <td>
-                    {account.payment_method
-                      ? PAYMENT_METHODS.find(m => m.value === account.payment_method)?.label ??
-                        account.payment_method
-                      : '—'}
-                  </td>
-                  <td>
-                    <span className={STATUS_CLASS[status]}>{STATUS_LABELS[status]}</span>
-                  </td>
-                  <td>
-                    <div className="action-buttons">
-                      {status !== 'paid' && (
-                        <button
-                          className="btn btn-sm btn-success"
-                          id={`btn-pagar-${account.id}`}
-                          onClick={() => openMarkPaid(account)}
-                          title="Marcar como pago"
-                        >
-                          Pago
-                        </button>
-                      )}
-                      <button
-                        className="btn btn-sm btn-ghost"
-                        id={`btn-editar-conta-${account.id}`}
-                        onClick={() => openEdit(account)}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        className="btn btn-sm btn-danger-ghost"
-                        id={`btn-deletar-conta-${account.id}`}
-                        onClick={() => setDeleteId(account.id)}
-                      >
-                        Excluir
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+      {/* Tabela */}
+      <div className="card">
+        <div className="card-body flush">
+          {filtered.length === 0 ? (
+            <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text-3)' }}>
+              <AdminIcon name="wallet" size={32} />
+              <p style={{ marginTop: 12, fontSize: 14 }}>Nenhuma conta encontrada.</p>
+              {activeTab === 'todas' && (
+                <button className="btn primary" style={{ marginTop: 16 }} onClick={openCreate}>
+                  Criar primeira conta
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table className="tbl" data-testid="accounts-table">
+                <thead>
+                  <tr>
+                    <th>Descrição</th>
+                    <th style={{ width: 130 }}>Categoria</th>
+                    <th style={{ width: 150 }}>Credor</th>
+                    <th style={{ width: 110 }}>Valor</th>
+                    <th style={{ width: 110 }}>Vencimento</th>
+                    <th style={{ width: 120 }}>Forma de pgto</th>
+                    <th style={{ width: 110 }}>Status</th>
+                    <th style={{ width: 110 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(account => {
+                    const status = getAccountStatus(account)
+                    const { label, cls } = statusBadge(status)
+                    return (
+                      <tr key={account.id}>
+                        <td>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span>{account.description}</span>
+                            {account.is_recurring && (
+                              <span className="badge producao" style={{ alignSelf: 'flex-start', fontSize: 10 }}>
+                                {account.recurrence_months === 1 ? 'Mensal' : 'Anual'}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ color: 'var(--text-2)', fontSize: 12 }}>{account.category}</td>
+                        <td style={{ color: 'var(--text-2)' }}>{account.creditor ?? '—'}</td>
+                        <td className="num" style={{ fontWeight: 500 }}>{fmtCurrency(account.amount)}</td>
+                        <td style={{ color: 'var(--text-2)', fontSize: 12.5 }}>{fmtDate(account.due_date)}</td>
+                        <td style={{ color: 'var(--text-2)', fontSize: 12 }}>
+                          {account.payment_method
+                            ? PAYMENT_METHODS.find(m => m.value === account.payment_method)?.label ?? account.payment_method
+                            : '—'}
+                        </td>
+                        <td><span className={cls}>{label}</span></td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                            {status !== 'paid' && (
+                              <button
+                                className="btn sm"
+                                style={{ background: 'var(--green-soft)', color: 'var(--green)', borderColor: 'transparent' }}
+                                id={`btn-pagar-${account.id}`}
+                                onClick={() => setMarkPaid({ account, paidAt: todayStr, paymentMethod: '' })}
+                                title="Marcar como pago"
+                              >
+                                Pago
+                              </button>
+                            )}
+                            <button
+                              className="icon-btn"
+                              id={`btn-editar-conta-${account.id}`}
+                              onClick={() => openEdit(account)}
+                              title="Editar"
+                            >
+                              <AdminIcon name="edit" size={14} />
+                            </button>
+                            <button
+                              className="icon-btn"
+                              style={{ color: 'var(--text-3)' }}
+                              id={`btn-deletar-conta-${account.id}`}
+                              onClick={() => setDeleteId(account.id)}
+                              title="Excluir"
+                            >
+                              <AdminIcon name="trash" size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Drawer: Criar / Editar */}
-      {drawerOpen && (
-        <div className="drawer-overlay" onClick={() => setDrawerOpen(false)}>
-          <div
-            className="drawer"
-            onClick={e => e.stopPropagation()}
-            data-testid="account-drawer"
-          >
-            <div className="drawer-header">
-              <h2>{editingId ? 'Editar Conta' : 'Nova Conta a Pagar'}</h2>
-              <button className="btn btn-ghost btn-icon" onClick={() => setDrawerOpen(false)}>
-                ✕
-              </button>
+      <div
+        className={`drawer-backdrop ${drawerOpen ? 'open' : ''}`}
+        onClick={closeDrawer}
+      />
+      <div className={`drawer ${drawerOpen ? 'open' : ''}`} data-testid="account-drawer">
+        <div className="drawer-header">
+          <div>
+            <h3>{editingId ? 'Editar Conta' : 'Nova Conta a Pagar'}</h3>
+            <div className="cust-meta">
+              {editingId ? 'Altere os dados abaixo' : 'Preencha os dados da conta'}
             </div>
-            <div className="drawer-body">
-              {error && <div className="form-error">{error}</div>}
+          </div>
+          <button className="icon-btn" onClick={closeDrawer}>
+            <AdminIcon name="x" size={14} />
+          </button>
+        </div>
 
-              <div className="form-group">
-                <label className="form-label">Descrição *</label>
+        <div className="drawer-body">
+          <div style={{ display: 'grid', gap: 12 }}>
+            {formError && (
+              <div style={{ background: '#fee2e2', color: '#dc2626', padding: '8px 12px', borderRadius: 6, fontSize: 13 }}>
+                {formError}
+              </div>
+            )}
+
+            <div className="field">
+              <label>Descrição *</label>
+              <input
+                id="input-descricao-conta"
+                className="input"
+                value={form.description}
+                onChange={e => handleField('description', e.target.value)}
+                placeholder="Ex: Aluguel do espaço"
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="field">
+                <label>Valor (R$) *</label>
                 <input
-                  id="input-descricao-conta"
-                  className="form-input"
-                  value={form.description}
-                  onChange={e => handleField('description', e.target.value)}
-                  placeholder="Ex: Aluguel do espaço"
+                  id="input-valor-conta"
+                  className="input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.amount}
+                  onChange={e => handleField('amount', e.target.value)}
+                  placeholder="0,00"
                 />
               </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Valor (R$) *</label>
-                  <input
-                    id="input-valor-conta"
-                    className="form-input"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.amount}
-                    onChange={e => handleField('amount', e.target.value)}
-                    placeholder="0,00"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Vencimento *</label>
-                  <input
-                    id="input-vencimento-conta"
-                    className="form-input"
-                    type="date"
-                    value={form.due_date}
-                    onChange={e => handleField('due_date', e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Categoria *</label>
-                <select
-                  id="select-categoria-conta"
-                  className="form-select"
-                  value={form.category}
-                  onChange={e => handleField('category', e.target.value as ExpenseCategory)}
-                >
-                  <option value="">Selecione...</option>
-                  {EXPENSE_CATEGORIES.map(c => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Credor / Fornecedor</label>
+              <div className="field">
+                <label>Vencimento *</label>
                 <input
-                  id="input-credor-conta"
-                  className="form-input"
-                  value={form.creditor}
-                  onChange={e => handleField('creditor', e.target.value)}
-                  placeholder="Ex: Locadora São João"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Forma de Pagamento</label>
-                <select
-                  id="select-pagamento-conta"
-                  className="form-select"
-                  value={form.payment_method}
-                  onChange={e =>
-                    handleField('payment_method', e.target.value as PaymentMethod)
-                  }
-                >
-                  <option value="">Não informado</option>
-                  {PAYMENT_METHODS.map(m => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-checkbox">
-                  <input
-                    id="checkbox-recorrente"
-                    type="checkbox"
-                    checked={form.is_recurring}
-                    onChange={e => handleField('is_recurring', e.target.checked)}
-                  />
-                  <span>Conta recorrente</span>
-                </label>
-              </div>
-
-              {form.is_recurring && (
-                <div className="form-group">
-                  <label className="form-label">Recorrência</label>
-                  <select
-                    id="select-recorrencia-conta"
-                    className="form-select"
-                    value={form.recurrence_months}
-                    onChange={e =>
-                      handleField('recurrence_months', Number(e.target.value) as RecurrenceMonths)
-                    }
-                  >
-                    <option value={1}>Mensal</option>
-                    <option value={12}>Anual</option>
-                  </select>
-                </div>
-              )}
-
-              <div className="form-group">
-                <label className="form-label">Observações</label>
-                <textarea
-                  id="textarea-obs-conta"
-                  className="form-textarea"
-                  value={form.notes}
-                  onChange={e => handleField('notes', e.target.value)}
-                  rows={3}
-                  placeholder="Informações adicionais..."
+                  id="input-vencimento-conta"
+                  className="input"
+                  type="date"
+                  value={form.due_date}
+                  onChange={e => handleField('due_date', e.target.value)}
                 />
               </div>
             </div>
-            <div className="drawer-footer">
-              <button className="btn btn-ghost" onClick={() => setDrawerOpen(false)}>
-                Cancelar
-              </button>
-              <button
-                id="btn-salvar-conta"
-                className="btn btn-primary"
-                onClick={handleSave}
-                disabled={isPending}
+
+            <div className="field">
+              <label>Categoria *</label>
+              <select
+                id="select-categoria-conta"
+                className="input"
+                value={form.category}
+                onChange={e => handleField('category', e.target.value as ExpenseCategory)}
               >
-                {isPending ? 'Salvando...' : editingId ? 'Salvar Alterações' : 'Criar Conta'}
-              </button>
+                <option value="">Selecione...</option>
+                {EXPENSE_CATEGORIES.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="field">
+              <label>Credor / Fornecedor</label>
+              <input
+                id="input-credor-conta"
+                className="input"
+                value={form.creditor}
+                onChange={e => handleField('creditor', e.target.value)}
+                placeholder="Ex: Locadora São João"
+              />
+            </div>
+
+            <div className="field">
+              <label>Forma de pagamento</label>
+              <select
+                id="select-pagamento-conta"
+                className="input"
+                value={form.payment_method}
+                onChange={e => handleField('payment_method', e.target.value as PaymentMethod)}
+              >
+                <option value="">Não informado</option>
+                {PAYMENT_METHODS.map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="field">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  id="checkbox-recorrente"
+                  type="checkbox"
+                  checked={form.is_recurring}
+                  onChange={e => handleField('is_recurring', e.target.checked)}
+                />
+                Conta recorrente
+              </label>
+            </div>
+
+            {form.is_recurring && (
+              <div className="field">
+                <label>Recorrência</label>
+                <select
+                  id="select-recorrencia-conta"
+                  className="input"
+                  value={form.recurrence_months}
+                  onChange={e => handleField('recurrence_months', Number(e.target.value) as RecurrenceMonths)}
+                >
+                  <option value={1}>Mensal</option>
+                  <option value={12}>Anual</option>
+                </select>
+              </div>
+            )}
+
+            <div className="field">
+              <label>Observações</label>
+              <textarea
+                id="textarea-obs-conta"
+                className="input"
+                value={form.notes}
+                onChange={e => handleField('notes', e.target.value)}
+                rows={3}
+                placeholder="Informações adicionais..."
+                style={{ height: 'auto' }}
+              />
             </div>
           </div>
         </div>
-      )}
+
+        <div className="drawer-footer">
+          <button className="btn ghost" onClick={closeDrawer}>Cancelar</button>
+          <button
+            id="btn-salvar-conta"
+            className="btn primary"
+            onClick={handleSave}
+            disabled={isPending}
+          >
+            {isPending ? 'Salvando...' : editingId ? 'Salvar alterações' : 'Criar conta'}
+          </button>
+        </div>
+      </div>
 
       {/* Modal: Confirmar exclusão */}
       {deleteId && (
-        <div className="modal-overlay">
-          <div className="modal" data-testid="delete-modal">
-            <h3 className="modal-title">Excluir conta?</h3>
-            <p className="modal-body">Esta ação não pode ser desfeita.</p>
-            <div className="modal-actions">
-              <button className="btn btn-ghost" onClick={() => setDeleteId(null)}>
-                Cancelar
-              </button>
+        <>
+          <div className="drawer-backdrop open" style={{ zIndex: 200 }} onClick={() => setDeleteId(null)} />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'var(--bg)', border: '1px solid var(--border)',
+            borderRadius: 12, padding: 24, zIndex: 201, width: 320,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+          }} data-testid="delete-modal">
+            <h4 style={{ marginBottom: 8, fontSize: 15, fontWeight: 600 }}>Excluir conta?</h4>
+            <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 20 }}>
+              Esta ação não pode ser desfeita.
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn ghost" onClick={() => setDeleteId(null)}>Cancelar</button>
               <button
                 id="btn-confirmar-exclusao-conta"
-                className="btn btn-danger"
+                className="btn"
+                style={{ background: '#dc2626', color: '#fff', borderColor: '#dc2626' }}
                 onClick={handleDelete}
                 disabled={isPending}
               >
@@ -606,70 +643,76 @@ export function FinanceiroClient({
               </button>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Modal: Marcar como pago */}
       {markPaid && (
-        <div className="modal-overlay">
-          <div className="modal" data-testid="mark-paid-modal">
-            <h3 className="modal-title">Marcar como pago</h3>
-            <p className="modal-body">{markPaid.account.description}</p>
+        <>
+          <div className="drawer-backdrop open" style={{ zIndex: 200 }} onClick={() => setMarkPaid(null)} />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'var(--bg)', border: '1px solid var(--border)',
+            borderRadius: 12, padding: 24, zIndex: 201, width: 360,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+          }} data-testid="mark-paid-modal">
+            <h4 style={{ marginBottom: 4, fontSize: 15, fontWeight: 600 }}>Confirmar pagamento</h4>
+            <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 16 }}>
+              {markPaid.account.description}
+            </p>
 
-            <div className="form-group" style={{ marginTop: 16 }}>
-              <label className="form-label">Data do pagamento</label>
-              <input
-                className="form-input"
-                type="date"
-                value={markPaid.paidAt}
-                onChange={e =>
-                  setMarkPaid(prev => (prev ? { ...prev, paidAt: e.target.value } : null))
-                }
-              />
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div className="field">
+                <label>Data do pagamento</label>
+                <input
+                  className="input"
+                  type="date"
+                  value={markPaid.paidAt}
+                  onChange={e => setMarkPaid(prev => prev ? { ...prev, paidAt: e.target.value } : null)}
+                />
+              </div>
+
+              <div className="field">
+                <label>Forma de pagamento *</label>
+                <select
+                  id="select-forma-pagamento-pago"
+                  className="input"
+                  value={markPaid.paymentMethod}
+                  onChange={e => setMarkPaid(prev => prev ? { ...prev, paymentMethod: e.target.value as PaymentMethod } : null)}
+                >
+                  <option value="">Selecione...</option>
+                  {PAYMENT_METHODS.map(m => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {markPaid.account.is_recurring && (
+                <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0, background: 'var(--surface-2)', padding: '8px 10px', borderRadius: 6 }}>
+                  Conta recorrente — o próximo vencimento será gerado automaticamente.
+                </p>
+              )}
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Forma de pagamento *</label>
-              <select
-                id="select-forma-pagamento-pago"
-                className="form-select"
-                value={markPaid.paymentMethod}
-                onChange={e =>
-                  setMarkPaid(prev =>
-                    prev ? { ...prev, paymentMethod: e.target.value as PaymentMethod } : null
-                  )
-                }
-              >
-                <option value="">Selecione...</option>
-                {PAYMENT_METHODS.map(m => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {markPaid.account.is_recurring && (
-              <p className="form-hint">
-                Conta recorrente. O próximo vencimento será gerado automaticamente.
-              </p>
-            )}
-
-            <div className="modal-actions">
-              <button className="btn btn-ghost" onClick={() => setMarkPaid(null)}>
-                Cancelar
-              </button>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
+              <button className="btn ghost" onClick={() => setMarkPaid(null)}>Cancelar</button>
               <button
                 id="btn-confirmar-pagamento"
-                className="btn btn-success"
+                className="btn"
+                style={{
+                  background: !markPaid.paymentMethod ? undefined : 'var(--green)',
+                  color: !markPaid.paymentMethod ? undefined : '#fff',
+                  borderColor: !markPaid.paymentMethod ? undefined : 'var(--green)',
+                }}
                 onClick={handleMarkPaid}
                 disabled={isPending || !markPaid.paymentMethod}
               >
-                {isPending ? 'Confirmando...' : 'Confirmar Pagamento'}
+                {isPending ? 'Confirmando...' : 'Confirmar pagamento'}
               </button>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   )
