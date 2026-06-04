@@ -484,7 +484,7 @@ export const EXPENSE_CATEGORIES = [
 
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number]
 
-export type PaymentMethod =
+export type ExpensePaymentMethod =
   | 'pix'
   | 'boleto'
   | 'cartao'
@@ -501,7 +501,7 @@ export type AccountPayable = {
   paid_at: string | null
   category: ExpenseCategory
   creditor: string | null
-  payment_method: PaymentMethod | null
+  payment_method: ExpensePaymentMethod | null
   is_recurring: boolean
   recurrence_months: RecurrenceMonths | null
   notes: string | null

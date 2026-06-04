@@ -11,7 +11,7 @@ export async function fetchMonthlyRevenue(year: number, month: number): Promise<
 import type {
   AccountPayable,
   ExpenseCategory,
-  PaymentMethod,
+  ExpensePaymentMethod,
   RecurrenceMonths,
 } from '@/lib/types'
 
@@ -21,7 +21,7 @@ type AccountPayableInput = {
   due_date: string
   category: ExpenseCategory
   creditor?: string | null
-  payment_method?: PaymentMethod | null
+  payment_method?: ExpensePaymentMethod | null
   is_recurring: boolean
   recurrence_months?: RecurrenceMonths | null
   notes?: string | null
@@ -83,7 +83,7 @@ export async function deleteAccountPayable(
 export async function markAccountAsPaid(
   account: AccountPayable,
   paidAt: string,
-  paymentMethod: PaymentMethod
+  paymentMethod: ExpensePaymentMethod
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = createServiceClient()
 

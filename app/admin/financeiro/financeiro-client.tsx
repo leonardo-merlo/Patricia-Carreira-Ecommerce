@@ -14,7 +14,7 @@ import {
   type AccountPayable,
   type AccountPayableStatus,
   type ExpenseCategory,
-  type PaymentMethod,
+  type ExpensePaymentMethod,
   type RecurrenceMonths,
   EXPENSE_CATEGORIES,
   getAccountStatus,
@@ -22,7 +22,7 @@ import {
 
 type FilterTab = 'todas' | 'pendentes' | 'em_atraso' | 'pagas'
 
-const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
+const PAYMENT_METHODS: { value: ExpensePaymentMethod; label: string }[] = [
   { value: 'pix', label: 'PIX' },
   { value: 'boleto', label: 'Boleto' },
   { value: 'cartao', label: 'Cartão' },
@@ -51,7 +51,7 @@ type FormState = {
   due_date: string
   category: ExpenseCategory | ''
   creditor: string
-  payment_method: PaymentMethod | ''
+  payment_method: ExpensePaymentMethod | ''
   is_recurring: boolean
   recurrence_months: RecurrenceMonths
   notes: string
@@ -72,7 +72,7 @@ const emptyForm: FormState = {
 type MarkPaidState = {
   account: AccountPayable
   paidAt: string
-  paymentMethod: PaymentMethod | ''
+  paymentMethod: ExpensePaymentMethod | ''
 }
 
 export function FinanceiroClient({
@@ -191,7 +191,7 @@ export function FinanceiroClient({
         due_date: form.due_date,
         category: form.category as ExpenseCategory,
         creditor: form.creditor || null,
-        payment_method: (form.payment_method as PaymentMethod) || null,
+        payment_method: (form.payment_method as ExpensePaymentMethod) || null,
         is_recurring: form.is_recurring,
         recurrence_months: form.is_recurring ? form.recurrence_months : null,
         notes: form.notes || null,
@@ -245,13 +245,13 @@ export function FinanceiroClient({
       const result = await markAccountAsPaid(
         markPaid.account,
         markPaid.paidAt,
-        markPaid.paymentMethod as PaymentMethod
+        markPaid.paymentMethod as ExpensePaymentMethod
       )
       if (result.success) {
         setAccounts(prev =>
           prev.map(a =>
             a.id === markPaid.account.id
-              ? { ...a, paid_at: markPaid.paidAt, payment_method: markPaid.paymentMethod as PaymentMethod }
+              ? { ...a, paid_at: markPaid.paidAt, payment_method: markPaid.paymentMethod as ExpensePaymentMethod }
               : a
           )
         )
@@ -573,7 +573,7 @@ export function FinanceiroClient({
                 id="select-pagamento-conta"
                 className="input"
                 value={form.payment_method}
-                onChange={e => handleField('payment_method', e.target.value as PaymentMethod)}
+                onChange={e => handleField('payment_method', e.target.value as ExpensePaymentMethod)}
               >
                 <option value="">Não informado</option>
                 {PAYMENT_METHODS.map(m => (
@@ -701,7 +701,7 @@ export function FinanceiroClient({
                   id="select-forma-pagamento-pago"
                   className="input"
                   value={markPaid.paymentMethod}
-                  onChange={e => setMarkPaid(prev => prev ? { ...prev, paymentMethod: e.target.value as PaymentMethod } : null)}
+                  onChange={e => setMarkPaid(prev => prev ? { ...prev, paymentMethod: e.target.value as ExpensePaymentMethod } : null)}
                 >
                   <option value="">Selecione...</option>
                   {PAYMENT_METHODS.map(m => (
