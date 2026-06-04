@@ -51,7 +51,7 @@ function fmtValue(coupon: Coupon): string {
 
 function couponToISODate(dateStr: string): string {
   if (!dateStr) return ''
-  return new Date(dateStr + 'T00:00:00').toISOString()
+  return new Date(dateStr + 'T00:00:00Z').toISOString()
 }
 
 function isoToInputDate(iso: string | null | undefined): string {
