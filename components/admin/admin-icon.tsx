@@ -7,7 +7,7 @@ type IconName =
   | "bell" | "settings" | "logout" | "edit" | "trash" | "eye" | "upload" | "image"
   | "package" | "truck" | "user" | "users" | "money" | "cart" | "filter"
   | "download" | "history" | "list" | "moreH" | "sparkles" | "tag" | "factory"
-  | "store" | "creditCard" | "fileText" | "plug" | "mail" | "mapPin"
+  | "store" | "creditCard" | "fileText" | "plug" | "mail" | "mapPin" | "wallet"
 
 interface AdminIconProps {
   name: IconName
@@ -66,6 +66,7 @@ const paths: Record<IconName, React.ReactNode> = {
   plug: <><path d="M6 2v3M10 2v3"/><path d="M5 5h6v2a3 3 0 01-6 0V5z"/><path d="M8 10v4"/></>,
   mail: <><rect x="1.5" y="3.5" width="13" height="9" rx="1"/><path d="M1.5 5.5l6.5 4 6.5-4"/></>,
   mapPin: <><path d="M8 2a4 4 0 014 4c0 2.5-4 8-4 8S4 8.5 4 6a4 4 0 014-4z"/><circle cx="8" cy="6" r="1.5"/></>,
+  wallet: <><rect x="1.5" y="5" width="13" height="9" rx="1"/><path d="M5 5V3.5a1 1 0 011-1h4a1 1 0 011 1V5"/><rect x="10" y="8" width="4.5" height="3" rx="0.5"/></>,
 }
 
 export function AdminIcon({ name, size = 16, className = "", style }: AdminIconProps) {
