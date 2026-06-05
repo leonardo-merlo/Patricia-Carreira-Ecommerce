@@ -23,14 +23,7 @@ export function ProductImage({
   if (hasError) {
     // next/image não otimiza SVG — usa img nativo para o placeholder
     // eslint-disable-next-line @next/next/no-img-element
-    return (
-      <img
-        src={PLACEHOLDER}
-        alt=""
-        aria-hidden="true"
-        className="absolute inset-0 h-full w-full object-cover"
-      />
-    )
+    return <img src={PLACEHOLDER} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" />
   }
 
   return (

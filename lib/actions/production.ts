@@ -111,8 +111,12 @@ export async function createManualProductionOrder(input: {
     return { success: false, error: poErr?.message ?? 'Erro ao criar OP' }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const itemPayload: any = {
+  const itemPayload: {
+    production_order_id: string
+    quantity_requested: number
+    output_material_id?: string
+    product_variant_id?: string
+  } = {
     production_order_id: po.id,
     quantity_requested: input.quantity,
     ...(input.is_for_material

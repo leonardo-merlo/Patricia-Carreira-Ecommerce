@@ -448,7 +448,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
 
                 {tab === 'atacado' && (
                   atacado.length === 0 ? (
-                    <tr><td colSpan={7} style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--text-3)' }}>Nenhum pedido atacado. Clique em "Novo pedido atacado" para criar.</td></tr>
+                    <tr><td colSpan={7} style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--text-3)' }}>Nenhum pedido atacado. Clique em &quot;Novo pedido atacado&quot; para criar.</td></tr>
                   ) : atacado.map((o) => {
                     const s = ATACADO_STATUS[o.status] ?? { cls: 'neutral', txt: o.status }
                     const initials = o.customer_name.split(' ').map((x) => x[0]).slice(0, 2).join('')
