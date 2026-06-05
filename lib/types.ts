@@ -404,11 +404,12 @@ export type FilterState = {
 
 /** Opção de frete retornada pela Melhor Envio */
 export type ShippingOption = {
-  id: string;
-  name: string; // ex: "SEDEX", "PAC", "Jadlog"
+  id: number;               // service ID do Melhor Envio
+  name: string;             // ex: "SEDEX", "PAC", "Jadlog .Package"
+  company: string;          // ex: "Correios", "Jadlog"
   price: number;
-  delivery_days: number;
-  logo_url: string | null;
+  delivery_days_min: number;
+  delivery_days_max: number;
 };
 
 /** Payload do formulário de checkout */

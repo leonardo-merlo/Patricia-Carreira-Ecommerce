@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { ShoppingBag, ChevronRight, ArrowLeft } from "lucide-react"
+import { ShoppingBag, ChevronRight, ArrowLeft, Package } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -52,6 +52,8 @@ export default async function PedidosPage() {
       payment_status,
       payment_method,
       total_amount,
+      shipping_method,
+      tracking_code,
       created_at,
       order_items (
         product_name,
@@ -122,46 +124,85 @@ export default async function PedidosPage() {
             const firstItem = items[0]
             const extraCount = items.length - 1
 
+            const trackingCode = order.tracking_code as string | null
+            const shippingMethod = order.shipping_method as string | null
+            const correiosUrl = trackingCode
+              ? `https://rastreamento.correios.com.br/app/index.php?objetos=${trackingCode}`
+              : null
+
             return (
-              <Link
+              <div
                 key={order.id}
-                href={`/pedido/${order.id}`}
-                className="flex items-center justify-between gap-4 rounded-xl border border-outline-variant bg-surface-container-low p-5 transition-colors hover:bg-surface-container"
+                className="flex flex-col gap-0 rounded-xl border border-outline-variant bg-surface-container-low overflow-hidden"
               >
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-label-md text-label-md text-on-surface">
-                      Pedido #{shortId}
-                    </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColor}`}
-                    >
-                      {statusLabel}
-                    </span>
+                {/* Linha principal — clicável */}
+                <Link
+                  href={`/pedido/${order.id}`}
+                  className="flex items-center justify-between gap-4 p-5 transition-colors hover:bg-surface-container"
+                >
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-label-md text-label-md text-on-surface">
+                        Pedido #{shortId}
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColor}`}
+                      >
+                        {statusLabel}
+                      </span>
+                    </div>
+
+                    {firstItem && (
+                      <p className="truncate font-body-md text-body-md text-on-surface-variant">
+                        {firstItem.product_name}
+                        {extraCount > 0 && ` + ${extraCount} item${extraCount > 1 ? "s" : ""}`}
+                      </p>
+                    )}
+
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 font-caption text-caption text-on-surface-variant">
+                      <span>{date}</span>
+                      {order.payment_method && (
+                        <span>{METHOD_LABEL[order.payment_method] ?? order.payment_method}</span>
+                      )}
+                    </div>
                   </div>
 
-                  {firstItem && (
-                    <p className="truncate font-body-md text-body-md text-on-surface-variant">
-                      {firstItem.product_name}
-                      {extraCount > 0 && ` + ${extraCount} item${extraCount > 1 ? "s" : ""}`}
-                    </p>
-                  )}
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="font-headline-sm text-headline-sm text-on-surface">
+                      {formatPrice(order.total_amount)}
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-on-surface-variant" />
+                  </div>
+                </Link>
 
-                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 font-caption text-caption text-on-surface-variant">
-                    <span>{date}</span>
-                    {order.payment_method && (
-                      <span>{METHOD_LABEL[order.payment_method] ?? order.payment_method}</span>
+                {/* Rastreio — aparece só quando disponível */}
+                {trackingCode && (
+                  <div className="flex items-center justify-between gap-3 border-t border-outline-variant bg-surface-container px-5 py-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Package className="h-4 w-4 flex-shrink-0 text-primary" />
+                      <div className="min-w-0">
+                        <p className="font-caption text-caption text-on-surface-variant">
+                          {shippingMethod ?? "Rastreio"}
+                        </p>
+                        <p className="font-label-md text-label-md text-on-surface tracking-wider">
+                          {trackingCode}
+                        </p>
+                      </div>
+                    </div>
+                    {correiosUrl && (
+                      <a
+                        href={correiosUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 rounded-lg border border-outline-variant px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Rastrear
+                      </a>
                     )}
                   </div>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className="font-headline-sm text-headline-sm text-on-surface">
-                    {formatPrice(order.total_amount)}
-                  </span>
-                  <ChevronRight className="h-4 w-4 text-on-surface-variant" />
-                </div>
-              </Link>
+                )}
+              </div>
             )
           })}
         </div>

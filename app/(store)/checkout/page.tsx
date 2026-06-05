@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, type FormEvent, type ReactNode } from "rea
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Script from "next/script"
-import { Loader2, QrCode, CreditCard, FileText, ChevronRight } from "lucide-react"
+import { Loader2, QrCode, CreditCard, FileText, ChevronRight, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
@@ -12,7 +12,9 @@ import { cn, formatPrice } from "@/lib/utils"
 import { useCart } from "@/lib/cart-context"
 import { fetchAddressByCEP } from "@/lib/integrations/viacep"
 import { createPayment } from "@/lib/actions/payments"
+import { getShippingOptions } from "@/lib/actions/shipping"
 import type { PaymentMethod } from "@/lib/actions/payments"
+import type { ShippingOption } from "@/lib/types"
 
 // ─── Masks ────────────────────────────────────────────────────────────────────
 
@@ -96,7 +98,8 @@ function validate(
   p: Personal,
   a: Address,
   method: PaymentMethod | null,
-  card: Card
+  card: Card,
+  shipping: ShippingOption | null
 ): Errors {
   const e: Errors = {}
   if (!p.name.trim()) e.name = "Nome obrigatório"
@@ -109,6 +112,7 @@ function validate(
   if (!a.neighborhood.trim()) e.neighborhood = "Bairro obrigatório"
   if (!a.city.trim()) e.city = "Cidade obrigatória"
   if (!a.state.trim()) e.state = "Estado obrigatório"
+  if (!shipping) e.shipping = "Selecione uma opção de frete"
   if (!method) e.method = "Selecione a forma de pagamento"
   if (method === "boleto" && !p.cpf.trim()) e.cpf = "CPF obrigatório para boleto"
   if (method === "credit_card") {
@@ -124,7 +128,7 @@ function validate(
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const { cart, hydrated, clearCart } = useCart()
+  const { cart, hydrated, clearCart, setShipping } = useCart()
 
   const mpRef = useRef<any>(null)
   const [personal, setPersonal] = useState<Personal>(EMPTY_PERSONAL)
@@ -137,6 +141,12 @@ export default function CheckoutPage() {
   const [cepError, setCepError] = useState("")
   const [loading, setLoading] = useState(false)
   const [sdkLoaded, setSdkLoaded] = useState(false)
+
+  // Frete
+  const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([])
+  const [shippingLoading, setShippingLoading] = useState(false)
+  const [shippingError, setShippingError] = useState("")
+  const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null)
 
   useEffect(() => {
     if (hydrated && cart.items.length === 0 && !loading) router.replace("/carrinho")
@@ -162,27 +172,54 @@ export default function CheckoutPage() {
     const masked = maskCEP(value)
     setAddress((prev) => ({ ...prev, cep: masked }))
     setCepError("")
+
     if (masked.replace(/\D/g, "").length === 8) {
       setCepLoading(true)
-      const result = await fetchAddressByCEP(masked)
+      setShippingLoading(true)
+      setShippingOptions([])
+      setShippingError("")
+      setSelectedShipping(null)
+      setShipping(0)
+
+      const cartItems = cart.items.map((i) => ({ variantId: i.variant.id, quantity: i.quantity }))
+
+      const [addressResult, shippingResult] = await Promise.all([
+        fetchAddressByCEP(masked),
+        getShippingOptions(masked, cartItems),
+      ])
+
       setCepLoading(false)
-      if (result) {
+      setShippingLoading(false)
+
+      if (addressResult) {
         setAddress((prev) => ({
           ...prev,
-          street: result.logradouro,
-          neighborhood: result.bairro,
-          city: result.localidade,
-          state: result.uf,
+          street: addressResult.logradouro,
+          neighborhood: addressResult.bairro,
+          city: addressResult.localidade,
+          state: addressResult.uf,
         }))
       } else {
         setCepError("CEP não encontrado")
       }
+
+      if (shippingResult.ok) {
+        setShippingOptions(shippingResult.options)
+      } else {
+        setShippingError(shippingResult.error)
+      }
     }
+  }
+
+  function handleSelectShipping(option: ShippingOption) {
+    setSelectedShipping(option)
+    setShipping(option.price)
+    setErrors((prev) => ({ ...prev, shipping: "" }))
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    const errs = validate(personal, address, method, card)
+    const errs = validate(personal, address, method, card, selectedShipping)
     if (Object.keys(errs).length > 0) {
       setErrors(errs)
       return
@@ -241,6 +278,8 @@ export default function CheckoutPage() {
           })),
           discountAmount: cart.discount_amount,
           shippingAmount: cart.shipping_amount,
+          shippingMethod: selectedShipping?.name ?? null,
+          melhorEnvioServiceId: selectedShipping?.id ?? null,
           couponId: null,
         },
       })
@@ -462,6 +501,88 @@ export default function CheckoutPage() {
 
               <Separator />
 
+              {/* Frete */}
+              <section>
+                <h2 className="mb-4 font-headline-sm text-headline-sm text-on-surface">
+                  Frete
+                </h2>
+
+                {shippingLoading && (
+                  <div className="flex items-center gap-2 font-body-md text-body-md text-on-surface-variant">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Calculando opções de frete...
+                  </div>
+                )}
+
+                {!shippingLoading && shippingError && (
+                  <p className="font-body-md text-body-md text-error">{shippingError}</p>
+                )}
+
+                {!shippingLoading && shippingOptions.length === 0 && !shippingError && (
+                  <p className="font-body-md text-body-md text-on-surface-variant">
+                    Preencha o CEP para ver as opções de frete.
+                  </p>
+                )}
+
+                {!shippingLoading && shippingOptions.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    {shippingOptions.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => handleSelectShipping(option)}
+                        className={cn(
+                          "flex items-center justify-between rounded-lg border p-4 text-left transition-colors",
+                          selectedShipping?.id === option.id
+                            ? "border-primary bg-primary/5"
+                            : "border-outline-variant hover:border-primary/50"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Truck
+                            className={cn(
+                              "h-5 w-5 flex-shrink-0",
+                              selectedShipping?.id === option.id
+                                ? "text-primary"
+                                : "text-on-surface-variant"
+                            )}
+                          />
+                          <div>
+                            <p
+                              className={cn(
+                                "font-label-md text-label-md",
+                                selectedShipping?.id === option.id
+                                  ? "text-on-surface"
+                                  : "text-on-surface-variant"
+                              )}
+                            >
+                              {option.name}
+                            </p>
+                            <p className="font-caption text-caption text-on-surface-variant">
+                              {option.company} · {option.delivery_days_min}–{option.delivery_days_max} dias úteis
+                            </p>
+                          </div>
+                        </div>
+                        <span
+                          className={cn(
+                            "font-label-lg text-label-lg",
+                            selectedShipping?.id === option.id
+                              ? "text-primary"
+                              : "text-on-surface"
+                          )}
+                        >
+                          {formatPrice(option.price)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <FieldError msg={errors.shipping} />
+              </section>
+
+              <Separator />
+
               {/* Pagamento */}
               <section>
                 <h2 className="mb-4 font-headline-sm text-headline-sm text-on-surface">
@@ -625,7 +746,11 @@ export default function CheckoutPage() {
                 )}
                 <div className="flex justify-between text-on-surface-variant">
                   <span>Frete</span>
-                  <span className="italic">A calcular</span>
+                  {selectedShipping ? (
+                    <span>{formatPrice(selectedShipping.price)}</span>
+                  ) : (
+                    <span className="italic">A calcular</span>
+                  )}
                 </div>
               </div>
 

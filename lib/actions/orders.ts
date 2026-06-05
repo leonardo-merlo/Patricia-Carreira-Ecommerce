@@ -36,6 +36,8 @@ type SaveOrderInput = {
   totalAmount: number
   shippingAmount: number
   discountAmount: number
+  shippingMethod: string | null
+  melhorEnvioServiceId: number | null
   couponId: string | null
   userId: string | null
 }
@@ -132,6 +134,8 @@ export async function saveOrder(
       total_amount: input.totalAmount,
       discount_amount: input.discountAmount,
       shipping_amount: input.shippingAmount,
+      shipping_method: input.shippingMethod,
+      melhor_envio_service_id: input.melhorEnvioServiceId,
       payment_status: input.paymentStatus,
       payment_id: input.paymentId,
       payment_method: input.paymentMethod,

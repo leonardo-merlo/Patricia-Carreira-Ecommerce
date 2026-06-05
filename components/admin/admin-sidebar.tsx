@@ -29,8 +29,8 @@ export function AdminSidebar({ openOrders, lowStock }: AdminSidebarProps) {
 
   const primaryNav = [
     { href: '/admin', label: 'Dashboard', icon: 'home' as const, badge: null, badgeAlert: false },
-    { href: '/admin/pedidos', label: 'Pedidos', icon: 'bag' as const, badge: openOrders > 0 ? String(openOrders) : null, badgeAlert: false },
     { href: '/admin/estoque', label: 'Estoque', icon: 'box' as const, badge: lowStock > 0 ? String(lowStock) : null, badgeAlert: lowStock > 0 },
+    { href: '/admin/pedidos', label: 'Pedidos', icon: 'bag' as const, badge: openOrders > 0 ? String(openOrders) : null, badgeAlert: false },
     { href: '/admin/materias', label: 'Matérias-Primas', icon: 'layers' as const, badge: null, badgeAlert: false },
     { href: '/admin/producao', label: 'Produção', icon: 'wrench' as const, badge: null, badgeAlert: false },
   ]

@@ -24,6 +24,8 @@ export type CreatePaymentInput = {
     lineItems: OrderLineItem[]
     discountAmount: number
     shippingAmount: number
+    shippingMethod: string | null
+    melhorEnvioServiceId: number | null
     couponId: string | null
   }
 }
@@ -92,6 +94,8 @@ export async function createPayment(
         paymentStatus: result.status === 'approved' ? 'paid' : 'pending',
         totalAmount: input.amount,
         shippingAmount: input.orderData.shippingAmount,
+        shippingMethod: input.orderData.shippingMethod,
+        melhorEnvioServiceId: input.orderData.melhorEnvioServiceId,
         discountAmount: input.orderData.discountAmount,
         couponId: input.orderData.couponId,
         userId,

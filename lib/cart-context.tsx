@@ -17,6 +17,7 @@ type CartAction =
   | { type: "UPDATE_QUANTITY"; variantId: string; quantity: number }
   | { type: "APPLY_COUPON"; coupon: Coupon }
   | { type: "REMOVE_COUPON" }
+  | { type: "SET_SHIPPING"; amount: number }
   | { type: "CLEAR_CART" }
   | { type: "HYDRATE"; payload: Cart }
 
@@ -101,6 +102,9 @@ function cartReducer(state: Cart, action: CartAction): Cart {
         ...totals(state.items, null, state.shipping_amount),
       }
 
+    case "SET_SHIPPING":
+      return { ...state, ...totals(state.items, state.coupon, action.amount) }
+
     case "CLEAR_CART":
       return EMPTY_CART
 
@@ -122,6 +126,7 @@ interface CartContextValue {
   updateQuantity: (variantId: string, quantity: number) => void
   applyCoupon: (coupon: Coupon) => void
   removeCoupon: () => void
+  setShipping: (amount: number) => void
   clearCart: () => void
 }
 
@@ -157,6 +162,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: "UPDATE_QUANTITY", variantId, quantity }),
     applyCoupon: (coupon) => dispatch({ type: "APPLY_COUPON", coupon }),
     removeCoupon: () => dispatch({ type: "REMOVE_COUPON" }),
+    setShipping: (amount) => dispatch({ type: "SET_SHIPPING", amount }),
     clearCart: () => dispatch({ type: "CLEAR_CART" }),
   }
 

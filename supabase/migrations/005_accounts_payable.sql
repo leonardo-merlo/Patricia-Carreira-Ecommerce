@@ -27,3 +27,6 @@ CREATE POLICY "admin_all_accounts_payable" ON accounts_payable
         AND user_profiles.role = 'admin'
     )
   );
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON accounts_payable TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON accounts_payable TO service_role;

@@ -3,6 +3,7 @@ import { createHmac } from 'crypto'
 import { createServiceClient } from '@/lib/supabase/service'
 import { decrementStockByOrderId } from '@/lib/actions/orders'
 import { recordCouponUsage } from '@/lib/actions/coupons'
+import { purchaseShippingLabel } from '@/lib/actions/label'
 
 function validateMPSignature(req: NextRequest, dataId: string): boolean {
   const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET
@@ -103,6 +104,12 @@ export async function POST(req: NextRequest) {
       } catch (err) {
         console.error('[MP Webhook] erro ao registrar uso de cupom:', err)
       }
+    }
+
+    try {
+      await purchaseShippingLabel(order.id)
+    } catch (err) {
+      console.error('[MP Webhook] erro ao comprar etiqueta ME:', err)
     }
 
     console.log('[MP Webhook] pedido aprovado:', order.id)
