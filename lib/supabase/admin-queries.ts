@@ -192,7 +192,7 @@ export async function getRetailOrders(limit = 50): Promise<RetailOrderRow[]> {
   const { data, error } = await supabase
     .from('orders')
     .select(`
-      id, created_at, total_amount, status, payment_status, payment_method, tracking_code, nfe_url, nfe_number,
+      id, created_at, total_amount, status, payment_status, payment_method, tracking_code, melhor_envio_order_id, nfe_url, nfe_number,
       customer:customers(name, address),
       items:order_items(
         id, quantity, unit_price,
@@ -256,7 +256,7 @@ export async function getRetailOrders(limit = 50): Promise<RetailOrderRow[]> {
       payment_status: (o.payment_status as string) ?? 'pending',
       status: o.status as string,
       tracking_code: (o.tracking_code as string | null) ?? null,
-      melhor_envio_order_id: null,
+      melhor_envio_order_id: (o.melhor_envio_order_id as string | null) ?? null,
       nfe_url: (o.nfe_url as string | null) ?? null,
       nfe_number: (o.nfe_number as string | null) ?? null,
       items,
