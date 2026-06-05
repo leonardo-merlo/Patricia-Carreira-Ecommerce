@@ -45,6 +45,7 @@ type SaveOrderInput = {
 export async function saveOrder(
   input: SaveOrderInput
 ): Promise<{ ok: true; orderId: string } | { ok: false; error: string }> {
+  console.log('[saveOrder] start — method:', input.paymentMethod, 'shipping:', input.shippingMethod, 'serviceId:', input.melhorEnvioServiceId)
   const supabase = createServiceClient()
 
   let customerId: string
@@ -145,9 +146,10 @@ export async function saveOrder(
     .single()
 
   if (orderError || !order) {
-    console.error('[saveOrder] order insert error:', orderError)
+    console.error('[saveOrder] order insert error:', JSON.stringify(orderError))
     return { ok: false, error: 'Erro ao criar pedido' }
   }
+  console.log('[saveOrder] order created:', order.id)
 
   const itemRows = input.lineItems.map((item) => ({
     order_id: order.id,

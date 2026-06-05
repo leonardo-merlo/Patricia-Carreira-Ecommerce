@@ -62,12 +62,16 @@ export async function createPayment(
   }
 
   console.log('[createPayment] method:', input.method, 'amount:', input.amount, 'userId:', userId)
+  console.log('[createPayment] orderData keys:', input.orderData ? Object.keys(input.orderData) : 'none')
+  console.log('[createPayment] shippingMethod:', input.orderData?.shippingMethod, 'serviceId:', input.orderData?.melhorEnvioServiceId)
 
   try {
     let result: MPPaymentResult
 
     if (input.method === 'pix') {
+      console.log('[createPayment] calling createPixPayment')
       result = await createPixPayment(input.amount, mpPayer)
+      console.log('[createPayment] MP result status:', result.status)
     } else if (input.method === 'boleto') {
       if (!input.payer.cpf) throw new Error('CPF obrigatório para boleto')
       result = await createBoletoPayment(input.amount, mpPayer)
@@ -84,6 +88,7 @@ export async function createPayment(
     }
 
     // Save order to DB and decrement stock (for card, immediately; for pix/boleto, on webhook)
+    console.log('[createPayment] calling saveOrder')
     let orderId = result.id
     if (input.orderData) {
       const saved = await saveOrder({
