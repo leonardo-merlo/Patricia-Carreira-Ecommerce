@@ -1,6 +1,9 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResend() {
+  if (!process.env.RESEND_API_KEY) return null
+  return new Resend(process.env.RESEND_API_KEY)
+}
 
 export type OrderConfirmationInput = {
   to: string
@@ -35,6 +38,12 @@ export async function sendOrderConfirmation(input: OrderConfirmationInput): Prom
     .join('')
 
   const from = process.env.RESEND_FROM || 'onboarding@resend.dev'
+
+  const resend = getResend()
+  if (!resend) {
+    console.warn('[Resend] RESEND_API_KEY não configurada — email não enviado')
+    return
+  }
 
   await resend.emails.send({
     from,
