@@ -6,6 +6,7 @@ import type { RawMaterialRow, VariantWithBOM, PurchaseRequestRow } from '@/lib/s
 import {
   registerMaterialEntry,
   createRawMaterial,
+  registerMaterialExit,
   addBOMEntry,
   updateBOMEntry,
   deleteBOMEntry,
@@ -13,21 +14,32 @@ import {
   cancelPurchaseRequest,
 } from '@/lib/actions/raw-materials'
 
-const CATEGORIES = ['Bordado', 'Couro', 'Metais', 'Forro', 'Lona', 'Aviamentos'] as const
+const CATEGORIES = ['Bordado', 'Couro', 'Metais', 'Forro', 'Tecido', 'Aviamentos'] as const
 type Category = typeof CATEGORIES[number]
 
+// material_type: tipo específico dentro da categoria (dropdown ou livre)
+const MATERIAL_TYPES: Record<Category, string[]> = {
+  Bordado: [],  // campo livre — nome do modelo
+  Couro: ['legítimo', 'legítimo de carneiro', 'sintético', 'vaqueta', 'raspa de porco', 'marrom'],
+  Metais: ['argola', 'mosquetão', 'ilhó', 'botão', 'fivela', 'corrente', 'rebite', 'pressão'],
+  Forro: [],    // sem tipo definido por enquanto
+  Tecido: ['lona', 'tricoline', 'viscolinho', 'viscose', 'sarjada', 'viscode'],
+  Aviamentos: [], // sem tipo definido
+}
+
+// subcategory: estado/posição/tamanho dentro do tipo
 const SUBCATEGORIES: Record<Category, string[]> = {
   Bordado: [],
   Couro: ['bruto', 'com laser'],
-  Metais: ['argola', 'mosquetão', 'ilhó', 'botão', 'fivela', 'corrente', 'rebite', 'pressão'],
+  Metais: ['P', 'M', 'G'],
   Forro: ['frente', 'costas', 'bolsos', 'lateral'],
-  Lona: ['bruta', 'com corte'],
+  Tecido: ['bruta', 'com corte'],
   Aviamentos: ['etiqueta', 'zíper'],
 }
 
 function deriveType(category: Category, subcategory: string): 'bruta' | 'intermediaria' {
   if (category === 'Couro' && subcategory === 'com laser') return 'intermediaria'
-  if (category === 'Lona' && subcategory === 'com corte') return 'intermediaria'
+  if (category === 'Tecido' && subcategory === 'com corte') return 'intermediaria'
   return 'bruta'
 }
 
@@ -50,6 +62,13 @@ function formatQty(qty: number, unit: string) {
 }
 
 export function MateriasClient({ materials, variants, purchaseRequests }: MateriasClientProps) {
+  // ── Exit modal ──
+  const [exitFor, setExitFor] = useState<RawMaterialRow | null>(null)
+  const [exitQty, setExitQty] = useState('1')
+  const [exitReason, setExitReason] = useState<'perda' | 'ajuste' | 'uso_manual'>('ajuste')
+  const [exitNotes, setExitNotes] = useState('')
+  const [exitError, setExitError] = useState('')
+
   // ── Entry modal ──
   const [entryFor, setEntryFor] = useState<RawMaterialRow | null>(null)
   const [entryQty, setEntryQty] = useState('1')
@@ -76,6 +95,8 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
   const [newCategory, setNewCategory] = useState<string>(CATEGORIES[0])
   const [newSubcategory, setNewSubcategory] = useState<string>(() => SUBCATEGORIES[CATEGORIES[0]]?.[0] ?? '')
   const [newSubcategoryFree, setNewSubcategoryFree] = useState<string>('')
+  const [newMaterialType, setNewMaterialType] = useState<string>(() => MATERIAL_TYPES[CATEGORIES[0]]?.[0] ?? '')
+  const [newMaterialTypeFree, setNewMaterialTypeFree] = useState<string>('')
   const [newUnit, setNewUnit] = useState<'metro' | 'unidade' | 'kg' | 'cm'>('unidade')
   const [newStock, setNewStock] = useState('0')
   const [newMinStock, setNewMinStock] = useState('0')
@@ -185,9 +206,34 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
 
   function handleCategoryChange(cat: string) {
     setNewCategory(cat)
+    const types = MATERIAL_TYPES[cat as Category] ?? []
+    setNewMaterialType(types[0] ?? '')
+    setNewMaterialTypeFree('')
     const subs = SUBCATEGORIES[cat as Category] ?? []
     setNewSubcategory(subs[0] ?? '')
     setNewSubcategoryFree('')
+  }
+
+  function handleExit() {
+    if (!exitFor) return
+    const qty = parseFloat(exitQty.replace(',', '.'))
+    if (isNaN(qty) || qty <= 0) { setExitError('Informe uma quantidade válida'); return }
+    setExitError('')
+    startTransition(async () => {
+      const res = await registerMaterialExit({
+        material_id: exitFor.id,
+        quantity: qty,
+        reason: exitReason,
+        notes: exitNotes || null,
+      })
+      if (res.success) {
+        setExitFor(null)
+        setExitQty('1')
+        setExitNotes('')
+      } else {
+        setExitError(res.error)
+      }
+    })
   }
 
   function openNewMaterial() {
@@ -195,6 +241,8 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
     setNewName(''); setNewCategory(CATEGORIES[0])
     setNewSubcategory(SUBCATEGORIES[CATEGORIES[0]]?.[0] ?? '')
     setNewSubcategoryFree('')
+    setNewMaterialType(MATERIAL_TYPES[CATEGORIES[0]]?.[0] ?? '')
+    setNewMaterialTypeFree('')
     setNewUnit('unidade'); setNewStock('0'); setNewMinStock('0')
     setNewCost(''); setNewSupplier(''); setNewNotes(''); setNewError('')
   }
@@ -214,11 +262,16 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
         ? deriveType(newCategory as Category, subcategoryValue)
         : 'bruta'
 
+      const materialTypeValue = newCategory === 'Bordado'
+        ? (newMaterialTypeFree.trim() || null)
+        : (newMaterialType || null)
+
       const res = await createRawMaterial({
         name: newName.trim(),
         type: typeValue,
         category: newCategory,
         subcategory: subcategoryValue,
+        material_type: materialTypeValue,
         unit: newUnit,
         stock_quantity: stockQty,
         minimum_stock: isNaN(minQty) ? 0 : minQty,
@@ -228,6 +281,8 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
       })
       if (res.success) {
         setShowNewMaterial(false)
+        setNewMaterialType(MATERIAL_TYPES[CATEGORIES[0]]?.[0] ?? '')
+        setNewMaterialTypeFree('')
       } else {
         setNewError(res.error)
       }
@@ -323,6 +378,14 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
                               }}
                             >
                               <AdminIcon name="plus" size={11} /> Entrada
+                            </button>
+                            <button
+                              className="btn sm ghost"
+                              onClick={() => { setExitFor(m); setExitQty('1'); setExitNotes(''); setExitError('') }}
+                              title="Registrar saída"
+                              data-testid={`btn-exit-${m.id}`}
+                            >
+                              <AdminIcon name="minus" size={11} />
                             </button>
                           </div>
                         </td>
@@ -735,6 +798,38 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
                   </select>
                 </div>
 
+                {/* material_type — dropdown para categorias com lista fixa */}
+                {(MATERIAL_TYPES[newCategory as Category]?.length ?? 0) > 0 && newCategory !== 'Bordado' && (
+                  <div className="field">
+                    <label>Tipo</label>
+                    <select
+                      id="new-material-type"
+                      className="select"
+                      value={newMaterialType}
+                      onChange={(e) => setNewMaterialType(e.target.value)}
+                    >
+                      {MATERIAL_TYPES[newCategory as Category].map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* material_type — campo livre para Bordado */}
+                {newCategory === 'Bordado' && (
+                  <div className="field">
+                    <label>Modelo do bordado</label>
+                    <input
+                      id="new-material-type-free"
+                      type="text"
+                      className="input"
+                      placeholder="Ex: Floral Pochete, Geométrico Liberty..."
+                      value={newMaterialTypeFree}
+                      onChange={(e) => setNewMaterialTypeFree(e.target.value)}
+                    />
+                  </div>
+                )}
+
                 {/* Subcategoria — dropdown para categorias com opções fixas */}
                 {newCategory !== 'Bordado' && (SUBCATEGORIES[newCategory as Category]?.length ?? 0) > 0 && (
                   <div className="field">
@@ -800,6 +895,91 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
               <button className="btn primary" onClick={handleCreateMaterial} disabled={isPending}>
                 <AdminIcon name="plus" size={12} />
                 {isPending ? 'Salvando...' : 'Cadastrar matéria-prima'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de saída de estoque ── */}
+      {exitFor && (
+        <div className="modal-backdrop" onClick={() => setExitFor(null)}>
+          <div className="modal" id="exit-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3>Registrar Saída</h3>
+                <div className="sub">
+                  {exitFor.name} · estoque atual {formatQty(exitFor.stock_quantity, exitFor.unit)}
+                </div>
+              </div>
+              <button className="icon-btn" onClick={() => setExitFor(null)}>
+                <AdminIcon name="x" size={14} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: 'grid', gap: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="field">
+                    <label>Quantidade a retirar</label>
+                    <div style={{ display: 'flex' }}>
+                      <input
+                        id="exit-qty"
+                        type="number"
+                        min="0.001"
+                        step="0.001"
+                        className="input"
+                        value={exitQty}
+                        onChange={(e) => setExitQty(e.target.value)}
+                        style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
+                      />
+                      <span style={{
+                        display: 'grid', placeItems: 'center', background: 'var(--surface-2)',
+                        border: '1px solid var(--border-input)', borderLeft: 'none', padding: '0 12px',
+                        borderTopRightRadius: 6, borderBottomRightRadius: 6, color: 'var(--text-2)',
+                        fontSize: 12, whiteSpace: 'nowrap',
+                      }}>
+                        {exitFor.unit}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label>Motivo</label>
+                    <select
+                      id="exit-reason"
+                      className="select"
+                      value={exitReason}
+                      onChange={(e) => setExitReason(e.target.value as typeof exitReason)}
+                    >
+                      <option value="ajuste">Ajuste de inventário</option>
+                      <option value="perda">Perda / descarte</option>
+                      <option value="uso_manual">Uso avulso</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="field">
+                  <label>Observações (opcional)</label>
+                  <input
+                    id="exit-notes"
+                    type="text"
+                    className="input"
+                    value={exitNotes}
+                    onChange={(e) => setExitNotes(e.target.value)}
+                  />
+                </div>
+                {exitError && (
+                  <div style={{ color: 'var(--red)', fontSize: 12 }}>{exitError}</div>
+                )}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn ghost" onClick={() => setExitFor(null)}>Cancelar</button>
+              <button
+                id="btn-confirmar-saida"
+                className="btn danger"
+                disabled={isPending}
+                onClick={handleExit}
+              >
+                {isPending ? 'Salvando...' : 'Confirmar Saída'}
               </button>
             </div>
           </div>
