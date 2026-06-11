@@ -791,3 +791,178 @@
 
 .admin-root :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .admin-root .sidebar, .admin-root .topbar { user-select: none; }
+
+/* ── Kanban de produção ──────────────────────────────── */
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.kanban-column {
+  background: var(--bg-surface, #fff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.kanban-column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-muted, #f9fafb);
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  font-weight: 600;
+  font-size: 0.8125rem;
+}
+
+.kanban-column-count {
+  background: var(--border, #e5e7eb);
+  border-radius: 999px;
+  padding: 0 0.375rem;
+  font-size: 0.75rem;
+}
+
+.kanban-column-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  min-height: 80px;
+}
+
+.kanban-empty {
+  color: var(--text-muted, #9ca3af);
+  font-size: 0.8125rem;
+  text-align: center;
+  padding: 1rem 0;
+}
+
+/* ── OP card ─────────────────────────────────────────── */
+.op-card {
+  background: var(--bg, #fff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 0.375rem;
+  padding: 0.625rem;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.op-card:hover,
+.op-card:focus {
+  border-color: var(--color-primary, #6366f1);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  outline: none;
+}
+
+.op-card--missing { border-left: 3px solid #f59e0b; }
+
+.op-card-title {
+  font-weight: 600;
+  font-size: 0.8125rem;
+  line-height: 1.3;
+}
+
+.op-card-meta {
+  color: var(--text-muted, #6b7280);
+  font-size: 0.75rem;
+}
+
+.op-card-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.op-cat-badge {
+  font-size: 0.625rem;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-weight: 500;
+}
+
+.op-cat-badge--done    { background: #d1fae5; color: #065f46; }
+.op-cat-badge--ok      { background: #e0f2fe; color: #0369a1; }
+.op-cat-badge--missing { background: #fef3c7; color: #92400e; }
+
+.op-card-advance {
+  align-self: flex-end;
+  font-size: 0.6875rem;
+  margin-top: 0.125rem;
+}
+
+/* ── OP checklist no modal ──────────────────────────── */
+.op-checklist {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 0.375rem;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+
+.op-checklist-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-muted, #f9fafb);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.op-check-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  align-items: start;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border-subtle, #f3f4f6);
+}
+
+.op-check-row:last-child { border-bottom: none; }
+.op-check-row--needs_laser   { background: #fffbeb; }
+.op-check-row--needs_purchase { background: #fff1f2; }
+
+.op-check-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  grid-column: 1;
+}
+
+.op-check-category { font-weight: 500; }
+
+.op-check-status {
+  font-size: 0.75rem;
+  font-weight: 500;
+  grid-column: 2;
+  white-space: nowrap;
+  padding-top: 2px;
+}
+
+.op-check-status--ok             { color: #059669; }
+.op-check-status--needs_laser    { color: #d97706; }
+.op-check-status--needs_purchase { color: #dc2626; }
+
+.op-check-detail {
+  grid-column: 1 / -1;
+  font-size: 0.75rem;
+  color: var(--text-muted, #6b7280);
+  padding-left: 1.25rem;
+}
+
+.op-notes {
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-muted, #f9fafb);
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+}
