@@ -11,6 +11,7 @@ import type {
 } from '@/lib/supabase/admin-queries'
 import { createWholesaleOrder, previewOrderCheck, type ItemCheckResult } from '@/lib/actions/wholesale'
 import { createPurchaseRequests } from '@/lib/actions/raw-materials'
+import { updateOrderStatus } from '@/lib/actions/orders'
 import { generateShippingLabel, getLabelPrintUrl } from '@/lib/actions/label'
 
 interface PedidosClientProps {
@@ -67,6 +68,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
   // Atacado: dropdown de ações por pedido
   const [openActionsFor, setOpenActionsFor] = useState<string | null>(null)
   const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null)
+  const [statusLoading, setStatusLoading] = useState<string | null>(null)
 
   // Wholesale creation modal
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -514,8 +516,11 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-2)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                  onClick={() => {
-                    alert(`Alterar status para "${opt.label}" — em breve`)
+                  disabled={statusLoading === o.id}
+                  onClick={async () => {
+                    setStatusLoading(o.id)
+                    await updateOrderStatus(o.id, opt.value)
+                    setStatusLoading(null)
                     setOpenActionsFor(null)
                     setDropdownPos(null)
                   }}

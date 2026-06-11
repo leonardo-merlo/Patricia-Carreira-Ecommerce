@@ -228,3 +228,28 @@ export async function decrementStockByOrderId(orderId: string): Promise<void> {
     if (rpcError) throw new Error(`Falha ao decrementar estoque: ${rpcError.message}`)
   }
 }
+
+// ─── Atualizar status de pedido atacado ──────────────────────────────────────
+
+export type UpdateOrderStatusResult =
+  | { success: true }
+  | { success: false; error: string }
+
+export async function updateOrderStatus(
+  orderId: string,
+  status: string,
+): Promise<UpdateOrderStatusResult> {
+  const supabase = createServiceClient()
+  const { revalidatePath } = await import('next/cache')
+
+  const { error } = await supabase
+    .from('orders')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', orderId)
+
+  if (error) return { success: false, error: error.message }
+
+  revalidatePath('/admin/pedidos')
+  return { success: true }
+}
+

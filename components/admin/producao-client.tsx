@@ -129,7 +129,7 @@ export function ProducaoClient({ ops, variants }: ProducaoClientProps) {
           <h1 className="page-title">Produção</h1>
           <p className="page-subtitle">{activeCount} {activeCount === 1 ? 'ordem ativa' : 'ordens ativas'}</p>
         </div>
-        <button id="btn-nova-op" className="btn btn-primary" onClick={() => setShowNovaOp(true)}>
+        <button id="btn-nova-op" className="btn primary" onClick={() => setShowNovaOp(true)}>
           <AdminIcon name="plus" /> Nova OP
         </button>
       </div>
@@ -165,10 +165,11 @@ export function ProducaoClient({ ops, variants }: ProducaoClientProps) {
       </div>
 
       {displaySelected && (
-        <div className="modal-overlay" onClick={() => setSelectedOp(null)}>
+        <div className="modal-backdrop" onClick={() => setSelectedOp(null)}>
           <div
-            className="modal-panel"
+            className="modal"
             id={`op-detail-${displaySelected.id}`}
+            style={{ width: 520, maxHeight: '85vh', overflowY: 'auto' }}
             onClick={(e) => e.stopPropagation()}
           >
             <OpDetailModal
@@ -185,11 +186,11 @@ export function ProducaoClient({ ops, variants }: ProducaoClientProps) {
       )}
 
       {showNovaOp && (
-        <div className="modal-overlay" onClick={() => setShowNovaOp(false)}>
-          <div className="modal-panel" id="nova-op-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-backdrop" onClick={() => setShowNovaOp(false)}>
+          <div className="modal" id="nova-op-modal" style={{ width: 440 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="modal-title">Nova Ordem de Produção</h2>
-              <button className="modal-close" onClick={() => setShowNovaOp(false)}>✕</button>
+              <h3>Nova Ordem de Produção</h3>
+              <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--text-3)', padding: '0 4px' }} onClick={() => setShowNovaOp(false)}>✕</button>
             </div>
             <div className="modal-body">
               <div className="field">
@@ -225,13 +226,13 @@ export function ProducaoClient({ ops, variants }: ProducaoClientProps) {
                   onChange={(e) => setNovaNotes(e.target.value)}
                 />
               </div>
-              {novaError && <p className="error-msg">{novaError}</p>}
+              {novaError && <p style={{ color: 'var(--red)', fontSize: 12, margin: '4px 0 0' }}>{novaError}</p>}
             </div>
             <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={() => setShowNovaOp(false)}>Cancelar</button>
+              <button className="btn ghost" onClick={() => setShowNovaOp(false)}>Cancelar</button>
               <button
                 id="btn-criar-op"
-                className="btn btn-primary"
+                className="btn primary"
                 disabled={isPending}
                 onClick={handleCreateOp}
               >
@@ -291,7 +292,7 @@ function OpCard({
       </div>
       {ADVANCE_LABEL[op.status] && (
         <button
-          className="btn btn-sm btn-ghost op-card-advance"
+          className="btn sm ghost op-card-advance"
           disabled={isPending}
           onClick={(e) => { e.stopPropagation(); onAdvance() }}
           data-testid="btn-advance-op"
@@ -328,24 +329,24 @@ function OpDetailModal({
     <>
       <div className="modal-header">
         <div>
-          <h2 className="modal-title">{op.variant_label}</h2>
-          <p className="modal-subtitle">
+          <h3>{op.variant_label}</h3>
+          <div className="sub">
             {op.variant_sku} · Qtd: {op.quantity_requested}
             {op.customer_name && ` · ${op.customer_name}`}
-          </p>
+          </div>
         </div>
-        <button className="modal-close" onClick={onClose} data-testid="btn-close-op-detail">✕</button>
+        <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--text-3)', padding: '0 4px' }} onClick={onClose} data-testid="btn-close-op-detail">✕</button>
       </div>
 
       <div className="modal-body">
         {categories.length === 0 ? (
-          <p className="text-muted">Este produto não tem BOM cadastrado.</p>
+          <p className="cust-meta">Este produto não tem BOM cadastrado.</p>
         ) : (
           <div className="op-checklist" id="op-material-checklist">
             <div className="op-checklist-header">
               <span>Materiais necessários</span>
               <button
-                className="btn btn-xs btn-ghost"
+                className="btn sm ghost"
                 onClick={onRefresh}
                 disabled={isPending}
                 data-testid="btn-refresh-materials"
@@ -411,7 +412,7 @@ function OpDetailModal({
       <div className="modal-footer">
         {op.status !== 'completed' && op.status !== 'cancelled' && (
           <button
-            className="btn btn-ghost btn-danger"
+            className="btn danger-outline"
             onClick={onCancel}
             disabled={isPending}
             data-testid="btn-cancel-op"
@@ -421,7 +422,7 @@ function OpDetailModal({
         )}
         {ADVANCE_LABEL[op.status] && (
           <button
-            className="btn btn-primary"
+            className="btn primary"
             onClick={onAdvance}
             disabled={isPending}
             data-testid="btn-advance-op-detail"

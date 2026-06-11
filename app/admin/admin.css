@@ -798,6 +798,7 @@
   grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
   align-items: start;
+  margin-top: 1rem;
 }
 
 .kanban-column {

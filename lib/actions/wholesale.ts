@@ -115,7 +115,40 @@ export async function createWholesaleOrder(
     }
   }
 
+  // Decrementa estoque de variantes com quantidade disponível em stock
+  for (const itemCheck of check) {
+    if (itemCheck.quantity_from_stock > 0) {
+      const { data: variant } = await supabase
+        .from('product_variants')
+        .select('stock_quantity')
+        .eq('id', itemCheck.variant_id)
+        .single()
+
+      if (variant) {
+        const before = Number(variant.stock_quantity)
+        const after = Math.max(0, before - itemCheck.quantity_from_stock)
+
+        await supabase
+          .from('product_variants')
+          .update({ stock_quantity: after })
+          .eq('id', itemCheck.variant_id)
+
+        await supabase.from('stock_adjustments').insert({
+          target: 'product_variant',
+          target_id: itemCheck.variant_id,
+          quantity_before: before,
+          quantity_after: after,
+          delta: -(itemCheck.quantity_from_stock),
+          reason: 'venda',
+          notes: `Pedido atacado ${order.id.slice(-6).toUpperCase()}`,
+          created_by: 'henrique',
+        })
+      }
+    }
+  }
+
   revalidatePath('/admin/pedidos')
+  revalidatePath('/admin/estoque')
 
   return { success: true, order_id: order.id, check }
 }

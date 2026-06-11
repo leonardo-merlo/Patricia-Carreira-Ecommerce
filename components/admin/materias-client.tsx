@@ -849,21 +849,6 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
                   </div>
                 )}
 
-                {/* Subcategoria — campo livre para Bordado */}
-                {newCategory === 'Bordado' && (
-                  <div className="field">
-                    <label>Modelo do bordado</label>
-                    <input
-                      id="new-material-subcategory-free"
-                      type="text"
-                      className="input"
-                      placeholder="Ex: Floral Pochete, Geométrico Liberty..."
-                      value={newSubcategoryFree}
-                      onChange={(e) => setNewSubcategoryFree(e.target.value)}
-                    />
-                  </div>
-                )}
-
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                   <div className="field">
                     <label>Estoque inicial</label>
