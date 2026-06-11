@@ -64,7 +64,7 @@ export async function checkAndSetMaterials(opId: string): Promise<CheckMaterials
     .from('bill_of_materials')
     .select(`
       quantity_needed,
-      material:raw_materials(id, name, category, subcategory, unit, stock_quantity)
+      material:raw_materials(id, name, category, subcategory, material_type, unit, stock_quantity)
     `)
     .eq('product_variant_id', op.product_variant_id)
 
@@ -82,7 +82,7 @@ export async function checkAndSetMaterials(opId: string): Promise<CheckMaterials
     quantity_needed: number
     material: {
       id: string; name: string; category: string
-      subcategory: string | null; unit: string; stock_quantity: number
+      subcategory: string | null; material_type: string | null; unit: string; stock_quantity: number
     } | null
   }
 
@@ -103,12 +103,17 @@ export async function checkAndSetMaterials(opId: string): Promise<CheckMaterials
 
     let couroBrutoAvailable: number | null = null
     if (category === 'Couro' && mat.subcategory === 'com laser') {
-      const { data: bruto } = await supabase
+      const brutoQuery = supabase
         .from('raw_materials')
         .select('stock_quantity')
         .eq('category', 'Couro')
         .eq('subcategory', 'bruto')
-        .maybeSingle()
+
+      if (mat.material_type) {
+        brutoQuery.eq('material_type', mat.material_type)
+      }
+
+      const { data: bruto } = await brutoQuery.maybeSingle()
       couroBrutoAvailable = bruto ? Number(bruto.stock_quantity) : 0
     }
 
