@@ -100,13 +100,18 @@ export async function createWholesaleOrder(
   )
 
   for (const itemCheck of check) {
-    if (itemCheck.quantity_to_produce > 0) {
-      await createManualProductionOrder({
-        product_variant_id: itemCheck.variant_id,
-        quantity: itemCheck.quantity_to_produce,
-        order_id: order.id,
-        notes: null,
-      })
+    if (itemCheck.quantity_to_produce > 0 && (itemCheck.scenario === 'B' || itemCheck.scenario === 'C')) {
+      try {
+        await createManualProductionOrder({
+          product_variant_id: itemCheck.variant_id,
+          quantity: itemCheck.quantity_to_produce,
+          order_id: order.id,
+          notes: null,
+        })
+      } catch (err) {
+        console.error('[createWholesaleOrder] Falha ao criar OP para variante', itemCheck.variant_id, err)
+        // Continua — pedido já foi criado, OP pode ser criada manualmente no painel
+      }
     }
   }
 
