@@ -135,6 +135,7 @@ export async function checkAndSetMaterials(opId: string): Promise<CheckMaterials
     })
     .eq('id', opId)
 
+  revalidatePath('/admin/producao')
   return { success: true }
 }
 
