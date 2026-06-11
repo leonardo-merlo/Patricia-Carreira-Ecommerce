@@ -268,7 +268,7 @@ function OpCard({
       role="button"
       tabIndex={0}
       onClick={onSelect}
-      onKeyDown={(e) => { if (e.key === 'Enter') onSelect() }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
     >
       <div className="op-card-title">{op.variant_label ?? '—'}</div>
       <div className="op-card-meta">
