@@ -66,6 +66,7 @@ export async function createRawMaterial(input: {
   type: 'bruta' | 'intermediaria'
   category: string
   subcategory: string | null
+  material_type: string | null
   unit: 'metro' | 'unidade' | 'kg' | 'cm'
   stock_quantity: number
   minimum_stock: number
@@ -80,6 +81,7 @@ export async function createRawMaterial(input: {
     type: input.type,
     category: input.category,
     subcategory: input.subcategory,
+    material_type: input.material_type,
     unit: input.unit,
     stock_quantity: input.stock_quantity,
     minimum_stock: input.minimum_stock,
@@ -246,6 +248,63 @@ export async function cancelPurchaseRequest(id: string): Promise<StockEntryResul
   if (error) {
     return { success: false, error: error.message }
   }
+
+  revalidatePath('/admin/materias')
+  return { success: true }
+}
+
+// ─── Saída manual de estoque ──────────────────────────────────────────────────
+
+export async function registerMaterialExit(input: {
+  material_id: string
+  quantity: number
+  reason: 'perda' | 'ajuste' | 'uso_manual'
+  notes: string | null
+}): Promise<StockEntryResult> {
+  const supabase = createServiceClient()
+
+  const { data: mat, error: fetchErr } = await supabase
+    .from('raw_materials')
+    .select('stock_quantity')
+    .eq('id', input.material_id)
+    .single()
+
+  if (fetchErr || !mat) {
+    return { success: false, error: 'Matéria-prima não encontrada' }
+  }
+
+  const before = Number(mat.stock_quantity)
+  const after = before - input.quantity
+
+  if (after < 0) {
+    return { success: false, error: `Estoque insuficiente. Disponível: ${before}` }
+  }
+
+  const { error: updateErr } = await supabase
+    .from('raw_materials')
+    .update({ stock_quantity: after })
+    .eq('id', input.material_id)
+
+  if (updateErr) {
+    return { success: false, error: updateErr.message }
+  }
+
+  const reasonMap: Record<string, string> = {
+    perda: 'perda',
+    ajuste: 'ajuste_inventario',
+    uso_manual: 'ajuste_inventario',
+  }
+
+  await supabase.from('stock_adjustments').insert({
+    target: 'raw_material',
+    target_id: input.material_id,
+    quantity_before: before,
+    quantity_after: after,
+    delta: -input.quantity,
+    reason: reasonMap[input.reason],
+    notes: input.notes,
+    created_by: 'henrique',
+  })
 
   revalidatePath('/admin/materias')
   return { success: true }
