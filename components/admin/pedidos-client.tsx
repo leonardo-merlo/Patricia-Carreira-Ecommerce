@@ -9,8 +9,7 @@ import type {
   WholesaleCustomer,
   WholesaleVariant,
 } from '@/lib/supabase/admin-queries'
-import { createWholesaleOrder, previewOrderCheck, type ItemCheckResult, type SuggestedOP } from '@/lib/actions/wholesale'
-import { createProductionOrders } from '@/lib/actions/production'
+import { createWholesaleOrder, previewOrderCheck, type ItemCheckResult } from '@/lib/actions/wholesale'
 import { createPurchaseRequests } from '@/lib/actions/raw-materials'
 import { generateShippingLabel, getLabelPrintUrl } from '@/lib/actions/label'
 
@@ -88,7 +87,6 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
   // Preview state (antes de salvar)
   const [previewCheck, setPreviewCheck] = useState<ItemCheckResult[]>([])
   const [previewError, setPreviewError] = useState('')
-  const [editedOPs, setEditedOPs] = useState<SuggestedOP[]>([])
 
   const filteredVarejo = varejo.filter((o) => {
     if (statusFilter && o.status !== statusFilter) return false
@@ -125,7 +123,6 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
     setPurchaseError('')
     setPreviewCheck([])
     setPreviewError('')
-    setEditedOPs([])
     setLineItems([{ variantId: wholesaleVariants[0]?.id ?? '', qty: 1 }])
     setOrderNotes('')
     setSelectedCustomer(wholesaleCustomers[0]?.id ?? '')
@@ -146,7 +143,6 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
         return
       }
       setPreviewCheck(res.check)
-      setEditedOPs(res.check.flatMap((r) => r.suggested_ops))
       setCreateStep('preview')
     })
   }
@@ -177,29 +173,10 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
 
       setCreatedOrderId(res.order_id)
       setCheckResult(res.check)
-
-      // Cria OPs automaticamente se foram selecionadas no preview
-      if (editedOPs.length > 0) {
-        const opsRes = await createProductionOrders({ order_id: res.order_id, ops: editedOPs })
-        if (opsRes.success) setOpCreated(true)
-      }
-
+      // OPs are auto-created inside createWholesaleOrder for scenarios B/C
+      const hasProduction = res.check.some((r) => r.scenario === 'B' || r.scenario === 'C')
+      if (hasProduction) setOpCreated(true)
       setCreateStep('result')
-    })
-  }
-
-  function handleCreateOPs() {
-    const allOps: SuggestedOP[] = checkResult.flatMap((r) => r.suggested_ops)
-    if (allOps.length === 0) return
-    setOpError('')
-
-    startTransition(async () => {
-      const res = await createProductionOrders({ order_id: createdOrderId, ops: allOps })
-      if (!res.success) {
-        setOpError(res.error)
-      } else {
-        setOpCreated(true)
-      }
     })
   }
 
@@ -232,7 +209,6 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
   }, 0)
 
   const allScenariosOk = checkResult.every((r) => r.scenario === 'A' || r.scenario === 'B' || r.scenario === 'C')
-  const hasSuggestedOPs = checkResult.some((r) => r.suggested_ops.length > 0)
   const hasItemsToPurchase = checkResult.some((r) => r.items_to_purchase.length > 0)
 
   return (
@@ -669,33 +645,6 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                             </div>
                           </div>
 
-                          {/* OPs sugeridas com toggle */}
-                          {r.suggested_ops.length > 0 && (
-                            <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
-                              <div className="cust-meta" style={{ fontSize: 11, fontWeight: 500, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>OPs a criar</div>
-                              {r.suggested_ops.map((op, i) => {
-                                const isSelected = editedOPs.some((e) => e.output_id === op.output_id && e.type === op.type)
-                                return (
-                                  <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '3px 0', cursor: 'pointer' }}>
-                                    <input
-                                      type="checkbox"
-                                      checked={isSelected}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          setEditedOPs((prev) => [...prev, op])
-                                        } else {
-                                          setEditedOPs((prev) => prev.filter((p) => !(p.output_id === op.output_id && p.type === op.type)))
-                                        }
-                                      }}
-                                    />
-                                    <span className={`badge ${op.type === 'corte' ? 'neutral' : 'varejo'}`} style={{ fontSize: 10.5 }}>{op.type}</span>
-                                    <span>{op.label}</span>
-                                  </label>
-                                )
-                              })}
-                            </div>
-                          )}
-
                           {/* Compras necessárias */}
                           {r.items_to_purchase.length > 0 && (
                             <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border)', background: 'var(--red-soft)' }}>
@@ -716,7 +665,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                   <button className="btn ghost" onClick={() => setCreateStep('form')}>← Voltar</button>
                   <button className="btn primary" onClick={handleSubmitOrder} disabled={isPending}>
                     <AdminIcon name="checkCircle" size={12} />
-                    {isPending ? 'Criando pedido...' : `Criar pedido${editedOPs.length > 0 ? ` + ${editedOPs.length} OP(s)` : ''}`}
+                    {isPending ? 'Criando pedido...' : 'Criar pedido'}
                   </button>
                 </div>
               </>
@@ -805,19 +754,6 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                             </div>
                           )}
 
-                          {/* OPs sugeridas */}
-                          {r.suggested_ops.length > 0 && (
-                            <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
-                              <div className="cust-meta" style={{ fontSize: 11, fontWeight: 500, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>OPs sugeridas</div>
-                              {r.suggested_ops.map((op, i) => (
-                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '3px 0' }}>
-                                  <span className={`badge ${op.type === 'corte' ? 'neutral' : 'varejo'}`} style={{ fontSize: 10.5 }}>{op.type}</span>
-                                  <span>{op.label}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
                           {/* O que precisa comprar */}
                           {r.items_to_purchase.length > 0 && (
                             <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border)', background: 'var(--red-soft)' }}>
@@ -852,12 +788,6 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                 </div>
                 <div className="modal-footer">
                   <button className="btn ghost" onClick={() => setShowCreateModal(false)}>Fechar</button>
-                  {hasSuggestedOPs && !opCreated && (
-                    <button className="btn primary" onClick={handleCreateOPs} disabled={isPending}>
-                      <AdminIcon name="factory" size={12} />
-                      {isPending ? 'Criando OPs...' : `Criar ${checkResult.flatMap((r) => r.suggested_ops).length} ordem(ns) de produção`}
-                    </button>
-                  )}
                   {hasItemsToPurchase && !purchasesCreated && (
                     <button
                       className="btn"
