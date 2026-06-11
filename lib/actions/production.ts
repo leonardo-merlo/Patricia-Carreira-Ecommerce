@@ -2,104 +2,30 @@
 
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/service'
-import type { SuggestedOP } from '@/lib/actions/wholesale'
-
-export type CreateOPInput = {
-  order_id: string | null
-  ops: SuggestedOP[]
-}
+import type { MissingMaterialEntry } from '@/lib/supabase/admin-queries'
 
 export type CreateOPResult =
   | { success: true; op_ids: string[] }
   | { success: false; error: string }
 
-export async function createProductionOrders(input: CreateOPInput): Promise<CreateOPResult> {
-  const supabase = createServiceClient()
-  const opIds: string[] = []
-
-  // Passagem 1: cria OPs de corte e mapeia material_id → op_id
-  const corteOpByMaterialId: Record<string, string> = {}
-
-  for (const op of input.ops.filter((o) => o.type === 'corte')) {
-    const { data: po, error: poErr } = await supabase
-      .from('production_orders')
-      .insert({
-        order_id: input.order_id,
-        type: op.type,
-        status: 'draft',
-        notes: null,
-        created_by: 'henrique',
-        depends_on_op_id: null,
-      })
-      .select('id')
-      .single()
-
-    if (poErr || !po) return { success: false, error: poErr?.message ?? 'Erro ao criar OP de corte' }
-
-    const { error: itemErr } = await supabase.from('production_order_items').insert({
-      production_order_id: po.id,
-      quantity_requested: op.quantity,
-      output_material_id: op.output_id,
-    })
-
-    if (itemErr) return { success: false, error: itemErr.message }
-
-    corteOpByMaterialId[op.output_id] = po.id
-    opIds.push(po.id)
-  }
-
-  // Passagem 2: cria OPs de acabamento com depends_on_op_id apontando para o corte correto
-  for (const op of input.ops.filter((o) => o.type !== 'corte')) {
-    const dependsMaterialId = op.depends_on_material_ids?.[0] ?? null
-    const dependsOnOpId = dependsMaterialId ? (corteOpByMaterialId[dependsMaterialId] ?? null) : null
-
-    const { data: po, error: poErr } = await supabase
-      .from('production_orders')
-      .insert({
-        order_id: input.order_id,
-        type: op.type,
-        status: 'draft',
-        notes: null,
-        created_by: 'henrique',
-        depends_on_op_id: dependsOnOpId,
-      })
-      .select('id')
-      .single()
-
-    if (poErr || !po) return { success: false, error: poErr?.message ?? 'Erro ao criar OP de acabamento' }
-
-    const { error: itemErr } = await supabase.from('production_order_items').insert({
-      production_order_id: po.id,
-      quantity_requested: op.quantity,
-      ...(op.is_for_material
-        ? { output_material_id: op.output_id }
-        : { product_variant_id: op.output_id }),
-    })
-
-    if (itemErr) return { success: false, error: itemErr.message }
-
-    opIds.push(po.id)
-  }
-
-  revalidatePath('/admin/producao')
-  revalidatePath('/admin/pedidos')
-
-  return { success: true, op_ids: opIds }
+export type CreateManualOPInput = {
+  product_variant_id: string
+  quantity: number
+  order_id: string | null
+  notes: string | null
 }
 
-export async function createManualProductionOrder(input: {
-  type: 'corte' | 'acabamento'
-  output_id: string
-  is_for_material: boolean
-  quantity: number
-  notes: string | null
-}): Promise<CreateOPResult> {
+export async function createManualProductionOrder(
+  input: CreateManualOPInput,
+): Promise<CreateOPResult> {
   const supabase = createServiceClient()
 
   const { data: po, error: poErr } = await supabase
     .from('production_orders')
     .insert({
-      type: input.type,
+      product_variant_id: input.product_variant_id,
+      quantity_requested: input.quantity,
+      order_id: input.order_id,
       status: 'draft',
       notes: input.notes,
       created_by: 'henrique',
@@ -111,26 +37,148 @@ export async function createManualProductionOrder(input: {
     return { success: false, error: poErr?.message ?? 'Erro ao criar OP' }
   }
 
-  const itemPayload: {
-    production_order_id: string
-    quantity_requested: number
-    output_material_id?: string
-    product_variant_id?: string
-  } = {
-    production_order_id: po.id,
-    quantity_requested: input.quantity,
-    ...(input.is_for_material
-      ? { output_material_id: input.output_id }
-      : { product_variant_id: input.output_id }),
-  }
-
-  const { error: itemErr } = await supabase.from('production_order_items').insert(itemPayload)
-  if (itemErr) {
-    return { success: false, error: itemErr.message }
-  }
+  await checkAndSetMaterials(po.id)
 
   revalidatePath('/admin/producao')
   return { success: true, op_ids: [po.id] }
+}
+
+export type CheckMaterialsResult =
+  | { success: true }
+  | { success: false; error: string }
+
+export async function checkAndSetMaterials(opId: string): Promise<CheckMaterialsResult> {
+  const supabase = createServiceClient()
+
+  const { data: op, error: opErr } = await supabase
+    .from('production_orders')
+    .select('product_variant_id, quantity_requested')
+    .eq('id', opId)
+    .single()
+
+  if (opErr || !op?.product_variant_id) {
+    return { success: false, error: 'OP ou variante não encontrada' }
+  }
+
+  const { data: bom, error: bomErr } = await supabase
+    .from('bill_of_materials')
+    .select(`
+      quantity_needed,
+      material:raw_materials(id, name, category, subcategory, material_type, unit, stock_quantity)
+    `)
+    .eq('product_variant_id', op.product_variant_id)
+
+  if (bomErr) return { success: false, error: bomErr.message }
+
+  if (!bom || bom.length === 0) {
+    await supabase
+      .from('production_orders')
+      .update({ materials_sufficient: true, missing_materials: [], material_checks: {} })
+      .eq('id', opId)
+    return { success: true }
+  }
+
+  type BomRow = {
+    quantity_needed: number
+    material: {
+      id: string; name: string; category: string
+      subcategory: string | null; material_type: string | null; unit: string; stock_quantity: number
+    } | null
+  }
+
+  const missing: MissingMaterialEntry[] = []
+  const checksInit: Record<string, boolean> = {}
+
+  for (const row of bom as unknown as BomRow[]) {
+    const mat = row.material
+    if (!mat) continue
+
+    const needed = row.quantity_needed * op.quantity_requested
+    const available = Number(mat.stock_quantity)
+    const category = mat.category
+
+    if (!(category in checksInit)) checksInit[category] = false
+
+    if (available >= needed) continue
+
+    let couroBrutoAvailable: number | null = null
+    if (category === 'Couro' && mat.subcategory === 'com laser') {
+      const brutoQuery = supabase
+        .from('raw_materials')
+        .select('stock_quantity')
+        .eq('category', 'Couro')
+        .eq('subcategory', 'bruto')
+
+      if (mat.material_type) {
+        brutoQuery.eq('material_type', mat.material_type)
+      }
+
+      const { data: bruto } = await brutoQuery.maybeSingle()
+      couroBrutoAvailable = bruto ? Number(bruto.stock_quantity) : 0
+    }
+
+    missing.push({
+      material_id: mat.id,
+      material_name: mat.name,
+      category,
+      needed,
+      available,
+      missing: needed - available,
+      unit: mat.unit,
+      couro_bruto_available: couroBrutoAvailable,
+    })
+  }
+
+  const sufficient = missing.length === 0
+
+  await supabase
+    .from('production_orders')
+    .update({
+      materials_sufficient: sufficient,
+      missing_materials: missing,
+      material_checks: checksInit,
+    })
+    .eq('id', opId)
+
+  revalidatePath('/admin/producao')
+  return { success: true }
+}
+
+export type ToggleCheckResult =
+  | { success: true }
+  | { success: false; error: string }
+
+export async function toggleMaterialCheck(
+  opId: string,
+  category: string,
+  checked: boolean,
+): Promise<ToggleCheckResult> {
+  const supabase = createServiceClient()
+
+  const { data: op, error: fetchErr } = await supabase
+    .from('production_orders')
+    .select('material_checks')
+    .eq('id', opId)
+    .single()
+
+  if (fetchErr || !op) {
+    return { success: false, error: 'OP não encontrada' }
+  }
+
+  const updated = {
+    ...(op.material_checks as Record<string, boolean>),
+    [category]: checked,
+  }
+
+  const { error: updateErr } = await supabase
+    .from('production_orders')
+    .update({ material_checks: updated })
+    .eq('id', opId)
+
+  if (updateErr) return { success: false, error: updateErr.message }
+
+  revalidatePath('/admin/producao')
+  return { success: true }
 }
 
 export type AdvanceStatusResult =

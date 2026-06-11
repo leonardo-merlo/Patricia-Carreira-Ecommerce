@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/service'
+import { createManualProductionOrder } from '@/lib/actions/production'
 
 export type WholesaleOrderLineItem = {
   variant_id: string
@@ -24,16 +25,6 @@ export type BomItemCheck = {
   recipe_check?: BomItemCheck[]
 }
 
-export type SuggestedOP = {
-  type: 'corte' | 'acabamento'
-  label: string
-  quantity: number
-  output_id: string
-  is_for_material: boolean
-  // IDs dos materiais intermediários que este acabamento precisa (vazio para cortes e cenário B)
-  depends_on_material_ids: string[]
-}
-
 export type PurchaseItem = {
   material_id: string
   material_name: string
@@ -53,7 +44,6 @@ export type ItemCheckResult = {
   scenario: 'A' | 'B' | 'C' | 'D'
   scenario_label: string
   bom_check: BomItemCheck[]
-  suggested_ops: SuggestedOP[]
   items_to_purchase: PurchaseItem[]
 }
 
@@ -108,6 +98,22 @@ export async function createWholesaleOrder(
   const check = await Promise.all(
     input.items.map((it) => checkItemAvailability(supabase, it.variant_id, it.quantity)),
   )
+
+  for (const itemCheck of check) {
+    if (itemCheck.quantity_to_produce > 0 && (itemCheck.scenario === 'B' || itemCheck.scenario === 'C')) {
+      try {
+        await createManualProductionOrder({
+          product_variant_id: itemCheck.variant_id,
+          quantity: itemCheck.quantity_to_produce,
+          order_id: order.id,
+          notes: null,
+        })
+      } catch (err) {
+        console.error('[createWholesaleOrder] Falha ao criar OP para variante', itemCheck.variant_id, err)
+        // Continua — pedido já foi criado, OP pode ser criada manualmente no painel
+      }
+    }
+  }
 
   revalidatePath('/admin/pedidos')
 
@@ -179,7 +185,6 @@ async function checkItemAvailability(
       scenario: 'A',
       scenario_label: 'Estoque disponível',
       bom_check: [],
-      suggested_ops: [],
       items_to_purchase: [],
     }
   }
@@ -203,7 +208,6 @@ async function checkItemAvailability(
       scenario: 'D',
       scenario_label: 'Sem receita cadastrada — não é possível produzir',
       bom_check: [],
-      suggested_ops: [],
       items_to_purchase: [],
     }
   }
@@ -301,42 +305,14 @@ async function checkItemAvailability(
 
   let scenario: 'A' | 'B' | 'C' | 'D'
   let scenarioLabel: string
-  const suggestedOps: SuggestedOP[] = []
   const itemsToPurchase: PurchaseItem[] = []
 
   if (allBomSufficient) {
     scenario = 'B'
-    scenarioLabel = 'Materiais disponíveis — OP de acabamento'
-    suggestedOps.push({
-      type: 'acabamento',
-      label: `${deficit}× ${productName} — ${variantLabel}`,
-      quantity: deficit,
-      output_id: variantId,
-      is_for_material: false,
-      depends_on_material_ids: [],
-    })
+    scenarioLabel = 'Materiais disponíveis — produção possível'
   } else if (shortIntermediaries.length > 0 && canProduceAll && !hasShortBruta) {
     scenario = 'C'
-    scenarioLabel = 'MP intermediária em falta — OP corte + OP acabamento'
-    for (const si of shortIntermediaries) {
-      suggestedOps.push({
-        type: 'corte',
-        label: `${si.needed}× ${si.materialName}`,
-        quantity: si.needed,
-        output_id: si.materialId,
-        is_for_material: true,
-        depends_on_material_ids: [],
-      })
-    }
-    suggestedOps.push({
-      type: 'acabamento',
-      label: `${deficit}× ${productName} — ${variantLabel}`,
-      quantity: deficit,
-      output_id: variantId,
-      is_for_material: false,
-      // este acabamento depende dos cortes gerados acima
-      depends_on_material_ids: shortIntermediaries.map((si) => si.materialId),
-    })
+    scenarioLabel = 'MP intermediária em falta — produção possível com corte'
   } else {
     scenario = 'D'
     scenarioLabel = 'Materiais insuficientes — compra necessária'
@@ -375,7 +351,6 @@ async function checkItemAvailability(
     scenario,
     scenario_label: scenarioLabel,
     bom_check: bomCheck,
-    suggested_ops: suggestedOps,
     items_to_purchase: itemsToPurchase,
   }
 }
@@ -393,7 +368,6 @@ function makeErrorResult(variantId: string, qty: number): ItemCheckResult {
     scenario: 'D',
     scenario_label: 'Erro ao verificar variante',
     bom_check: [],
-    suggested_ops: [],
     items_to_purchase: [],
   }
 }
