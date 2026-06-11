@@ -73,7 +73,6 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
   // ── Nova matéria-prima modal ──
   const [showNewMaterial, setShowNewMaterial] = useState(false)
   const [newName, setNewName] = useState('')
-  const [newType, setNewType] = useState<'bruta' | 'intermediaria'>('bruta')
   const [newCategory, setNewCategory] = useState<string>(CATEGORIES[0])
   const [newSubcategory, setNewSubcategory] = useState<string>(() => SUBCATEGORIES[CATEGORIES[0]]?.[0] ?? '')
   const [newSubcategoryFree, setNewSubcategoryFree] = useState<string>('')
@@ -193,7 +192,7 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
 
   function openNewMaterial() {
     setShowNewMaterial(true)
-    setNewName(''); setNewType('bruta'); setNewCategory(CATEGORIES[0])
+    setNewName(''); setNewCategory(CATEGORIES[0])
     setNewSubcategory(SUBCATEGORIES[CATEGORIES[0]]?.[0] ?? '')
     setNewSubcategoryFree('')
     setNewUnit('unidade'); setNewStock('0'); setNewMinStock('0')
@@ -722,28 +721,11 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
                   <input className="input" placeholder="Ex: Couro Vaqueta Caramelo" value={newName} onChange={(e) => setNewName(e.target.value)} />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div className="field">
-                    <label>Tipo</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                      {(['bruta', 'intermediaria'] as const).map((t) => (
-                        <button
-                          key={t}
-                          className={`btn sm ${newType === t ? 'primary' : 'ghost'}`}
-                          style={{ justifyContent: 'center' }}
-                          onClick={() => setNewType(t)}
-                        >
-                          {t === 'bruta' ? 'Bruta' : 'Intermediária'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="field">
-                    <label>Unidade</label>
-                    <select className="select" value={newUnit} onChange={(e) => setNewUnit(e.target.value as typeof newUnit)}>
-                      {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-                    </select>
-                  </div>
+                <div className="field">
+                  <label>Unidade</label>
+                  <select className="select" value={newUnit} onChange={(e) => setNewUnit(e.target.value as typeof newUnit)}>
+                    {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                  </select>
                 </div>
 
                 <div className="field">
@@ -755,11 +737,11 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
 
                 {/* Subcategoria — dropdown para categorias com opções fixas */}
                 {newCategory !== 'Bordado' && (SUBCATEGORIES[newCategory as Category]?.length ?? 0) > 0 && (
-                  <div>
-                    <label className="form-label">Subcategoria</label>
+                  <div className="field">
+                    <label>Subcategoria</label>
                     <select
                       id="new-material-subcategory"
-                      className="form-select"
+                      className="select"
                       value={newSubcategory}
                       onChange={(e) => setNewSubcategory(e.target.value)}
                     >
@@ -772,12 +754,12 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
 
                 {/* Subcategoria — campo livre para Bordado */}
                 {newCategory === 'Bordado' && (
-                  <div>
-                    <label className="form-label">Modelo do bordado</label>
+                  <div className="field">
+                    <label>Modelo do bordado</label>
                     <input
                       id="new-material-subcategory-free"
                       type="text"
-                      className="form-input"
+                      className="input"
                       placeholder="Ex: Floral Pochete, Geométrico Liberty..."
                       value={newSubcategoryFree}
                       onChange={(e) => setNewSubcategoryFree(e.target.value)}
