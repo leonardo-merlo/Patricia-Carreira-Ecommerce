@@ -51,7 +51,7 @@ export async function getDashboardKPIs(): Promise<DashboardKPIs> {
     supabase
       .from('production_orders')
       .select('*', { count: 'exact', head: true })
-      .in('status', ['draft', 'materials_checked', 'approved', 'in_progress']),
+      .in('status', ['draft', 'approved', 'in_progress']),
 
     supabase
       .from('product_variants')
@@ -385,35 +385,30 @@ export async function getAllVariantsWithBOM(): Promise<VariantWithBOM[]> {
 export type MissingMaterialEntry = {
   material_id: string
   material_name: string
+  category: string
   needed: number
   available: number
   missing: number
   unit: string
-}
-
-export type ProductionOrderItemRow = {
-  id: string
-  quantity_requested: number
-  quantity_produced: number
-  materials_sufficient: boolean | null
-  missing_materials: MissingMaterialEntry[]
-  product_variant_id: string | null
-  variant_label: string | null
-  output_material_id: string | null
-  output_material_name: string | null
+  couro_bruto_available: number | null
 }
 
 export type ProductionOrderRow = {
   id: string
   order_id: string | null
-  depends_on_op_id: string | null
   customer_name: string | null
-  type: 'corte' | 'acabamento' | 'beneficiamento'
+  product_variant_id: string | null
+  variant_sku: string | null
+  variant_label: string | null
+  quantity_requested: number
+  quantity_produced: number
+  materials_sufficient: boolean | null
+  missing_materials: MissingMaterialEntry[]
+  material_checks: Record<string, boolean>
   status: string
   notes: string | null
   created_by: string
   created_at: string
-  items: ProductionOrderItemRow[]
 }
 
 export async function getProductionOrders(limit = 50): Promise<ProductionOrderRow[]> {
@@ -422,15 +417,13 @@ export async function getProductionOrders(limit = 50): Promise<ProductionOrderRo
   const { data, error } = await supabase
     .from('production_orders')
     .select(`
-      id, order_id, depends_on_op_id, type, status, notes, created_by, created_at,
+      id, order_id, product_variant_id, quantity_requested, quantity_produced,
+      materials_sufficient, missing_materials, material_checks,
+      status, notes, created_by, created_at,
       order:orders(customer:customers(name)),
-      items:production_order_items(
-        id, quantity_requested, quantity_produced, materials_sufficient, missing_materials,
-        product_variant_id, output_material_id,
-        variant:product_variants(sku, size, color, product:products(name)),
-        output_material:raw_materials(name)
-      )
+      variant:product_variants(sku, size, color, product:products(name))
     `)
+    .not('status', 'eq', 'cancelled')
     .order('created_at', { ascending: false })
     .limit(limit)
 
@@ -439,54 +432,46 @@ export async function getProductionOrders(limit = 50): Promise<ProductionOrderRo
     return []
   }
 
-  type ItemRaw = {
-    id: string
-    quantity_requested: number
-    quantity_produced: number
-    materials_sufficient: boolean | null
-    missing_materials: MissingMaterialEntry[] | null
-    product_variant_id: string | null
-    output_material_id: string | null
-    variant: { sku: string; size: string | null; color: string | null; product: { name: string } | null } | null
-    output_material: { name: string } | null
-  }
+  type VariantRaw = {
+    sku: string; size: string | null; color: string | null
+    product: { name: string } | null
+  } | null
 
   type OrderRaw = {
-    id: string; order_id: string | null; depends_on_op_id: string | null
-    type: string; status: string
-    notes: string | null; created_by: string; created_at: string
+    id: string; order_id: string | null; product_variant_id: string | null
+    quantity_requested: number; quantity_produced: number
+    materials_sufficient: boolean | null
+    missing_materials: MissingMaterialEntry[] | null
+    material_checks: Record<string, boolean> | null
+    status: string; notes: string | null; created_by: string; created_at: string
     order: { customer: { name: string } | null } | null
-    items: ItemRaw[]
+    variant: VariantRaw
   }
 
-  return ((data ?? []) as unknown as OrderRaw[]).map((o) => ({
-    id: o.id,
-    order_id: o.order_id,
-    depends_on_op_id: o.depends_on_op_id ?? null,
-    customer_name: o.order?.customer?.name ?? null,
-    type: o.type as 'corte' | 'acabamento' | 'beneficiamento',
-    status: o.status,
-    notes: o.notes,
-    created_by: o.created_by,
-    created_at: o.created_at,
-    items: (o.items ?? []).map((it) => {
-      const v = it.variant
-      const variantLabel = v
-        ? `${v.product?.name ?? ''} — ${[v.color, v.size].filter(Boolean).join(' ')}`
-        : null
-      return {
-        id: it.id,
-        quantity_requested: it.quantity_requested,
-        quantity_produced: it.quantity_produced,
-        materials_sufficient: it.materials_sufficient,
-        missing_materials: it.missing_materials ?? [],
-        product_variant_id: it.product_variant_id,
-        variant_label: variantLabel,
-        output_material_id: it.output_material_id,
-        output_material_name: it.output_material?.name ?? null,
-      }
-    }),
-  }))
+  return ((data ?? []) as unknown as OrderRaw[]).map((o) => {
+    const v = o.variant
+    const productName = v?.product?.name ?? 'Produto'
+    const parts = [v?.color, v?.size].filter(Boolean).join(' — ')
+    const variantLabel = parts ? `${productName} — ${parts}` : productName
+
+    return {
+      id: o.id,
+      order_id: o.order_id,
+      customer_name: o.order?.customer?.name ?? null,
+      product_variant_id: o.product_variant_id,
+      variant_sku: v?.sku ?? null,
+      variant_label: variantLabel,
+      quantity_requested: o.quantity_requested,
+      quantity_produced: o.quantity_produced,
+      materials_sufficient: o.materials_sufficient,
+      missing_materials: o.missing_materials ?? [],
+      material_checks: o.material_checks ?? {},
+      status: o.status,
+      notes: o.notes,
+      created_by: o.created_by,
+      created_at: o.created_at,
+    }
+  })
 }
 
 // ─── Atacado ──────────────────────────────────────────────────────────────────
