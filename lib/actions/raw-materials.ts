@@ -65,6 +65,7 @@ export async function createRawMaterial(input: {
   name: string
   type: 'bruta' | 'intermediaria'
   category: string
+  subcategory: string | null
   unit: 'metro' | 'unidade' | 'kg' | 'cm'
   stock_quantity: number
   minimum_stock: number
@@ -78,6 +79,7 @@ export async function createRawMaterial(input: {
     name: input.name,
     type: input.type,
     category: input.category,
+    subcategory: input.subcategory,
     unit: input.unit,
     stock_quantity: input.stock_quantity,
     minimum_stock: input.minimum_stock,
