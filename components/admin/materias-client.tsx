@@ -340,8 +340,10 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                               <span style={{ fontWeight: 500, fontSize: 12.5 }}>{m.name}</span>
-                              <div className="row" style={{ gap: 4 }}>
-                                <span className="cust-meta" style={{ fontSize: 11 }}>{m.category}</span>
+                              <div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>
+                                <span className="cust-meta" style={{ fontSize: 11 }}>
+                                  {[m.category, m.material_type, m.subcategory].filter(Boolean).join(' › ')}
+                                </span>
                                 {s.badge}
                               </div>
                             </div>
