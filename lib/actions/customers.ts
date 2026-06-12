@@ -20,6 +20,7 @@ export async function updateCustomer(
     email: string | null
     phone: string | null
     cpf_cnpj: string | null
+    instagram: string | null
     type: 'retail' | 'wholesale'
     address: Address
   },
@@ -32,6 +33,7 @@ export async function updateCustomer(
       email: data.email || null,
       phone: data.phone || null,
       cpf_cnpj: data.cpf_cnpj || null,
+      instagram: data.instagram || null,
       type: data.type,
       address: data.address,
     })
@@ -47,6 +49,7 @@ export async function createCustomer(data: {
   email: string | null
   phone: string | null
   cpf_cnpj: string | null
+  instagram: string | null
   type: 'retail' | 'wholesale'
 }): Promise<{ error: string | null }> {
   const supabase = createServiceClient()
@@ -55,6 +58,7 @@ export async function createCustomer(data: {
     email: data.email || null,
     phone: data.phone || null,
     cpf_cnpj: data.cpf_cnpj || null,
+    instagram: data.instagram || null,
     type: data.type,
   })
 

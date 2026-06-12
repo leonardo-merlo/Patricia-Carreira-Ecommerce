@@ -14,6 +14,7 @@ export type CustomerRow = {
   email: string | null
   phone: string | null
   cpf_cnpj: string | null
+  instagram: string | null
   type: 'retail' | 'wholesale'
   address: {
     street?: string
@@ -37,7 +38,7 @@ export async function getCustomers(): Promise<CustomerRow[]> {
   const [custRes, ordersRes] = await Promise.all([
     supabase
       .from('customers')
-      .select('id, name, email, phone, cpf_cnpj, type, address, created_at')
+      .select('id, name, email, phone, cpf_cnpj, instagram, type, address, created_at')
       .order('created_at', { ascending: false }),
     supabase
       .from('orders')
@@ -87,6 +88,7 @@ export async function getCustomers(): Promise<CustomerRow[]> {
       email: (c.email as string | null) ?? null,
       phone: (c.phone as string | null) ?? null,
       cpf_cnpj: (c.cpf_cnpj as string | null) ?? null,
+      instagram: (c.instagram as string | null) ?? null,
       type: c.type as 'retail' | 'wholesale',
       address: c.address as CustomerRow['address'],
       created_at: c.created_at as string,

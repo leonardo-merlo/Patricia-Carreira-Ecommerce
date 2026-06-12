@@ -8,6 +8,7 @@ type IconName =
   | "package" | "truck" | "user" | "users" | "money" | "cart" | "filter"
   | "download" | "history" | "list" | "moreH" | "sparkles" | "tag" | "factory"
   | "store" | "creditCard" | "fileText" | "plug" | "mail" | "mapPin" | "wallet"
+  | "instagram"
 
 interface AdminIconProps {
   name: IconName
@@ -67,6 +68,7 @@ const paths: Record<IconName, React.ReactNode> = {
   mail: <><rect x="1.5" y="3.5" width="13" height="9" rx="1"/><path d="M1.5 5.5l6.5 4 6.5-4"/></>,
   mapPin: <><path d="M8 2a4 4 0 014 4c0 2.5-4 8-4 8S4 8.5 4 6a4 4 0 014-4z"/><circle cx="8" cy="6" r="1.5"/></>,
   wallet: <><rect x="1.5" y="5" width="13" height="9" rx="1"/><path d="M5 5V3.5a1 1 0 011-1h4a1 1 0 011 1V5"/><rect x="10" y="8" width="4.5" height="3" rx="0.5"/></>,
+  instagram: <><rect x="2.5" y="2.5" width="11" height="11" rx="3"/><circle cx="8" cy="8" r="2.6"/><circle cx="11.2" cy="4.8" r="0.6" fill="currentColor"/></>,
 }
 
 export function AdminIcon({ name, size = 16, className = "", style }: AdminIconProps) {

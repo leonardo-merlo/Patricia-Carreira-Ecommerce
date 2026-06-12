@@ -47,13 +47,14 @@ function initials(name: string): string {
 }
 
 function exportCSV(rows: CustomerRow[]): void {
-  const headers = ['Nome', 'Tipo', 'Email', 'Telefone', 'CPF/CNPJ', 'Cidade', 'UF', 'Pedidos', 'Total comprado (R$)', 'Último pedido']
+  const headers = ['Nome', 'Tipo', 'Email', 'Telefone', 'CPF/CNPJ', 'Instagram', 'Cidade', 'UF', 'Pedidos', 'Total comprado (R$)', 'Último pedido']
   const data = rows.map((c) => [
     c.name,
     c.type === 'wholesale' ? 'Atacado' : 'Varejo',
     c.email ?? '',
     c.phone ?? '',
     c.cpf_cnpj ?? '',
+    c.instagram ? `@${c.instagram}` : '',
     c.address?.city ?? '',
     c.address?.state ?? '',
     c.order_count,
@@ -77,6 +78,7 @@ type EditForm = {
   email: string
   phone: string
   cpf_cnpj: string
+  instagram: string
   type: 'retail' | 'wholesale'
   street: string
   number: string
@@ -92,6 +94,7 @@ type NewForm = {
   email: string
   phone: string
   cpf_cnpj: string
+  instagram: string
   type: 'retail' | 'wholesale'
 }
 
@@ -101,6 +104,7 @@ function toEditForm(c: CustomerRow): EditForm {
     email: c.email ?? '',
     phone: c.phone ?? '',
     cpf_cnpj: c.cpf_cnpj ?? '',
+    instagram: c.instagram ?? '',
     type: c.type,
     street: c.address?.street ?? '',
     number: c.address?.number ?? '',
@@ -128,7 +132,7 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
   const [drawerMode, setDrawerMode] = useState<'view' | 'edit'>('view')
   const [showNew, setShowNew]       = useState(false)
   const [editForm, setEditForm]     = useState<EditForm | null>(null)
-  const [newForm, setNewForm]       = useState<NewForm>({ name: '', email: '', phone: '', cpf_cnpj: '', type: 'retail' })
+  const [newForm, setNewForm]       = useState<NewForm>({ name: '', email: '', phone: '', cpf_cnpj: '', instagram: '', type: 'retail' })
   const [saveError, setSaveError]   = useState<string | null>(null)
 
   const cities = useMemo(() => {
@@ -216,11 +220,12 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
           }
         : null
       const result = await updateCustomer(selected.id, {
-        name:     editForm.name,
-        email:    editForm.email    || null,
-        phone:    editForm.phone    || null,
-        cpf_cnpj: editForm.cpf_cnpj || null,
-        type:     editForm.type,
+        name:      editForm.name,
+        email:     editForm.email    || null,
+        phone:     editForm.phone    || null,
+        cpf_cnpj:  editForm.cpf_cnpj || null,
+        instagram: editForm.instagram.trim().replace(/^@/, '') || null,
+        type:      editForm.type,
         address,
       })
       if (result.error) {
@@ -237,17 +242,18 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
     setSaveError(null)
     startTransition(async () => {
       const result = await createCustomer({
-        name:     newForm.name,
-        email:    newForm.email    || null,
-        phone:    newForm.phone    || null,
-        cpf_cnpj: newForm.cpf_cnpj || null,
-        type:     newForm.type,
+        name:      newForm.name,
+        email:     newForm.email    || null,
+        phone:     newForm.phone    || null,
+        cpf_cnpj:  newForm.cpf_cnpj || null,
+        instagram: newForm.instagram.trim().replace(/^@/, '') || null,
+        type:      newForm.type,
       })
       if (result.error) {
         setSaveError(result.error)
       } else {
         setShowNew(false)
-        setNewForm({ name: '', email: '', phone: '', cpf_cnpj: '', type: 'retail' })
+        setNewForm({ name: '', email: '', phone: '', cpf_cnpj: '', instagram: '', type: 'retail' })
         router.refresh()
       }
     })
@@ -455,6 +461,19 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
                         <span>{selected.cpf_cnpj}</span>
                       </div>
                     )}
+                    {selected.instagram && (
+                      <div className="row" style={{ gap: 8, fontSize: 12.5 }}>
+                        <AdminIcon name="instagram" size={13} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
+                        <a
+                          href={`https://instagram.com/${selected.instagram}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: 'var(--accent)', textDecoration: 'none' }}
+                        >
+                          @{selected.instagram}
+                        </a>
+                      </div>
+                    )}
                     {selected.address?.city && (
                       <div className="row" style={{ gap: 8, fontSize: 12.5 }}>
                         <AdminIcon name="mapPin" size={13} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
@@ -518,6 +537,10 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
                     <div className="field">
                       <label>CPF / CNPJ</label>
                       <input className="input" value={editForm.cpf_cnpj} onChange={(e) => ef('cpf_cnpj', e.target.value)} />
+                    </div>
+                    <div className="field">
+                      <label>Instagram</label>
+                      <input className="input" placeholder="@usuario" value={editForm.instagram} onChange={(e) => ef('instagram', e.target.value)} />
                     </div>
                     <div className="divider" />
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -605,9 +628,15 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
                   <input className="input" type="email" placeholder="email@exemplo.com" value={newForm.email} onChange={(e) => setNewForm((f) => ({ ...f, email: e.target.value }))} />
                 </div>
               </div>
-              <div className="field">
-                <label>{newForm.type === 'wholesale' ? 'CNPJ' : 'CPF'}</label>
-                <input className="input" placeholder={newForm.type === 'wholesale' ? '00.000.000/0001-00' : '000.000.000-00'} value={newForm.cpf_cnpj} onChange={(e) => setNewForm((f) => ({ ...f, cpf_cnpj: e.target.value }))} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="field">
+                  <label>{newForm.type === 'wholesale' ? 'CNPJ' : 'CPF'}</label>
+                  <input className="input" placeholder={newForm.type === 'wholesale' ? '00.000.000/0001-00' : '000.000.000-00'} value={newForm.cpf_cnpj} onChange={(e) => setNewForm((f) => ({ ...f, cpf_cnpj: e.target.value }))} />
+                </div>
+                <div className="field">
+                  <label>Instagram</label>
+                  <input className="input" placeholder="@usuario" value={newForm.instagram} onChange={(e) => setNewForm((f) => ({ ...f, instagram: e.target.value }))} />
+                </div>
               </div>
               {saveError && (
                 <div style={{ color: 'var(--red)', fontSize: 12, padding: '8px 12px', background: 'var(--red-soft)', borderRadius: 6 }}>
