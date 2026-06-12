@@ -11,7 +11,7 @@ import {
   type CreateProductInput,
   type UpdateProductData,
 } from '@/lib/actions/products'
-import type { ProductWithVariants } from '@/lib/types'
+import { type ProductWithVariants, MANUAL_TAGS } from '@/lib/types'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -62,6 +62,11 @@ export function ProdutoDrawer({ mode, product, onClose }: ProdutoDrawerProps) {
   )
   const [subcategory, setSubcategory] = useState(product?.subcategory ?? '')
   const [isActive, setIsActive] = useState(product?.is_active ?? true)
+  const [tags, setTags] = useState<string[]>(product?.tags ?? [])
+
+  function toggleTag(tag: string) {
+    setTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
+  }
 
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>(product?.images ?? [])
@@ -140,6 +145,7 @@ export function ProdutoDrawer({ mode, product, onClose }: ProdutoDrawerProps) {
           subcategory: category === 'roupas' && subcategory ? subcategory : null,
           is_active: isActive,
           images: finalImages,
+          tags,
           variants: variants.map((v) => ({
             color: v.color.trim() || null,
             size: v.size.trim() || 'Único',
@@ -158,6 +164,7 @@ export function ProdutoDrawer({ mode, product, onClose }: ProdutoDrawerProps) {
           subcategory: category === 'roupas' && subcategory ? subcategory : null,
           is_active: isActive,
           images: finalImages,
+          tags,
         }
         await updateProduct(product.id, data)
       }
@@ -262,6 +269,29 @@ export function ProdutoDrawer({ mode, product, onClose }: ProdutoDrawerProps) {
                 <div className="cust-meta">Visível na loja online</div>
               </div>
               <button type="button" onClick={() => setIsActive((v) => !v)} className={`switch ${isActive ? 'on' : ''}`} style={{ cursor: 'pointer' }} />
+            </div>
+
+            <div className="field">
+              <label>Tags (rótulos na loja)</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {MANUAL_TAGS.map((tag) => {
+                  const on = tags.includes(tag)
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleTag(tag)}
+                      className={`btn sm ${on ? 'primary' : 'ghost'}`}
+                      aria-pressed={on}
+                    >
+                      {on && <AdminIcon name="check" size={11} />} {tag}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="cust-meta" style={{ marginTop: 6 }}>
+                Rótulos visuais no card do produto. &quot;Bazar&quot; aqui é só etiqueta — não muda a categoria. &quot;Esgotado&quot; e &quot;Última Peça&quot; continuam automáticos pelo estoque.
+              </div>
             </div>
           </div>
 

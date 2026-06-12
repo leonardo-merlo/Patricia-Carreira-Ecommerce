@@ -17,6 +17,12 @@ interface ProductCardProps {
   compact?: boolean
 }
 
+function tagVariant(tag: string): "default" | "secondary" | "tertiary" {
+  if (tag === "Promoção") return "tertiary"
+  if (tag === "Bazar") return "secondary"
+  return "default"
+}
+
 export function ProductCard({ product, className, compact = false }: ProductCardProps) {
   const { addItem } = useCart()
   const [hovered, setHovered] = useState(false)
@@ -96,19 +102,24 @@ export function ProductCard({ product, className, compact = false }: ProductCard
           />
         )}
 
-        {badge && (
-          <div className="absolute left-3 top-3">
-            <Badge
-              variant={
-                badge === "Esgotado"
-                  ? "secondary"
-                  : badge === "Última Peça"
-                  ? "tertiary"
-                  : "default"
-              }
-            >
-              {badge}
-            </Badge>
+        {(badge || (product.tags?.length ?? 0) > 0) && (
+          <div className="absolute left-3 top-3 flex flex-col items-start gap-1">
+            {badge && (
+              <Badge
+                variant={
+                  badge === "Esgotado"
+                    ? "secondary"
+                    : badge === "Última Peça"
+                    ? "tertiary"
+                    : "default"
+                }
+              >
+                {badge}
+              </Badge>
+            )}
+            {(product.tags ?? []).map((tag) => (
+              <Badge key={tag} variant={tagVariant(tag)}>{tag}</Badge>
+            ))}
           </div>
         )}
 

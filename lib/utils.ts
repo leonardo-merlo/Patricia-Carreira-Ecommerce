@@ -53,7 +53,6 @@ export function getProductBadge(product: Product): ProductBadge {
   )
   if (totalStock === 0) return 'Esgotado'
   if (totalStock === 1) return 'Última Peça'
-  const sevenDaysAgo = new Date(Date.now() - 7 * 864e5)
-  if (new Date(product.created_at) > sevenDaysAgo) return 'Lançamento'
+  // "Lançamento" deixou de ser automático — agora é uma tag manual (product.tags)
   return null
 }

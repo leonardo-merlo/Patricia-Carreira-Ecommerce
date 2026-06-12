@@ -75,6 +75,7 @@ export type Product = {
   wholesale_price: number | null; // null = não disponível no atacado
   is_active: boolean;
   images: string[]; // array de URLs (Supabase Storage)
+  tags?: string[]; // tags manuais (Lançamento, Promoção, Bazar...) — controladas pelo admin
   // Dados para cálculo de frete — obrigatórios antes de publicar
   weight_grams: number | null;
   length_cm: number | null;
@@ -391,6 +392,11 @@ export type Cart = {
 
 /** Badges exibidos no card de produto */
 export type ProductBadge = "Lançamento" | "Última Peça" | "Esgotado" | null;
+
+// Tags manuais que o Henrique liga/desliga em cada produto (rótulos visuais).
+// "Bazar" aqui é só um rótulo — NÃO muda a categoria do produto.
+export const MANUAL_TAGS = ["Lançamento", "Promoção", "Bazar"] as const;
+export type ManualTag = (typeof MANUAL_TAGS)[number];
 
 /** Estado dos filtros na página de categoria */
 export type FilterState = {

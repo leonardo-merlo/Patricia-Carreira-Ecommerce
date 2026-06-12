@@ -22,6 +22,7 @@ export type UpdateProductData = {
   subcategory: string | null
   is_active: boolean
   images: string[]
+  tags: string[]
 }
 
 export async function updateProduct(productId: string, data: UpdateProductData): Promise<void> {
@@ -50,6 +51,7 @@ export type CreateProductInput = {
   subcategory: string | null
   is_active: boolean
   images: string[]
+  tags: string[]
   variants: NewVariantInput[]
 }
 
@@ -78,6 +80,7 @@ export async function createProduct(data: CreateProductInput): Promise<string> {
       subcategory: data.subcategory ?? null,
       is_active: data.is_active,
       images: data.images,
+      tags: data.tags ?? [],
     })
     .select('id')
     .single()
