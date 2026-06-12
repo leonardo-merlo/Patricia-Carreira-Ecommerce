@@ -73,7 +73,7 @@ export async function checkAndSetMaterials(opId: string): Promise<CheckMaterials
   if (!bom || bom.length === 0) {
     await supabase
       .from('production_orders')
-      .update({ materials_sufficient: true, missing_materials: [], material_checks: {} })
+      .update({ materials_sufficient: true, missing_materials: [] })
       .eq('id', opId)
     return { success: true }
   }
@@ -87,7 +87,6 @@ export async function checkAndSetMaterials(opId: string): Promise<CheckMaterials
   }
 
   const missing: MissingMaterialEntry[] = []
-  const checksInit: Record<string, boolean> = {}
 
   for (const row of bom as unknown as BomRow[]) {
     const mat = row.material
@@ -96,8 +95,6 @@ export async function checkAndSetMaterials(opId: string): Promise<CheckMaterials
     const needed = row.quantity_needed * op.quantity_requested
     const available = Number(mat.stock_quantity)
     const category = mat.category
-
-    if (!(category in checksInit)) checksInit[category] = false
 
     if (available >= needed) continue
 
@@ -131,12 +128,12 @@ export async function checkAndSetMaterials(opId: string): Promise<CheckMaterials
 
   const sufficient = missing.length === 0
 
+  // Preserva material_checks existente (marcações do Henrique no card/modal).
   await supabase
     .from('production_orders')
     .update({
       materials_sufficient: sufficient,
       missing_materials: missing,
-      material_checks: checksInit,
     })
     .eq('id', opId)
 
@@ -150,7 +147,7 @@ export type ToggleCheckResult =
 
 export async function toggleMaterialCheck(
   opId: string,
-  category: string,
+  key: string,
   checked: boolean,
 ): Promise<ToggleCheckResult> {
   const supabase = createServiceClient()
@@ -166,8 +163,8 @@ export async function toggleMaterialCheck(
   }
 
   const updated = {
-    ...(op.material_checks as Record<string, boolean>),
-    [category]: checked,
+    ...((op.material_checks as Record<string, boolean>) ?? {}),
+    [key]: checked,
   }
 
   const { error: updateErr } = await supabase
@@ -238,4 +235,32 @@ export async function cancelProductionOrder(opId: string): Promise<AdvanceStatus
   revalidatePath('/admin/producao')
 
   return { success: true, new_status: 'cancelled' }
+}
+
+const VALID_STATUSES = ['draft', 'approved', 'in_progress', 'completed', 'cancelled']
+
+// Move a OP para qualquer status válido (avanço ou retrocesso) — usado pelo
+// drag-and-drop do kanban, que permite arrastar o card para frente ou para trás.
+export async function setProductionOrderStatus(
+  opId: string,
+  targetStatus: string,
+): Promise<AdvanceStatusResult> {
+  if (!VALID_STATUSES.includes(targetStatus)) {
+    return { success: false, error: `Status inválido: ${targetStatus}` }
+  }
+
+  const supabase = createServiceClient()
+
+  const { error } = await supabase
+    .from('production_orders')
+    .update({ status: targetStatus })
+    .eq('id', opId)
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/admin/producao')
+
+  return { success: true, new_status: targetStatus }
 }

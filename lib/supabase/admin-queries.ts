@@ -395,6 +395,17 @@ export type MissingMaterialEntry = {
   couro_bruto_available: number | null
 }
 
+export type OpMaterial = {
+  material_id: string
+  material_name: string
+  category: string
+  type_specific: string | null
+  unit: string
+  needed: number
+  available: number
+  sufficient: boolean
+}
+
 export type ProductionOrderRow = {
   id: string
   order_id: string | null
@@ -407,6 +418,7 @@ export type ProductionOrderRow = {
   materials_sufficient: boolean | null
   missing_materials: MissingMaterialEntry[]
   material_checks: Record<string, boolean>
+  materials: OpMaterial[]
   status: string
   notes: string | null
   created_by: string
@@ -450,11 +462,62 @@ export async function getProductionOrders(limit = 50): Promise<ProductionOrderRo
     variant: VariantRaw
   }
 
-  return ((data ?? []) as unknown as OrderRaw[]).map((o) => {
+  const rows = (data ?? []) as unknown as OrderRaw[]
+
+  // Carrega o BOM (receita) de todas as variantes envolvidas em uma única query
+  const variantIds = Array.from(
+    new Set(rows.map((o) => o.product_variant_id).filter((id): id is string => Boolean(id))),
+  )
+
+  type BomRaw = {
+    product_variant_id: string
+    quantity_needed: number
+    material: {
+      id: string; name: string; category: string
+      type_specific: string | null; unit: string; stock_quantity: number
+    } | null
+  }
+
+  const bomByVariant: Record<string, BomRaw[]> = {}
+  if (variantIds.length > 0) {
+    const { data: bomData } = await supabase
+      .from('bill_of_materials')
+      .select(`
+        product_variant_id,
+        quantity_needed,
+        material:raw_materials(id, name, category, type_specific, unit, stock_quantity)
+      `)
+      .in('product_variant_id', variantIds)
+
+    for (const b of (bomData ?? []) as unknown as BomRaw[]) {
+      ;(bomByVariant[b.product_variant_id] ??= []).push(b)
+    }
+  }
+
+  return rows.map((o) => {
     const v = o.variant
     const productName = v?.product?.name ?? 'Produto'
     const parts = [v?.color, v?.size].filter(Boolean).join(' — ')
     const variantLabel = parts ? `${productName} — ${parts}` : productName
+
+    const bom = o.product_variant_id ? bomByVariant[o.product_variant_id] ?? [] : []
+    const materials: OpMaterial[] = bom
+      .filter((b) => b.material)
+      .map((b) => {
+        const mat = b.material!
+        const needed = Number(b.quantity_needed) * o.quantity_requested
+        const available = Number(mat.stock_quantity)
+        return {
+          material_id: mat.id,
+          material_name: mat.name,
+          category: mat.category,
+          type_specific: mat.type_specific,
+          unit: mat.unit,
+          needed,
+          available,
+          sufficient: available >= needed,
+        }
+      })
 
     return {
       id: o.id,
@@ -468,6 +531,7 @@ export async function getProductionOrders(limit = 50): Promise<ProductionOrderRo
       materials_sufficient: o.materials_sufficient,
       missing_materials: o.missing_materials ?? [],
       material_checks: o.material_checks ?? {},
+      materials,
       status: o.status,
       notes: o.notes,
       created_by: o.created_by,

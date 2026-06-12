@@ -5,6 +5,7 @@ import { AdminIcon } from '@/components/admin/admin-icon'
 import type {
   ProductionOrderRow,
   MissingMaterialEntry,
+  OpMaterial,
   WholesaleVariant,
 } from '@/lib/supabase/admin-queries'
 import {
@@ -13,6 +14,7 @@ import {
   cancelProductionOrder,
   checkAndSetMaterials,
   toggleMaterialCheck,
+  setProductionOrderStatus,
 } from '@/lib/actions/production'
 
 interface ProducaoClientProps {
@@ -26,12 +28,6 @@ const COLUMNS: { status: string; label: string }[] = [
   { status: 'in_progress', label: 'Em Andamento' },
   { status: 'completed', label: 'Concluído' },
 ]
-
-const NEXT_STATUS: Record<string, string> = {
-  draft: 'approved',
-  approved: 'in_progress',
-  in_progress: 'completed',
-}
 
 const ADVANCE_LABEL: Record<string, string> = {
   draft: 'Aprovar',
@@ -53,15 +49,14 @@ interface PendingAction {
   targetStatus?: string
 }
 
-function categoryStatus(
-  category: string,
-  missing: MissingMaterialEntry[],
-): 'ok' | 'needs_laser' | 'needs_purchase' {
-  const entry = missing.find((m) => m.category === category)
-  if (!entry) return 'ok'
+type MaterialStatus = 'ok' | 'needs_laser' | 'needs_purchase'
+
+function materialStatus(m: OpMaterial, missing: MissingMaterialEntry[]): MaterialStatus {
+  if (m.sufficient) return 'ok'
+  const entry = missing.find((x) => x.material_id === m.material_id)
   if (
-    category === 'Couro' &&
-    entry.couro_bruto_available != null &&
+    m.category === 'Couro' &&
+    entry?.couro_bruto_available != null &&
     entry.couro_bruto_available > 0
   ) {
     return 'needs_laser'
@@ -69,10 +64,19 @@ function categoryStatus(
   return 'needs_purchase'
 }
 
-function categoriesForOp(op: ProductionOrderRow): string[] {
-  const fromMissing = op.missing_materials.map((m) => m.category)
-  const fromChecks = Object.keys(op.material_checks)
-  return Array.from(new Set([...fromChecks, ...fromMissing]))
+// Agrupa os materiais da OP por categoria, preservando a ordem de aparição.
+function groupByCategory(materials: OpMaterial[]): [string, OpMaterial[]][] {
+  const map = new Map<string, OpMaterial[]>()
+  for (const m of materials) {
+    const arr = map.get(m.category) ?? []
+    arr.push(m)
+    map.set(m.category, arr)
+  }
+  return Array.from(map.entries())
+}
+
+function fmtQty(n: number): string {
+  return n.toLocaleString('pt-BR', { maximumFractionDigits: 3 })
 }
 
 export function ProducaoClient({ ops, variants }: ProducaoClientProps) {
@@ -86,6 +90,7 @@ export function ProducaoClient({ ops, variants }: ProducaoClientProps) {
   const [isPending, startTransition] = useTransition()
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
   const [dragOpId, setDragOpId] = useState<string | null>(null)
+  const [dragOverStatus, setDragOverStatus] = useState<string | null>(null)
 
   const displaySelected = selectedOp
     ? (ops.find((o) => o.id === selectedOp.id) ?? selectedOp)
@@ -123,9 +128,9 @@ export function ProducaoClient({ ops, variants }: ProducaoClientProps) {
     })
   }
 
-  function handleToggleCheck(op: ProductionOrderRow, category: string, checked: boolean) {
+  function handleToggleCheck(op: ProductionOrderRow, key: string, checked: boolean) {
     startTransition(async () => {
-      await toggleMaterialCheck(op.id, category, checked)
+      await toggleMaterialCheck(op.id, key, checked)
     })
   }
 
@@ -155,21 +160,21 @@ export function ProducaoClient({ ops, variants }: ProducaoClientProps) {
     setDragOpId(opId)
   }
 
-  function handleDrop(targetStatus: string) {
-    if (!dragOpId) return
-    const op = ops.find((o) => o.id === dragOpId)
-    if (!op) { setDragOpId(null); return }
-
-    const nextStatus = NEXT_STATUS[op.status]
-    const isValidDrop = nextStatus === targetStatus || targetStatus === 'cancelled'
-
-    if (!isValidDrop || op.status === targetStatus) {
-      setDragOpId(null)
-      return
-    }
-
-    setPendingAction({ type: 'drag', op, targetStatus })
+  function handleDragEnd() {
     setDragOpId(null)
+    setDragOverStatus(null)
+  }
+
+  // Permite arrastar para frente OU para trás. Qualquer coluna diferente da
+  // atual abre a barra de confirmação antes de efetivar a mudança.
+  function handleDrop(targetStatus: string) {
+    const opId = dragOpId
+    setDragOpId(null)
+    setDragOverStatus(null)
+    if (!opId) return
+    const op = ops.find((o) => o.id === opId)
+    if (!op || op.status === targetStatus) return
+    setPendingAction({ type: 'drag', op, targetStatus })
   }
 
   function confirmPendingAction() {
@@ -178,14 +183,14 @@ export function ProducaoClient({ ops, variants }: ProducaoClientProps) {
     setPendingAction(null)
     setActionError(null)
 
-    if (type === 'iniciar' || (type === 'drag' && targetStatus === NEXT_STATUS[op.status])) {
+    if (type === 'iniciar') {
       startTransition(async () => {
         const res = await advanceProductionOrderStatus(op.id)
         if (!res.success) setActionError(res.error)
       })
-    } else if (type === 'drag' && targetStatus === 'cancelled') {
+    } else if (type === 'drag' && targetStatus) {
       startTransition(async () => {
-        const res = await cancelProductionOrder(op.id)
+        const res = await setProductionOrderStatus(op.id, targetStatus)
         if (!res.success) setActionError(res.error)
       })
     }
@@ -249,12 +254,24 @@ export function ProducaoClient({ ops, variants }: ProducaoClientProps) {
       <div className="kanban-board">
         {COLUMNS.map(({ status, label }) => {
           const colOps = ops.filter((o) => o.status === status)
+          const draggedOp = dragOpId ? ops.find((o) => o.id === dragOpId) : null
+          const isDropTarget =
+            dragOverStatus === status && draggedOp != null && draggedOp.status !== status
           return (
             <div
               key={status}
-              className="kanban-column"
+              className={`kanban-column${isDropTarget ? ' kanban-column--drop-target' : ''}`}
               data-status={status}
-              onDragOver={(e) => e.preventDefault()}
+              onDragOver={(e) => {
+                e.preventDefault()
+                if (dragOpId && dragOverStatus !== status) setDragOverStatus(status)
+              }}
+              onDragLeave={(e) => {
+                // só limpa se o ponteiro saiu da coluna inteira, não de um filho
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                  setDragOverStatus((cur) => (cur === status ? null : cur))
+                }
+              }}
               onDrop={() => handleDrop(status)}
             >
               <div className="kanban-column-header">
@@ -268,11 +285,17 @@ export function ProducaoClient({ ops, variants }: ProducaoClientProps) {
                     op={op}
                     onSelect={() => setSelectedOp(op)}
                     onAdvance={() => handleAdvance(op)}
+                    onToggleCheck={(key, val) => handleToggleCheck(op, key, val)}
                     onDragStart={() => handleDragStart(op.id)}
+                    onDragEnd={handleDragEnd}
+                    isDragging={dragOpId === op.id}
                     isPending={isPending}
                   />
                 ))}
-                {colOps.length === 0 && (
+                {isDropTarget && (
+                  <div className="kanban-drop-placeholder">Soltar aqui → {label}</div>
+                )}
+                {colOps.length === 0 && !isDropTarget && (
                   <p className="kanban-empty">Nenhuma OP</p>
                 )}
               </div>
@@ -401,26 +424,33 @@ function OpCard({
   op,
   onSelect,
   onAdvance,
+  onToggleCheck,
   onDragStart,
+  onDragEnd,
+  isDragging,
   isPending,
 }: {
   op: ProductionOrderRow
   onSelect: () => void
   onAdvance: () => void
+  onToggleCheck: (key: string, value: boolean) => void
   onDragStart: () => void
+  onDragEnd: () => void
+  isDragging: boolean
   isPending: boolean
 }) {
-  const categories = categoriesForOp(op)
+  const groups = groupByCategory(op.materials)
 
   return (
     <div
-      className={`op-card${op.materials_sufficient === false ? ' op-card--missing' : ''}`}
+      className={`op-card${op.materials_sufficient === false ? ' op-card--missing' : ''}${isDragging ? ' op-card--dragging' : ''}`}
       id={`op-card-${op.id}`}
       data-testid="op-card"
       role="button"
       tabIndex={0}
       draggable
-      onDragStart={onDragStart}
+      onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; onDragStart() }}
+      onDragEnd={onDragEnd}
       onClick={onSelect}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
     >
@@ -429,20 +459,41 @@ function OpCard({
         Qtd: {op.quantity_requested}
         {op.customer_name && <span> · {op.customer_name}</span>}
       </div>
-      <div className="op-card-categories">
-        {categories.map((cat) => {
-          const checked = op.material_checks[cat] ?? false
-          const hasMissing = op.missing_materials.some((m) => m.category === cat)
-          return (
-            <span
-              key={cat}
-              className={`op-cat-badge${checked ? ' op-cat-badge--done' : hasMissing ? ' op-cat-badge--missing' : ' op-cat-badge--ok'}`}
-            >
-              {cat}
-            </span>
-          )
-        })}
-      </div>
+
+      {groups.length > 0 && (
+        // stopPropagation: marcar materiais não deve abrir o modal nem selecionar o card
+        <div
+          className="op-card-materials"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          {groups.map(([category, mats]) => (
+            <div key={category} className="op-mat-group">
+              <div className="op-mat-group-title">{category}</div>
+              {mats.map((m) => {
+                const checked = op.material_checks[m.material_id] ?? false
+                return (
+                  <label key={m.material_id} className="op-mat-row">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => onToggleCheck(m.material_id, e.target.checked)}
+                      data-testid={`mat-check-${m.material_id}`}
+                    />
+                    <span className={`op-mat-name${checked ? ' op-mat-name--done' : ''}`}>
+                      {m.material_name}
+                    </span>
+                    <span className={`op-mat-avail ${m.sufficient ? 'ok' : 'low'}`}>
+                      {m.sufficient ? '✓' : `falta ${fmtQty(m.needed - m.available)} ${m.unit}`}
+                    </span>
+                  </label>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
       {ADVANCE_LABEL[op.status] && (
         <button
           className="btn sm ghost op-card-advance"
@@ -472,11 +523,11 @@ function OpDetailModal({
   onAdvance: () => void
   onCancel: () => void
   onRefresh: () => void
-  onToggleCheck: (category: string, value: boolean) => void
+  onToggleCheck: (key: string, value: boolean) => void
   onClose: () => void
   isPending: boolean
 }) {
-  const categories = categoriesForOp(op)
+  const groups = groupByCategory(op.materials)
 
   return (
     <>
@@ -499,7 +550,7 @@ function OpDetailModal({
       </div>
 
       <div className="modal-body">
-        {categories.length === 0 ? (
+        {op.materials.length === 0 ? (
           <p className="cust-meta">Este produto não tem BOM cadastrado.</p>
         ) : (
           <div className="op-checklist" id="op-material-checklist">
@@ -515,50 +566,54 @@ function OpDetailModal({
               </button>
             </div>
 
-            {categories.map((cat) => {
-              const status = categoryStatus(cat, op.missing_materials)
-              const checked = op.material_checks[cat] ?? false
-              const missingEntry = op.missing_materials.find((m) => m.category === cat)
+            {groups.map(([category, mats]) => (
+              <div key={category} className="op-check-group">
+                <div className="op-check-group-title">{category}</div>
+                {mats.map((m) => {
+                  const status = materialStatus(m, op.missing_materials)
+                  const checked = op.material_checks[m.material_id] ?? false
+                  const entry = op.missing_materials.find((x) => x.material_id === m.material_id)
 
-              return (
-                <div
-                  key={cat}
-                  className={`op-check-row op-check-row--${status}`}
-                  data-testid={`op-check-row-${cat.toLowerCase()}`}
-                >
-                  <label className="op-check-label">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={(e) => onToggleCheck(cat, e.target.checked)}
-                      data-testid={`check-${cat.toLowerCase()}`}
-                    />
-                    <span className="op-check-category">{cat}</span>
-                  </label>
+                  return (
+                    <div
+                      key={m.material_id}
+                      className={`op-check-row op-check-row--${status}`}
+                      data-testid={`op-check-row-${m.material_id}`}
+                    >
+                      <label className="op-check-label">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => onToggleCheck(m.material_id, e.target.checked)}
+                          data-testid={`check-${m.material_id}`}
+                        />
+                        <span className="op-check-category">{m.material_name}</span>
+                      </label>
 
-                  <span className={`op-check-status op-check-status--${status}`}>
-                    {status === 'ok' && '✅ Disponível'}
-                    {status === 'needs_laser' && '⚠️ Precisa de laser'}
-                    {status === 'needs_purchase' && '❌ Comprar'}
-                  </span>
+                      <span className={`op-check-status op-check-status--${status}`}>
+                        {status === 'ok' && '✅ Disponível'}
+                        {status === 'needs_laser' && '⚠️ Precisa de laser'}
+                        {status === 'needs_purchase' && '❌ Comprar'}
+                      </span>
 
-                  {missingEntry && (
-                    <div className="op-check-detail">
-                      {status === 'needs_laser' && (
-                        <span>
-                          Couro bruto disponível ({missingEntry.couro_bruto_available} {missingEntry.unit}) — enviar para laser antes de usar
-                        </span>
-                      )}
-                      {status === 'needs_purchase' && (
-                        <span>
-                          Falta {missingEntry.missing.toLocaleString('pt-BR')} {missingEntry.unit} — adicionar às compras
-                        </span>
+                      {!m.sufficient && (
+                        <div className="op-check-detail">
+                          {status === 'needs_laser' && entry ? (
+                            <span>
+                              Couro bruto disponível ({fmtQty(entry.couro_bruto_available ?? 0)} {m.unit}) — enviar para laser antes de usar
+                            </span>
+                          ) : (
+                            <span>
+                              Necessário {fmtQty(m.needed)} {m.unit} · estoque {fmtQty(m.available)} · faltam {fmtQty(m.needed - m.available)} {m.unit}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
-              )
-            })}
+                  )
+                })}
+              </div>
+            ))}
           </div>
         )}
 

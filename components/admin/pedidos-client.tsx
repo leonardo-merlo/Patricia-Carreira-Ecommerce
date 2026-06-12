@@ -645,7 +645,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
                               <span className={`badge ${cfg.cls}`}><span className="dot" />{cfg.label}</span>
                               <span className="cust-meta" style={{ fontSize: 11 }}>
-                                {r.quantity_requested} pedido · {r.quantity_from_stock} estoque · {r.quantity_to_produce} produzir
+                                {r.quantity_requested} pedido · {r.stock_available} em estoque · {r.quantity_to_produce} produzir
                               </span>
                             </div>
                           </div>
@@ -703,7 +703,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                                 <span className="dot" />{cfg.label}
                               </span>
                               <span className="cust-meta" style={{ fontSize: 11 }}>
-                                {r.quantity_requested} pedido · {r.quantity_from_stock} estoque · {r.quantity_to_produce} produzir
+                                {r.quantity_requested} pedido · {r.stock_available} em estoque · {r.quantity_to_produce} produzir
                               </span>
                               {r.scenario === 'D' && (
                                 <span className="cust-meta" style={{ fontSize: 10.5, color: 'var(--red)', fontStyle: 'italic' }}>

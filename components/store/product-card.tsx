@@ -166,18 +166,6 @@ export function ProductCard({ product, className, compact = false }: ProductCard
             </p>
           </>
         )}
-        {availableSizeVariants.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-1 pt-0.5">
-            {availableSizeVariants.map(({ size }) => (
-              <span
-                key={size}
-                className="rounded border border-outline-variant px-1.5 py-0.5 font-caption text-caption text-on-surface-variant"
-              >
-                {size}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
     </Link>
   )

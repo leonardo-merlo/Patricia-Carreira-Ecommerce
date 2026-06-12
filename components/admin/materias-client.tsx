@@ -19,7 +19,7 @@ type Category = typeof CATEGORIES[number]
 
 // tipo: item específico dentro da categoria
 const TIPOS: Record<Category, string[]> = {
-  Bordado: ['Bordado'],
+  Bordado: ['Bordado', 'Acabamento'],
   Couro: ['Legítimo carneiro', 'Legítimo vaqueta', 'Sintético montana', 'Sintético raspa', 'Sintético uruguai', 'Raspa de porco'],
   Metais: ['Argola', 'Mosquetão', 'Cursor', 'Meia argola', 'Fiel', 'Rebite', 'Imã', 'Fivela'],
   Forro: ['Frente', 'Costas', 'Bolso lateral'],

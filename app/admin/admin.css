@@ -967,3 +967,105 @@
   border-radius: 0.25rem;
   font-size: 0.875rem;
 }
+
+/* ── Drag & drop do kanban ──────────────────────────── */
+.op-card {
+  cursor: grab;
+}
+.op-card:active { cursor: grabbing; }
+
+.op-card--dragging {
+  opacity: 0.4;
+  border-style: dashed;
+}
+
+.kanban-column {
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.kanban-column--drop-target {
+  background: var(--accent-soft, #fff4ec);
+  box-shadow: inset 0 0 0 2px var(--accent, #c2410c);
+}
+
+.kanban-drop-placeholder {
+  border: 1.5px dashed var(--accent, #c2410c);
+  border-radius: 0.375rem;
+  padding: 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--accent, #c2410c);
+  text-align: center;
+  background: rgba(194, 65, 12, 0.04);
+}
+
+/* ── Checklist de materiais no card ─────────────────── */
+.op-card-materials {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  border-top: 1px solid var(--border-subtle, #f3f4f6);
+  padding-top: 0.375rem;
+  cursor: default;
+}
+
+.op-mat-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.op-mat-group-title {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #9ca3af);
+}
+
+.op-mat-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.op-mat-row input[type='checkbox'] {
+  width: 0.875rem;
+  height: 0.875rem;
+  cursor: pointer;
+  accent-color: var(--accent, #c2410c);
+}
+
+.op-mat-name { line-height: 1.25; }
+
+.op-mat-name--done {
+  text-decoration: line-through;
+  color: var(--text-muted, #9ca3af);
+}
+
+.op-mat-avail {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.op-mat-avail.ok  { color: #059669; }
+.op-mat-avail.low { color: #dc2626; }
+
+/* ── Agrupamento por categoria no checklist do modal ── */
+.op-check-group {
+  border-bottom: 1px solid var(--border-subtle, #f3f4f6);
+}
+.op-check-group:last-child { border-bottom: none; }
+
+.op-check-group-title {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #9ca3af);
+  padding: 0.375rem 0.75rem 0.125rem;
+  background: var(--bg-muted, #f9fafb);
+}
