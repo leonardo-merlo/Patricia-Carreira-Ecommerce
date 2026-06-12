@@ -516,10 +516,10 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-2)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                  disabled={statusLoading === o.id}
+                  disabled={statusLoading === openActionsFor}
                   onClick={async () => {
-                    setStatusLoading(o.id)
-                    await updateOrderStatus(o.id, opt.value)
+                    setStatusLoading(openActionsFor)
+                    await updateOrderStatus(openActionsFor, opt.value)
                     setStatusLoading(null)
                     setOpenActionsFor(null)
                     setDropdownPos(null)
