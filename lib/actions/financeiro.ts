@@ -21,6 +21,7 @@ type AccountPayableInput = {
   due_date: string
   category: ExpenseCategory
   creditor?: string | null
+  store_id?: string | null
   payment_method?: ExpensePaymentMethod | null
   is_recurring: boolean
   recurrence_months?: RecurrenceMonths | null
@@ -38,6 +39,7 @@ export async function createAccountPayable(
     due_date: input.due_date,
     category: input.category,
     creditor: input.creditor ?? null,
+    store_id: input.store_id ?? null,
     payment_method: input.payment_method ?? null,
     is_recurring: input.is_recurring,
     recurrence_months: input.is_recurring ? (input.recurrence_months ?? 1) : null,
@@ -109,6 +111,7 @@ export async function markAccountAsPaid(
       due_date: nextDueStr,
       category: account.category,
       creditor: account.creditor,
+      store_id: account.store_id,
       payment_method: null,
       is_recurring: true,
       recurrence_months: account.recurrence_months,

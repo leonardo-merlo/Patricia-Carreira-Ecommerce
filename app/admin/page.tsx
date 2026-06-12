@@ -5,6 +5,8 @@ import {
   getDashboardRecentOrders,
   getDashboardCriticalStock,
 } from '@/lib/supabase/admin-queries'
+import { getAllAccountsPayable } from '@/lib/supabase/financeiro'
+import { getStores } from '@/lib/actions/stores'
 
 const ENTREGA_MAP: Record<string, { cls: string; txt: string } | null> = {
   pending:    null,
@@ -39,11 +41,30 @@ function getGreeting(): string {
 }
 
 export default async function AdminDashboard() {
-  const [kpis, orders, critical] = await Promise.all([
+  const [kpis, orders, critical, accountsPayable, stores] = await Promise.all([
     getDashboardKPIs(),
     getDashboardRecentOrders(7),
     getDashboardCriticalStock(6),
+    getAllAccountsPayable(),
+    getStores(),
   ])
+
+  // ── Lembretes de contas a pagar ──
+  const apToday = new Date()
+  apToday.setHours(0, 0, 0, 0)
+  const apTodayStr = apToday.toISOString().split('T')[0]
+  const apIn7 = new Date(apToday)
+  apIn7.setDate(apIn7.getDate() + 7)
+  const apIn7Str = apIn7.toISOString().split('T')[0]
+  const apMonthPrefix = `${apToday.getFullYear()}-${String(apToday.getMonth() + 1).padStart(2, '0')}`
+
+  const apUnpaid = accountsPayable.filter((a) => !a.paid_at)
+  const apOverdue = apUnpaid.filter((a) => a.due_date < apTodayStr)
+  const apDueSoon = apUnpaid.filter((a) => a.due_date >= apTodayStr && a.due_date <= apIn7Str)
+  const apMonthPending = apUnpaid.filter((a) => a.due_date.startsWith(apMonthPrefix))
+  const apSum = (arr: typeof apUnpaid) => arr.reduce((s, a) => s + a.amount, 0)
+  const apAttention = [...apOverdue, ...apDueSoon].sort((a, b) => a.due_date.localeCompare(b.due_date)).slice(0, 6)
+  const storeNameMap = new Map(stores.map((s) => [s.id, s.name]))
 
   const revenueFormatted = formatPrice(kpis.revenue_month)
   const kpiValues = [
@@ -222,6 +243,61 @@ export default async function AdminDashboard() {
               </ul>
             )}
           </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 'var(--gap)' }}>
+        <div className="card-header">
+          <div className="row">
+            <h3 className="ttl">Contas a pagar</h3>
+            <span className="sub">
+              {apOverdue.length} vencida{apOverdue.length !== 1 ? 's' : ''} · {apDueSoon.length} a vencer em 7 dias
+            </span>
+          </div>
+          <a className="linkish" href="/admin/financeiro">Ver financeiro →</a>
+        </div>
+        <div className="card-body">
+          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: apAttention.length ? 16 : 0 }}>
+            <div className="kpi">
+              <div className="kpi-label"><span className="dot" style={{ background: 'var(--red)' }} />Vencidas</div>
+              <div className="kpi-value" style={{ color: apOverdue.length ? 'var(--red)' : undefined }}>{formatPrice(apSum(apOverdue))}</div>
+              <div className="kpi-trend"><span>{apOverdue.length} conta{apOverdue.length !== 1 ? 's' : ''}</span></div>
+            </div>
+            <div className="kpi">
+              <div className="kpi-label"><span className="dot" style={{ background: 'var(--yellow)' }} />A vencer (7 dias)</div>
+              <div className="kpi-value">{formatPrice(apSum(apDueSoon))}</div>
+              <div className="kpi-trend"><span>{apDueSoon.length} conta{apDueSoon.length !== 1 ? 's' : ''}</span></div>
+            </div>
+            <div className="kpi">
+              <div className="kpi-label"><span className="dot" style={{ background: 'var(--accent)' }} />Total do mês (em aberto)</div>
+              <div className="kpi-value">{formatPrice(apSum(apMonthPending))}</div>
+              <div className="kpi-trend"><span>{apMonthPending.length} conta{apMonthPending.length !== 1 ? 's' : ''}</span></div>
+            </div>
+          </div>
+          {apAttention.length > 0 ? (
+            <ul className="activity" style={{ borderTop: '1px solid var(--border)' }}>
+              {apAttention.map((a) => {
+                const isOverdue = a.due_date < apTodayStr
+                const [, m, d] = a.due_date.split('-')
+                const loja = a.store_id ? storeNameMap.get(a.store_id) : null
+                return (
+                  <li key={a.id} style={{ alignItems: 'center', padding: '10px 16px' }}>
+                    <span className="dot" style={{ background: isOverdue ? 'var(--red)' : 'var(--yellow)' }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.description}</div>
+                      <div className="cust-meta">Vence {d}/{m} · {a.category}{loja ? ` · ${loja}` : ''}</div>
+                    </div>
+                    <span style={{ fontWeight: 600, fontSize: 13, marginRight: 8 }}>{formatPrice(a.amount)}</span>
+                    <span className={`badge ${isOverdue ? 'esgotado' : 'warn'}`}>{isOverdue ? 'Vencida' : 'A vencer'}</span>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : (
+            <div style={{ padding: '8px 0 0', color: 'var(--text-3)', fontSize: 12.5 }}>
+              Nenhuma conta vencida ou a vencer nos próximos 7 dias.
+            </div>
+          )}
         </div>
       </div>
 

@@ -10,12 +10,14 @@ import {
   markAccountAsPaid,
   fetchMonthlyRevenue,
 } from '@/lib/actions/financeiro'
+import { getStores, createStore, updateStore, deleteStore } from '@/lib/actions/stores'
 import {
   type AccountPayable,
   type AccountPayableStatus,
   type ExpenseCategory,
   type ExpensePaymentMethod,
   type RecurrenceMonths,
+  type Store,
   EXPENSE_CATEGORIES,
   getAccountStatus,
 } from '@/lib/types'
@@ -51,6 +53,7 @@ type FormState = {
   due_date: string
   category: ExpenseCategory | ''
   creditor: string
+  store_id: string
   payment_method: ExpensePaymentMethod | ''
   is_recurring: boolean
   recurrence_months: RecurrenceMonths
@@ -63,11 +66,15 @@ const emptyForm: FormState = {
   due_date: '',
   category: '',
   creditor: '',
+  store_id: '',
   payment_method: '',
   is_recurring: false,
   recurrence_months: 1,
   notes: '',
 }
+
+type StoreForm = { id: string | null; name: string; city: string; notes: string }
+const emptyStoreForm: StoreForm = { id: null, name: '', city: '', notes: '' }
 
 type MarkPaidState = {
   account: AccountPayable
@@ -78,14 +85,50 @@ type MarkPaidState = {
 export function FinanceiroClient({
   initialAccounts,
   monthlyRevenue,
+  initialStores,
 }: {
   initialAccounts: AccountPayable[]
   monthlyRevenue: number
+  initialStores: Store[]
 }) {
   const nowInit = new Date()
   const initPeriod = `${nowInit.getFullYear()}-${String(nowInit.getMonth() + 1).padStart(2, '0')}`
 
   const [accounts, setAccounts] = useState<AccountPayable[]>(initialAccounts)
+  const [stores, setStores] = useState<Store[]>(initialStores)
+  const [showStores, setShowStores] = useState(false)
+  const [storeForm, setStoreForm] = useState<StoreForm>(emptyStoreForm)
+  const [storeError, setStoreError] = useState<string | null>(null)
+
+  const storeName = (id: string | null) => (id ? stores.find(s => s.id === id)?.name ?? null : null)
+
+  async function refreshStores() {
+    setStores(await getStores())
+  }
+
+  function handleSaveStore() {
+    if (!storeForm.name.trim()) { setStoreError('Informe o nome da loja.'); return }
+    setStoreError(null)
+    startTransition(async () => {
+      const payload = { name: storeForm.name, city: storeForm.city || null, notes: storeForm.notes || null }
+      const result = storeForm.id
+        ? await updateStore(storeForm.id, payload)
+        : await createStore(payload)
+      if (!result.success) { setStoreError(result.error); return }
+      await refreshStores()
+      setStoreForm(emptyStoreForm)
+    })
+  }
+
+  function handleDeleteStore(id: string) {
+    startTransition(async () => {
+      const result = await deleteStore(id)
+      if (result.success) {
+        await refreshStores()
+        if (storeForm.id === id) setStoreForm(emptyStoreForm)
+      }
+    })
+  }
   const [selectedPeriod, setSelectedPeriod] = useState(initPeriod)
   const [displayRevenue, setDisplayRevenue] = useState(monthlyRevenue)
   const [activeTab, setActiveTab] = useState<FilterTab>('todas')
@@ -157,6 +200,7 @@ export function FinanceiroClient({
       due_date: account.due_date,
       category: account.category,
       creditor: account.creditor ?? '',
+      store_id: account.store_id ?? '',
       payment_method: account.payment_method ?? '',
       is_recurring: account.is_recurring,
       recurrence_months: account.recurrence_months ?? 1,
@@ -191,6 +235,7 @@ export function FinanceiroClient({
         due_date: form.due_date,
         category: form.category as ExpenseCategory,
         creditor: form.creditor || null,
+        store_id: form.store_id || null,
         payment_method: (form.payment_method as ExpensePaymentMethod) || null,
         is_recurring: form.is_recurring,
         recurrence_months: form.is_recurring ? form.recurrence_months : null,
@@ -286,6 +331,9 @@ export function FinanceiroClient({
           <p className="page-sub">Contas a pagar e resultado do mês</p>
         </div>
         <div className="page-actions">
+          <button className="btn" id="btn-gerenciar-lojas" onClick={() => { setStoreForm(emptyStoreForm); setStoreError(null); setShowStores(true) }}>
+            <AdminIcon name="store" /> Lojas
+          </button>
           <button className="btn primary" id="btn-nova-conta" onClick={openCreate}>
             <AdminIcon name="plus" /> Nova conta
           </button>
@@ -402,6 +450,7 @@ export function FinanceiroClient({
                   <tr>
                     <th>Descrição</th>
                     <th style={{ width: 130 }}>Categoria</th>
+                    <th style={{ width: 140 }}>Loja</th>
                     <th style={{ width: 150 }}>Credor</th>
                     <th style={{ width: 110 }}>Valor</th>
                     <th style={{ width: 110 }}>Vencimento</th>
@@ -427,6 +476,7 @@ export function FinanceiroClient({
                           </div>
                         </td>
                         <td style={{ color: 'var(--text-2)', fontSize: 12 }}>{account.category}</td>
+                        <td style={{ color: 'var(--text-2)', fontSize: 12 }}>{storeName(account.store_id) ?? '—'}</td>
                         <td style={{ color: 'var(--text-2)' }}>{account.creditor ?? '—'}</td>
                         <td className="num" style={{ fontWeight: 500 }}>{fmtCurrency(account.amount)}</td>
                         <td style={{ color: 'var(--text-2)', fontSize: 12.5 }}>{fmtDate(account.due_date)}</td>
@@ -565,6 +615,29 @@ export function FinanceiroClient({
                 onChange={e => handleField('creditor', e.target.value)}
                 placeholder="Ex: Locadora São João"
               />
+            </div>
+
+            <div className="field">
+              <label>Loja</label>
+              <select
+                id="select-loja-conta"
+                className="input"
+                value={form.store_id}
+                onChange={e => handleField('store_id', e.target.value)}
+              >
+                <option value="">— Sem loja —</option>
+                {stores.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}{s.city ? ` · ${s.city}` : ''}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="linkish"
+                style={{ marginTop: 4, fontSize: 12, alignSelf: 'flex-start' }}
+                onClick={() => { setStoreForm(emptyStoreForm); setStoreError(null); setShowStores(true) }}
+              >
+                + Gerenciar lojas
+              </button>
             </div>
 
             <div className="field">
@@ -732,6 +805,72 @@ export function FinanceiroClient({
               >
                 {isPending ? 'Confirmando...' : 'Confirmar pagamento'}
               </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Modal: Gerenciar lojas */}
+      {showStores && (
+        <>
+          <div className="drawer-backdrop open" style={{ zIndex: 200 }} onClick={() => setShowStores(false)} />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'var(--bg)', border: '1px solid var(--border)',
+            borderRadius: 12, padding: 24, zIndex: 201, width: 420, maxHeight: '80vh', overflowY: 'auto',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+          }} data-testid="stores-modal">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div>
+                <h4 style={{ fontSize: 15, fontWeight: 600 }}>Lojas</h4>
+                <div className="cust-meta">Unidades para vincular às contas a pagar</div>
+              </div>
+              <button className="icon-btn" onClick={() => setShowStores(false)}><AdminIcon name="x" size={14} /></button>
+            </div>
+
+            {stores.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '4px 0 14px' }}>Nenhuma loja cadastrada ainda.</p>
+            ) : (
+              <div style={{ display: 'grid', gap: 6, marginBottom: 14 }}>
+                {stores.map(s => (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 6 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{s.name}</div>
+                      {s.city && <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{s.city}</div>}
+                    </div>
+                    <button className="icon-btn" title="Editar" onClick={() => { setStoreForm({ id: s.id, name: s.name, city: s.city ?? '', notes: s.notes ?? '' }); setStoreError(null) }}>
+                      <AdminIcon name="edit" size={13} />
+                    </button>
+                    <button className="icon-btn" style={{ color: 'var(--text-3)' }} title="Remover" onClick={() => handleDeleteStore(s.id)} disabled={isPending}>
+                      <AdminIcon name="trash" size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, display: 'grid', gap: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)' }}>
+                {storeForm.id ? 'Editar loja' : 'Nova loja'}
+              </div>
+              <div className="field">
+                <label>Nome *</label>
+                <input className="input" value={storeForm.name} onChange={e => setStoreForm(p => ({ ...p, name: e.target.value }))} placeholder="Ex: Loja Centro" />
+              </div>
+              <div className="field">
+                <label>Cidade</label>
+                <input className="input" value={storeForm.city} onChange={e => setStoreForm(p => ({ ...p, city: e.target.value }))} placeholder="Ex: Arraial d'Ajuda" />
+              </div>
+              {storeError && <div style={{ color: 'var(--red)', fontSize: 12 }}>{storeError}</div>}
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                {storeForm.id && (
+                  <button className="btn ghost" onClick={() => { setStoreForm(emptyStoreForm); setStoreError(null) }}>Cancelar edição</button>
+                )}
+                <button className="btn primary" onClick={handleSaveStore} disabled={isPending}>
+                  {isPending ? 'Salvando...' : storeForm.id ? 'Salvar loja' : 'Adicionar loja'}
+                </button>
+              </div>
             </div>
           </div>
         </>

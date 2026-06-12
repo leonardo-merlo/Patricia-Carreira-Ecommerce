@@ -502,10 +502,21 @@ export type AccountPayable = {
   paid_at: string | null
   category: ExpenseCategory
   creditor: string | null
+  store_id: string | null
   payment_method: ExpensePaymentMethod | null
   is_recurring: boolean
   recurrence_months: RecurrenceMonths | null
   notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type Store = {
+  id: string
+  name: string
+  city: string | null
+  notes: string | null
+  is_active: boolean
   created_at: string
   updated_at: string
 }
