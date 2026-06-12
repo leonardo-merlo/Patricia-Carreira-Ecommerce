@@ -10,6 +10,9 @@ import React, {
 } from "react"
 import type { Cart, CartItem, Product, ProductVariant, Coupon } from "@/lib/types"
 
+// Valor mínimo do subtotal para frete grátis (aplica-se à opção mais econômica).
+export const FREE_SHIPPING_THRESHOLD = 599
+
 // ─── Last-added notification ──────────────────────────────────────────────────
 
 export type LastAdded = {

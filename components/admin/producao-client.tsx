@@ -490,9 +490,15 @@ function OpCard({
                     />
                     <span className={`op-mat-name${checked ? ' op-mat-name--done' : ''}`}>
                       {m.material_name}
+                      {(m.state || m.type_specific) && (
+                        <span className="op-mat-state">{m.state ?? m.type_specific}</span>
+                      )}
                     </span>
-                    <span className={`op-mat-avail ${m.sufficient ? 'ok' : 'low'}`}>
-                      {m.sufficient ? '✓' : `falta ${fmtQty(m.needed - m.available)} ${m.unit}`}
+                    <span
+                      className={`op-mat-avail ${m.sufficient ? 'ok' : 'low'}`}
+                      title={`Necessário ${fmtQty(m.needed)} ${m.unit} · em estoque ${fmtQty(m.available)} ${m.unit}`}
+                    >
+                      {fmtQty(m.available)}/{fmtQty(m.needed)} {m.unit}
                     </span>
                   </label>
                 )
@@ -595,7 +601,12 @@ function OpDetailModal({
                           onChange={(e) => onToggleCheck(m.material_id, e.target.checked)}
                           data-testid={`check-${m.material_id}`}
                         />
-                        <span className="op-check-category">{m.material_name}</span>
+                        <span className="op-check-category">
+                          {m.material_name}
+                          {(m.state || m.type_specific) && (
+                            <span className="op-mat-state">{m.state ?? m.type_specific}</span>
+                          )}
+                        </span>
                       </label>
 
                       <span className={`op-check-status op-check-status--${status}`}>
@@ -604,19 +615,18 @@ function OpDetailModal({
                         {status === 'needs_purchase' && '❌ Comprar'}
                       </span>
 
-                      {!m.sufficient && (
-                        <div className="op-check-detail">
-                          {status === 'needs_laser' && entry ? (
-                            <span>
-                              Couro bruto disponível ({fmtQty(entry.couro_bruto_available ?? 0)} {m.unit}) — enviar para laser antes de usar
-                            </span>
-                          ) : (
-                            <span>
-                              Necessário {fmtQty(m.needed)} {m.unit} · estoque {fmtQty(m.available)} · faltam {fmtQty(m.needed - m.available)} {m.unit}
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      <div className="op-check-detail">
+                        {status === 'needs_laser' && entry ? (
+                          <span>
+                            Necessário {fmtQty(m.needed)} {m.unit} · couro bruto disponível ({fmtQty(entry.couro_bruto_available ?? 0)} {m.unit}) — enviar para laser antes de usar
+                          </span>
+                        ) : (
+                          <span>
+                            Necessário {fmtQty(m.needed)} {m.unit} · em estoque {fmtQty(m.available)} {m.unit}
+                            {!m.sufficient && ` · faltam ${fmtQty(m.needed - m.available)} ${m.unit}`}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )
                 })}

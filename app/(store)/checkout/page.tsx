@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { cn, formatPrice } from "@/lib/utils"
-import { useCart } from "@/lib/cart-context"
+import { useCart, FREE_SHIPPING_THRESHOLD } from "@/lib/cart-context"
 import { fetchAddressByCEP } from "@/lib/integrations/viacep"
 import { createPayment } from "@/lib/actions/payments"
 import { getShippingOptions } from "@/lib/actions/shipping"
@@ -211,9 +211,24 @@ export default function CheckoutPage() {
     }
   }
 
+  // Frete grátis na opção mais econômica (geralmente PAC) quando o subtotal atinge o mínimo.
+  const qualifiesForFreeShipping = cart.subtotal >= FREE_SHIPPING_THRESHOLD
+  const cheapestShippingId =
+    shippingOptions.length > 0
+      ? shippingOptions.reduce((min, o) => (o.price < min.price ? o : min), shippingOptions[0]).id
+      : null
+
+  function isFreeShipping(option: ShippingOption) {
+    return qualifiesForFreeShipping && option.id === cheapestShippingId
+  }
+
+  function effectiveShippingPrice(option: ShippingOption) {
+    return isFreeShipping(option) ? 0 : option.price
+  }
+
   function handleSelectShipping(option: ShippingOption) {
     setSelectedShipping(option)
-    setShipping(option.price)
+    setShipping(effectiveShippingPrice(option))
     setErrors((prev) => ({ ...prev, shipping: "" }))
   }
 
@@ -563,19 +578,36 @@ export default function CheckoutPage() {
                             </p>
                           </div>
                         </div>
-                        <span
-                          className={cn(
-                            "font-label-lg text-label-lg",
-                            selectedShipping?.id === option.id
-                              ? "text-primary"
-                              : "text-on-surface"
+                        <span className="flex flex-col items-end">
+                          {isFreeShipping(option) ? (
+                            <>
+                              <span className="font-caption text-caption text-on-surface-variant line-through">
+                                {formatPrice(option.price)}
+                              </span>
+                              <span className="font-label-lg text-label-lg text-tertiary">Grátis</span>
+                            </>
+                          ) : (
+                            <span
+                              className={cn(
+                                "font-label-lg text-label-lg",
+                                selectedShipping?.id === option.id
+                                  ? "text-primary"
+                                  : "text-on-surface"
+                              )}
+                            >
+                              {formatPrice(option.price)}
+                            </span>
                           )}
-                        >
-                          {formatPrice(option.price)}
                         </span>
                       </button>
                     ))}
                   </div>
+                )}
+
+                {qualifiesForFreeShipping && shippingOptions.length > 0 && (
+                  <p className="mt-3 font-caption text-caption text-tertiary">
+                    🎉 Você ganhou frete grátis na opção mais econômica!
+                  </p>
                 )}
 
                 <FieldError msg={errors.shipping} />
@@ -747,7 +779,11 @@ export default function CheckoutPage() {
                 <div className="flex justify-between text-on-surface-variant">
                   <span>Frete</span>
                   {selectedShipping ? (
-                    <span>{formatPrice(selectedShipping.price)}</span>
+                    isFreeShipping(selectedShipping) ? (
+                      <span className="text-tertiary">Grátis</span>
+                    ) : (
+                      <span>{formatPrice(selectedShipping.price)}</span>
+                    )
                   ) : (
                     <span className="italic">A calcular</span>
                   )}

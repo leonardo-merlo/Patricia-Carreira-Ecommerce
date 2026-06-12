@@ -400,6 +400,7 @@ export type OpMaterial = {
   material_name: string
   category: string
   type_specific: string | null
+  state: string | null
   unit: string
   needed: number
   available: number
@@ -474,7 +475,7 @@ export async function getProductionOrders(limit = 50): Promise<ProductionOrderRo
     quantity_needed: number
     material: {
       id: string; name: string; category: string
-      type_specific: string | null; unit: string; stock_quantity: number
+      type_specific: string | null; state: string | null; unit: string; stock_quantity: number
     } | null
   }
 
@@ -485,7 +486,7 @@ export async function getProductionOrders(limit = 50): Promise<ProductionOrderRo
       .select(`
         product_variant_id,
         quantity_needed,
-        material:raw_materials(id, name, category, type_specific, unit, stock_quantity)
+        material:raw_materials(id, name, category, type_specific, state, unit, stock_quantity)
       `)
       .in('product_variant_id', variantIds)
 
@@ -512,6 +513,7 @@ export async function getProductionOrders(limit = 50): Promise<ProductionOrderRo
           material_name: mat.name,
           category: mat.category,
           type_specific: mat.type_specific,
+          state: mat.state,
           unit: mat.unit,
           needed,
           available,

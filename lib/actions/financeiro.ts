@@ -48,6 +48,7 @@ export async function createAccountPayable(
 
   if (error) return { success: false, error: error.message }
   revalidatePath('/admin/financeiro')
+  revalidatePath('/admin')
   return { success: true }
 }
 
@@ -64,6 +65,7 @@ export async function updateAccountPayable(
 
   if (error) return { success: false, error: error.message }
   revalidatePath('/admin/financeiro')
+  revalidatePath('/admin')
   return { success: true }
 }
 
@@ -79,6 +81,7 @@ export async function deleteAccountPayable(
 
   if (error) return { success: false, error: error.message }
   revalidatePath('/admin/financeiro')
+  revalidatePath('/admin')
   return { success: true }
 }
 
@@ -120,5 +123,6 @@ export async function markAccountAsPaid(
   }
 
   revalidatePath('/admin/financeiro')
+  revalidatePath('/admin')
   return { success: true }
 }

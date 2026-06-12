@@ -8,6 +8,8 @@ import {
 import { getAllAccountsPayable } from '@/lib/supabase/financeiro'
 import { getStores } from '@/lib/actions/stores'
 
+export const dynamic = 'force-dynamic'
+
 const ENTREGA_MAP: Record<string, { cls: string; txt: string } | null> = {
   pending:    null,
   paid:       null,

@@ -47,6 +47,7 @@ export async function createStore(input: {
   }
 
   revalidatePath('/admin/financeiro')
+  revalidatePath('/admin')
   return { success: true }
 }
 
@@ -75,6 +76,7 @@ export async function updateStore(
   }
 
   revalidatePath('/admin/financeiro')
+  revalidatePath('/admin')
   return { success: true }
 }
 
@@ -91,5 +93,6 @@ export async function deleteStore(id: string): Promise<StoreResult> {
   }
 
   revalidatePath('/admin/financeiro')
+  revalidatePath('/admin')
   return { success: true }
 }
