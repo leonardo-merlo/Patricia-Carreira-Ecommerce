@@ -213,41 +213,49 @@ export function ProducaoClient({ ops, variants }: ProducaoClientProps) {
       {actionError && <div className="alert alert-error">{actionError}</div>}
 
       {pendingAction && (
-        <div
-          style={{
-            background: 'var(--bg-surface, #f9fafb)',
-            border: '1px solid var(--border, #e5e7eb)',
-            borderRadius: '0.5rem',
-            padding: '10px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            marginBottom: 12,
-            fontSize: 13,
-          }}
-          id="confirm-bar"
-          data-testid="confirm-bar"
-        >
-          <span style={{ flex: 1 }}>
-            {pendingAction.type === 'iniciar'
-              ? `Iniciar produção de "${pendingAction.op.variant_label}"?`
-              : `Mover "${pendingAction.op.variant_label}" para ${STATUS_LABEL[pendingAction.targetStatus ?? '']}?`}
-          </span>
-          <button
-            className="btn sm primary"
-            onClick={confirmPendingAction}
-            disabled={isPending}
-            data-testid="btn-confirm-action"
+        <div className="modal-backdrop" onClick={() => setPendingAction(null)}>
+          <div
+            className="modal confirm-modal"
+            id="confirm-modal"
+            data-testid="confirm-bar"
+            role="alertdialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
           >
-            Confirmar
-          </button>
-          <button
-            className="btn sm ghost"
-            onClick={() => setPendingAction(null)}
-            data-testid="btn-cancel-action"
-          >
-            Cancelar
-          </button>
+            <div className="confirm-modal-icon">
+              <AdminIcon name="alert" size={22} />
+            </div>
+            <h3 className="confirm-modal-title">
+              {pendingAction.type === 'iniciar' ? 'Iniciar produção?' : 'Mover ordem de produção?'}
+            </h3>
+            <p className="confirm-modal-text">
+              {pendingAction.type === 'iniciar' ? (
+                <>Confirmar o início da produção de <b>{pendingAction.op.variant_label}</b>?</>
+              ) : (
+                <>
+                  Mover <b>{pendingAction.op.variant_label}</b> para a coluna{' '}
+                  <b>{STATUS_LABEL[pendingAction.targetStatus ?? '']}</b>?
+                </>
+              )}
+            </p>
+            <div className="confirm-modal-actions">
+              <button
+                className="btn ghost"
+                onClick={() => setPendingAction(null)}
+                data-testid="btn-cancel-action"
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn primary"
+                onClick={confirmPendingAction}
+                disabled={isPending}
+                data-testid="btn-confirm-action"
+              >
+                {pendingAction.type === 'iniciar' ? 'Iniciar' : 'Mover'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

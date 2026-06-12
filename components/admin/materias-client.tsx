@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { AdminIcon } from '@/components/admin/admin-icon'
 import type { RawMaterialRow, VariantWithBOM, PurchaseRequestRow } from '@/lib/supabase/admin-queries'
+import type { Supplier } from '@/lib/actions/suppliers'
 import {
   registerMaterialEntry,
   createRawMaterial,
@@ -42,6 +43,7 @@ interface MateriasClientProps {
   materials: RawMaterialRow[]
   variants: VariantWithBOM[]
   purchaseRequests: PurchaseRequestRow[]
+  suppliers: Supplier[]
 }
 
 function stockState(cur: number, min: number) {
@@ -54,7 +56,7 @@ function formatQty(qty: number, unit: string) {
   return `${qty.toLocaleString('pt-BR', { maximumFractionDigits: 3 })} ${unit}`
 }
 
-export function MateriasClient({ materials, variants, purchaseRequests }: MateriasClientProps) {
+export function MateriasClient({ materials, variants, purchaseRequests, suppliers }: MateriasClientProps) {
   // ── Exit modal ──
   const [exitFor, setExitFor] = useState<RawMaterialRow | null>(null)
   const [exitQty, setExitQty] = useState('1')
@@ -92,7 +94,7 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
   const [newStock, setNewStock] = useState('0')
   const [newMinStock, setNewMinStock] = useState('0')
   const [newCost, setNewCost] = useState('')
-  const [newSupplier, setNewSupplier] = useState('')
+  const [newSupplierId, setNewSupplierId] = useState('')
   const [newNotes, setNewNotes] = useState('')
   const [newError, setNewError] = useState('')
 
@@ -230,7 +232,7 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
     setNewTipo(TIPOS[CATEGORIES[0]]?.[0] ?? '')
     setNewEstado('')
     setNewUnit('unidade'); setNewStock('0'); setNewMinStock('0')
-    setNewCost(''); setNewSupplier(''); setNewNotes(''); setNewError('')
+    setNewCost(''); setNewSupplierId(''); setNewNotes(''); setNewError('')
   }
 
   function handleCreateMaterial() {
@@ -256,7 +258,8 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
         stock_quantity: stockQty,
         minimum_stock: isNaN(minQty) ? 0 : minQty,
         cost_per_unit: newCost ? parseFloat(newCost.replace(',', '.')) : null,
-        supplier: newSupplier.trim() || null,
+        supplier: suppliers.find((s) => s.id === newSupplierId)?.name ?? null,
+        supplier_id: newSupplierId || null,
         notes: newNotes.trim() || null,
       })
       if (res.success) {
@@ -828,7 +831,23 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
 
                 <div className="field">
                   <label>Fornecedor (opcional)</label>
-                  <input className="input" value={newSupplier} onChange={(e) => setNewSupplier(e.target.value)} placeholder="Nome do fornecedor" />
+                  <select
+                    id="new-material-fornecedor"
+                    className="select"
+                    value={newSupplierId}
+                    onChange={(e) => setNewSupplierId(e.target.value)}
+                  >
+                    <option value="">— Sem fornecedor —</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                  {suppliers.length === 0 && (
+                    <span className="cust-meta" style={{ fontSize: 11, marginTop: 4 }}>
+                      Nenhum fornecedor cadastrado. Cadastre em{' '}
+                      <a href="/admin/fornecedores" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>Fornecedores</a>.
+                    </span>
+                  )}
                 </div>
 
                 <div className="field">

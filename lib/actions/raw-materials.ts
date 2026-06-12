@@ -73,6 +73,7 @@ export async function createRawMaterial(input: {
   minimum_stock: number
   cost_per_unit: number | null
   supplier: string | null
+  supplier_id: string | null
   notes: string | null
 }): Promise<StockEntryResult> {
   const supabase = createServiceClient()
@@ -89,6 +90,7 @@ export async function createRawMaterial(input: {
     minimum_stock: input.minimum_stock,
     cost_per_unit: input.cost_per_unit,
     supplier: input.supplier,
+    supplier_id: input.supplier_id,
     notes: input.notes,
   })
 
