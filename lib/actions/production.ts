@@ -275,9 +275,39 @@ export async function setProductionOrderStatus(
 
   const supabase = createServiceClient()
 
+  const { data: op, error: fetchErr } = await supabase
+    .from('production_orders')
+    .select('status')
+    .eq('id', opId)
+    .single()
+
+  if (fetchErr || !op) {
+    return { success: false, error: 'OP não encontrada' }
+  }
+
+  const current = op.status as string
+  if (current === targetStatus) {
+    return { success: true, new_status: targetStatus }
+  }
+
   // Concluir (inclusive arrastando o card para "Concluído") faz a baixa de estoque.
   if (targetStatus === 'completed') {
     return completeProductionOrder(supabase, opId)
+  }
+
+  // Sair de "Concluído" (arrastar de volta) estorna a baixa de estoque.
+  if (current === 'completed') {
+    const { error } = await supabase.rpc('revert_production_order', {
+      p_op_id: opId,
+      p_target_status: targetStatus,
+    })
+    if (error) {
+      return { success: false, error: error.message }
+    }
+    revalidatePath('/admin/producao')
+    revalidatePath('/admin/materias')
+    revalidatePath('/admin/estoque')
+    return { success: true, new_status: targetStatus }
   }
 
   const { error } = await supabase
