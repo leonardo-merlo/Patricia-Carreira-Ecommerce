@@ -188,6 +188,26 @@ const STATUS_TRANSITIONS: Record<string, string> = {
   in_progress: 'completed',
 }
 
+// Conclui a OP via função transacional no Postgres: desconta matéria-prima,
+// dá entrada no produto acabado e registra em stock_adjustments — ou faz
+// rollback e retorna erro se faltar material.
+async function completeProductionOrder(
+  supabase: ReturnType<typeof createServiceClient>,
+  opId: string,
+): Promise<AdvanceStatusResult> {
+  const { error } = await supabase.rpc('complete_production_order', { p_op_id: opId })
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/admin/producao')
+  revalidatePath('/admin/materias')
+  revalidatePath('/admin/estoque')
+
+  return { success: true, new_status: 'completed' }
+}
+
 export async function advanceProductionOrderStatus(opId: string): Promise<AdvanceStatusResult> {
   const supabase = createServiceClient()
 
@@ -204,6 +224,10 @@ export async function advanceProductionOrderStatus(opId: string): Promise<Advanc
   const nextStatus = STATUS_TRANSITIONS[op.status as string]
   if (!nextStatus) {
     return { success: false, error: `Não é possível avançar do status "${op.status}"` }
+  }
+
+  if (nextStatus === 'completed') {
+    return completeProductionOrder(supabase, opId)
   }
 
   const { error: updateErr } = await supabase
@@ -250,6 +274,11 @@ export async function setProductionOrderStatus(
   }
 
   const supabase = createServiceClient()
+
+  // Concluir (inclusive arrastando o card para "Concluído") faz a baixa de estoque.
+  if (targetStatus === 'completed') {
+    return completeProductionOrder(supabase, opId)
+  }
 
   const { error } = await supabase
     .from('production_orders')
