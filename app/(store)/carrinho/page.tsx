@@ -13,6 +13,7 @@ import { formatPrice } from "@/lib/utils"
 import { validateCoupon } from "@/lib/actions/coupons"
 
 const PLACEHOLDER = "/images/placeholder-product.svg"
+const FREE_SHIPPING_THRESHOLD = 599
 
 export default function CarrinhoPage() {
   const { cart, hydrated, removeItem, updateQuantity, applyCoupon, removeCoupon } = useCart()
@@ -250,6 +251,34 @@ export default function CarrinhoPage() {
                 {couponError && (
                   <p className="font-caption text-caption text-error">{couponError}</p>
                 )}
+              </div>
+            )}
+
+            {/* Frete grátis */}
+            {cart.subtotal >= FREE_SHIPPING_THRESHOLD ? (
+              <div className="flex flex-col gap-1.5 rounded-lg bg-tertiary/10 px-3 py-2.5">
+                <p className="font-label-md text-label-md text-tertiary">
+                  🎉 Frete grátis conquistado!
+                </p>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-tertiary/20">
+                  <div className="h-full w-full rounded-full bg-tertiary" />
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5 rounded-lg bg-surface-container px-3 py-2.5">
+                <p className="font-caption text-caption text-on-surface-variant">
+                  Faltam{" "}
+                  <span className="font-label-md text-label-md text-on-surface">
+                    {formatPrice(FREE_SHIPPING_THRESHOLD - cart.subtotal)}
+                  </span>{" "}
+                  para frete grátis
+                </p>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-outline-variant">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-500"
+                    style={{ width: `${Math.min((cart.subtotal / FREE_SHIPPING_THRESHOLD) * 100, 100)}%` }}
+                  />
+                </div>
               </div>
             )}
 
