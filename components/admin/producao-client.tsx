@@ -490,9 +490,7 @@ function OpCard({
                     />
                     <span className={`op-mat-name${checked ? ' op-mat-name--done' : ''}`}>
                       {m.material_name}
-                      {(m.state || m.type_specific) && (
-                        <span className="op-mat-state">{m.state ?? m.type_specific}</span>
-                      )}
+                      {m.state && <span className="op-mat-state">{m.state}</span>}
                     </span>
                     <span
                       className={`op-mat-avail ${m.sufficient ? 'ok' : 'low'}`}
@@ -603,9 +601,7 @@ function OpDetailModal({
                         />
                         <span className="op-check-category">
                           {m.material_name}
-                          {(m.state || m.type_specific) && (
-                            <span className="op-mat-state">{m.state ?? m.type_specific}</span>
-                          )}
+                          {m.state && <span className="op-mat-state">{m.state}</span>}
                         </span>
                       </label>
 

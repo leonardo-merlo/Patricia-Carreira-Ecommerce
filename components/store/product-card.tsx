@@ -19,6 +19,7 @@ interface ProductCardProps {
 
 function tagVariant(tag: string): "default" | "secondary" | "tertiary" {
   if (tag === "Promoção") return "tertiary"
+  if (tag === "Últimas peças") return "tertiary"
   if (tag === "Bazar") return "secondary"
   return "default"
 }

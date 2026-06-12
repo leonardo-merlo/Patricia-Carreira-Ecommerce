@@ -395,7 +395,7 @@ export type ProductBadge = "Lançamento" | "Última Peça" | "Esgotado" | null;
 
 // Tags manuais que o Henrique liga/desliga em cada produto (rótulos visuais).
 // "Bazar" aqui é só um rótulo — NÃO muda a categoria do produto.
-export const MANUAL_TAGS = ["Lançamento", "Promoção", "Bazar"] as const;
+export const MANUAL_TAGS = ["Lançamento", "Promoção", "Bazar", "Últimas peças"] as const;
 export type ManualTag = (typeof MANUAL_TAGS)[number];
 
 /** Estado dos filtros na página de categoria */
