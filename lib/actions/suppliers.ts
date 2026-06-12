@@ -128,7 +128,7 @@ export async function createSupplier(
 
   if (error) {
     console.error('[suppliers] createSupplier error:', error)
-    return { success: false, error: 'Erro ao cadastrar fornecedor.' }
+    return { success: false, error: error.message ?? 'Erro ao cadastrar fornecedor.' }
   }
 
   revalidatePath('/admin/fornecedores')
@@ -163,7 +163,7 @@ export async function updateSupplier(
 
   if (error) {
     console.error('[suppliers] updateSupplier error:', error)
-    return { success: false, error: 'Erro ao salvar fornecedor.' }
+    return { success: false, error: error.message ?? 'Erro ao salvar fornecedor.' }
   }
 
   revalidatePath('/admin/fornecedores')

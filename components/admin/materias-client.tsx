@@ -17,29 +17,22 @@ import {
 const CATEGORIES = ['Bordado', 'Couro', 'Metais', 'Forro', 'Tecido', 'Aviamentos'] as const
 type Category = typeof CATEGORIES[number]
 
-// material_type: tipo específico dentro da categoria (dropdown ou livre)
-const MATERIAL_TYPES: Record<Category, string[]> = {
-  Bordado: [],  // campo livre — nome do modelo
-  Couro: ['legítimo', 'legítimo de carneiro', 'sintético', 'vaqueta', 'raspa de porco', 'marrom'],
-  Metais: ['argola', 'mosquetão', 'ilhó', 'botão', 'fivela', 'corrente', 'rebite', 'pressão'],
-  Forro: [],    // sem tipo definido por enquanto
-  Tecido: ['lona', 'tricoline', 'viscolinho', 'viscose', 'sarjada', 'viscode'],
-  Aviamentos: [], // sem tipo definido
+// tipo: item específico dentro da categoria
+const TIPOS: Record<Category, string[]> = {
+  Bordado: ['Bordado'],
+  Couro: ['Legítimo carneiro', 'Legítimo vaqueta', 'Sintético montana', 'Sintético raspa', 'Sintético uruguai', 'Raspa de porco'],
+  Metais: ['Argola', 'Mosquetão', 'Cursor', 'Meia argola', 'Fiel', 'Rebite', 'Imã', 'Fivela'],
+  Forro: ['Frente', 'Costas', 'Bolso lateral'],
+  Tecido: ['Lona', 'Viscose sarjada', 'Viscolinho', 'Tricoline'],
+  Aviamentos: ['Etiqueta', 'Zíper', 'Linha'],
 }
 
-// subcategory: estado/posição/tamanho dentro do tipo
-const SUBCATEGORIES: Record<Category, string[]> = {
-  Bordado: [],
-  Couro: ['bruto', 'com laser'],
-  Metais: ['P', 'M', 'G'],
-  Forro: ['frente', 'costas', 'bolsos', 'lateral'],
-  Tecido: ['bruta', 'com corte'],
-  Aviamentos: ['etiqueta', 'zíper'],
-}
+// estado: processamento/tamanho do material (comum a todas as categorias)
+const ESTADOS = ['Bruto', 'Com laser', 'P', 'M', 'G', 'GG', 'Cortado'] as const
 
-function deriveType(category: Category, subcategory: string): 'bruta' | 'intermediaria' {
-  if (category === 'Couro' && subcategory === 'com laser') return 'intermediaria'
-  if (category === 'Tecido' && subcategory === 'com corte') return 'intermediaria'
+function deriveType(category: Category, state: string): 'bruta' | 'intermediaria' {
+  if (category === 'Couro' && state === 'Com laser') return 'intermediaria'
+  if (category === 'Tecido' && state === 'Cortado') return 'intermediaria'
   return 'bruta'
 }
 
@@ -93,10 +86,8 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
   const [showNewMaterial, setShowNewMaterial] = useState(false)
   const [newName, setNewName] = useState('')
   const [newCategory, setNewCategory] = useState<string>(CATEGORIES[0])
-  const [newSubcategory, setNewSubcategory] = useState<string>(() => SUBCATEGORIES[CATEGORIES[0]]?.[0] ?? '')
-  const [newSubcategoryFree, setNewSubcategoryFree] = useState<string>('')
-  const [newMaterialType, setNewMaterialType] = useState<string>(() => MATERIAL_TYPES[CATEGORIES[0]]?.[0] ?? '')
-  const [newMaterialTypeFree, setNewMaterialTypeFree] = useState<string>('')
+  const [newTipo, setNewTipo] = useState<string>(() => TIPOS[CATEGORIES[0]]?.[0] ?? '')
+  const [newEstado, setNewEstado] = useState<string>('')
   const [newUnit, setNewUnit] = useState<'metro' | 'unidade' | 'kg' | 'cm'>('unidade')
   const [newStock, setNewStock] = useState('0')
   const [newMinStock, setNewMinStock] = useState('0')
@@ -206,12 +197,9 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
 
   function handleCategoryChange(cat: string) {
     setNewCategory(cat)
-    const types = MATERIAL_TYPES[cat as Category] ?? []
-    setNewMaterialType(types[0] ?? '')
-    setNewMaterialTypeFree('')
-    const subs = SUBCATEGORIES[cat as Category] ?? []
-    setNewSubcategory(subs[0] ?? '')
-    setNewSubcategoryFree('')
+    const tipos = TIPOS[cat as Category] ?? []
+    setNewTipo(tipos[0] ?? '')
+    setNewEstado('')
   }
 
   function handleExit() {
@@ -239,10 +227,8 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
   function openNewMaterial() {
     setShowNewMaterial(true)
     setNewName(''); setNewCategory(CATEGORIES[0])
-    setNewSubcategory(SUBCATEGORIES[CATEGORIES[0]]?.[0] ?? '')
-    setNewSubcategoryFree('')
-    setNewMaterialType(MATERIAL_TYPES[CATEGORIES[0]]?.[0] ?? '')
-    setNewMaterialTypeFree('')
+    setNewTipo(TIPOS[CATEGORIES[0]]?.[0] ?? '')
+    setNewEstado('')
     setNewUnit('unidade'); setNewStock('0'); setNewMinStock('0')
     setNewCost(''); setNewSupplier(''); setNewNotes(''); setNewError('')
   }
@@ -254,24 +240,18 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
     if (isNaN(stockQty) || stockQty < 0) { setNewError('Estoque inválido'); return }
     setNewError('')
     startTransition(async () => {
-      const subcategoryValue = newCategory === 'Bordado'
-        ? (newSubcategoryFree.trim() || null)
-        : (newSubcategory || null)
-
-      const typeValue = subcategoryValue
-        ? deriveType(newCategory as Category, subcategoryValue)
+      const estadoValue = newEstado || null
+      const typeValue = estadoValue
+        ? deriveType(newCategory as Category, estadoValue)
         : 'bruta'
-
-      const materialTypeValue = newCategory === 'Bordado'
-        ? (newMaterialTypeFree.trim() || null)
-        : (newMaterialType || null)
 
       const res = await createRawMaterial({
         name: newName.trim(),
         type: typeValue,
         category: newCategory,
-        subcategory: subcategoryValue,
-        material_type: materialTypeValue,
+        subcategory: null,
+        type_specific: newTipo || null,
+        state: estadoValue,
         unit: newUnit,
         stock_quantity: stockQty,
         minimum_stock: isNaN(minQty) ? 0 : minQty,
@@ -281,8 +261,8 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
       })
       if (res.success) {
         setShowNewMaterial(false)
-        setNewMaterialType(MATERIAL_TYPES[CATEGORIES[0]]?.[0] ?? '')
-        setNewMaterialTypeFree('')
+        setNewTipo(TIPOS[CATEGORIES[0]]?.[0] ?? '')
+        setNewEstado('')
       } else {
         setNewError(res.error)
       }
@@ -342,7 +322,7 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
                               <span style={{ fontWeight: 500, fontSize: 12.5 }}>{m.name}</span>
                               <div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>
                                 <span className="cust-meta" style={{ fontSize: 11 }}>
-                                  {[m.category, m.material_type, m.subcategory].filter(Boolean).join(' › ')}
+                                  {[m.category, m.type_specific, m.state].filter(Boolean).join(' › ')}
                                 </span>
                                 {s.badge}
                               </div>
@@ -800,54 +780,36 @@ export function MateriasClient({ materials, variants, purchaseRequests }: Materi
                   </select>
                 </div>
 
-                {/* material_type — dropdown para categorias com lista fixa */}
-                {(MATERIAL_TYPES[newCategory as Category]?.length ?? 0) > 0 && newCategory !== 'Bordado' && (
-                  <div className="field">
-                    <label>Tipo</label>
-                    <select
-                      id="new-material-type"
-                      className="select"
-                      value={newMaterialType}
-                      onChange={(e) => setNewMaterialType(e.target.value)}
-                    >
-                      {MATERIAL_TYPES[newCategory as Category].map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                {/* Tipo — dropdown com opções específicas por categoria */}
+                <div className="field">
+                  <label>Tipo</label>
+                  <select
+                    id="new-material-tipo"
+                    className="select"
+                    value={newTipo}
+                    onChange={(e) => setNewTipo(e.target.value)}
+                  >
+                    {TIPOS[newCategory as Category].map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
 
-                {/* material_type — campo livre para Bordado */}
-                {newCategory === 'Bordado' && (
-                  <div className="field">
-                    <label>Modelo do bordado</label>
-                    <input
-                      id="new-material-type-free"
-                      type="text"
-                      className="input"
-                      placeholder="Ex: Floral Pochete, Geométrico Liberty..."
-                      value={newMaterialTypeFree}
-                      onChange={(e) => setNewMaterialTypeFree(e.target.value)}
-                    />
-                  </div>
-                )}
-
-                {/* Subcategoria — dropdown para categorias com opções fixas */}
-                {newCategory !== 'Bordado' && (SUBCATEGORIES[newCategory as Category]?.length ?? 0) > 0 && (
-                  <div className="field">
-                    <label>Subcategoria</label>
-                    <select
-                      id="new-material-subcategory"
-                      className="select"
-                      value={newSubcategory}
-                      onChange={(e) => setNewSubcategory(e.target.value)}
-                    >
-                      {SUBCATEGORIES[newCategory as Category].map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                {/* Estado — dropdown com valores comuns, opcional */}
+                <div className="field">
+                  <label>Estado (opcional)</label>
+                  <select
+                    id="new-material-estado"
+                    className="select"
+                    value={newEstado}
+                    onChange={(e) => setNewEstado(e.target.value)}
+                  >
+                    <option value="">— Sem estado —</option>
+                    {ESTADOS.map((e) => (
+                      <option key={e} value={e}>{e}</option>
+                    ))}
+                  </select>
+                </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                   <div className="field">

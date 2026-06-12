@@ -605,6 +605,7 @@ export default function FornecedoresClient({
                     value={form.name}
                     onChange={(e) => setField('name', e.target.value)}
                   />
+                  <span className="cust-meta" style={{ fontSize: 11 }}>* campo obrigatório</span>
                 </div>
                 <div className="field">
                   <label>CNPJ</label>

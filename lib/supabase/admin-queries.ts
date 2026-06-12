@@ -273,7 +273,8 @@ export type RawMaterialRow = {
   type: 'bruta' | 'intermediaria'
   category: string
   subcategory: string | null
-  material_type: string | null
+  type_specific: string | null
+  state: string | null
   color: string | null
   unit: string
   stock_quantity: number
@@ -288,7 +289,7 @@ export async function getRawMaterials(): Promise<RawMaterialRow[]> {
 
   const { data, error } = await supabase
     .from('raw_materials')
-    .select('id, name, type, category, subcategory, material_type, color, unit, stock_quantity, minimum_stock, cost_per_unit, supplier, notes')
+    .select('id, name, type, category, subcategory, type_specific, state, color, unit, stock_quantity, minimum_stock, cost_per_unit, supplier, notes')
     .order('category')
     .order('name')
 

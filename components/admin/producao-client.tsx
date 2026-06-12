@@ -27,10 +27,30 @@ const COLUMNS: { status: string; label: string }[] = [
   { status: 'completed', label: 'Concluído' },
 ]
 
+const NEXT_STATUS: Record<string, string> = {
+  draft: 'approved',
+  approved: 'in_progress',
+  in_progress: 'completed',
+}
+
 const ADVANCE_LABEL: Record<string, string> = {
   draft: 'Aprovar',
   approved: 'Iniciar',
   in_progress: 'Concluir',
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  draft: 'Rascunho',
+  approved: 'Aprovado',
+  in_progress: 'Em Andamento',
+  completed: 'Concluído',
+  cancelled: 'Cancelado',
+}
+
+interface PendingAction {
+  type: 'drag' | 'iniciar'
+  op: ProductionOrderRow
+  targetStatus?: string
 }
 
 function categoryStatus(
@@ -64,12 +84,23 @@ export function ProducaoClient({ ops, variants }: ProducaoClientProps) {
   const [novaError, setNovaError] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
+  const [dragOpId, setDragOpId] = useState<string | null>(null)
 
   const displaySelected = selectedOp
     ? (ops.find((o) => o.id === selectedOp.id) ?? selectedOp)
     : null
 
   function handleAdvance(op: ProductionOrderRow) {
+    // "Iniciar" (approved → in_progress) requires confirmation
+    if (op.status === 'approved') {
+      setPendingAction({ type: 'iniciar', op })
+      return
+    }
+    executeAdvance(op)
+  }
+
+  function executeAdvance(op: ProductionOrderRow) {
     setActionError(null)
     startTransition(async () => {
       const res = await advanceProductionOrderStatus(op.id)
@@ -120,10 +151,50 @@ export function ProducaoClient({ ops, variants }: ProducaoClientProps) {
     })
   }
 
+  function handleDragStart(opId: string) {
+    setDragOpId(opId)
+  }
+
+  function handleDrop(targetStatus: string) {
+    if (!dragOpId) return
+    const op = ops.find((o) => o.id === dragOpId)
+    if (!op) { setDragOpId(null); return }
+
+    const nextStatus = NEXT_STATUS[op.status]
+    const isValidDrop = nextStatus === targetStatus || targetStatus === 'cancelled'
+
+    if (!isValidDrop || op.status === targetStatus) {
+      setDragOpId(null)
+      return
+    }
+
+    setPendingAction({ type: 'drag', op, targetStatus })
+    setDragOpId(null)
+  }
+
+  function confirmPendingAction() {
+    if (!pendingAction) return
+    const { type, op, targetStatus } = pendingAction
+    setPendingAction(null)
+    setActionError(null)
+
+    if (type === 'iniciar' || (type === 'drag' && targetStatus === NEXT_STATUS[op.status])) {
+      startTransition(async () => {
+        const res = await advanceProductionOrderStatus(op.id)
+        if (!res.success) setActionError(res.error)
+      })
+    } else if (type === 'drag' && targetStatus === 'cancelled') {
+      startTransition(async () => {
+        const res = await cancelProductionOrder(op.id)
+        if (!res.success) setActionError(res.error)
+      })
+    }
+  }
+
   const activeCount = ops.filter((o) => !['completed', 'cancelled'].includes(o.status)).length
 
   return (
-    <div className="admin-page" id="producao-page">
+    <div className="page" id="producao-page">
       <div className="page-header">
         <div>
           <h1 className="page-title">Produção</h1>
@@ -136,11 +207,56 @@ export function ProducaoClient({ ops, variants }: ProducaoClientProps) {
 
       {actionError && <div className="alert alert-error">{actionError}</div>}
 
+      {pendingAction && (
+        <div
+          style={{
+            background: 'var(--bg-surface, #f9fafb)',
+            border: '1px solid var(--border, #e5e7eb)',
+            borderRadius: '0.5rem',
+            padding: '10px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            marginBottom: 12,
+            fontSize: 13,
+          }}
+          id="confirm-bar"
+          data-testid="confirm-bar"
+        >
+          <span style={{ flex: 1 }}>
+            {pendingAction.type === 'iniciar'
+              ? `Iniciar produção de "${pendingAction.op.variant_label}"?`
+              : `Mover "${pendingAction.op.variant_label}" para ${STATUS_LABEL[pendingAction.targetStatus ?? '']}?`}
+          </span>
+          <button
+            className="btn sm primary"
+            onClick={confirmPendingAction}
+            disabled={isPending}
+            data-testid="btn-confirm-action"
+          >
+            Confirmar
+          </button>
+          <button
+            className="btn sm ghost"
+            onClick={() => setPendingAction(null)}
+            data-testid="btn-cancel-action"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+
       <div className="kanban-board">
         {COLUMNS.map(({ status, label }) => {
           const colOps = ops.filter((o) => o.status === status)
           return (
-            <div key={status} className="kanban-column" data-status={status}>
+            <div
+              key={status}
+              className="kanban-column"
+              data-status={status}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => handleDrop(status)}
+            >
               <div className="kanban-column-header">
                 <span className="kanban-column-title">{label}</span>
                 <span className="kanban-column-count">{colOps.length}</span>
@@ -152,6 +268,7 @@ export function ProducaoClient({ ops, variants }: ProducaoClientProps) {
                     op={op}
                     onSelect={() => setSelectedOp(op)}
                     onAdvance={() => handleAdvance(op)}
+                    onDragStart={() => handleDragStart(op.id)}
                     isPending={isPending}
                   />
                 ))}
@@ -164,25 +281,57 @@ export function ProducaoClient({ ops, variants }: ProducaoClientProps) {
         })}
       </div>
 
+      {/* Detail modal — fixed centered overlay */}
       {displaySelected && (
-        <div className="modal-backdrop" onClick={() => setSelectedOp(null)}>
+        <>
           <div
-            className="modal"
-            id={`op-detail-${displaySelected.id}`}
-            style={{ width: 520, maxHeight: '85vh', overflowY: 'auto' }}
-            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 40,
+              background: 'rgba(0,0,0,0.4)',
+            }}
+            onClick={() => setSelectedOp(null)}
+            aria-hidden="true"
+          />
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 50,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+            }}
           >
-            <OpDetailModal
-              op={displaySelected}
-              onAdvance={() => handleAdvance(displaySelected)}
-              onCancel={() => handleCancel(displaySelected)}
-              onRefresh={() => handleRefreshMaterials(displaySelected)}
-              onToggleCheck={(cat, val) => handleToggleCheck(displaySelected, cat, val)}
-              onClose={() => setSelectedOp(null)}
-              isPending={isPending}
-            />
+            <div
+              className="modal"
+              id={`op-detail-${displaySelected.id}`}
+              style={{
+                background: 'var(--bg-surface, #fff)',
+                borderRadius: '0.75rem',
+                padding: '1.5rem',
+                width: '100%',
+                maxWidth: 512,
+                maxHeight: '80vh',
+                overflowY: 'auto',
+                pointerEvents: 'auto',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <OpDetailModal
+                op={displaySelected}
+                onAdvance={() => handleAdvance(displaySelected)}
+                onCancel={() => handleCancel(displaySelected)}
+                onRefresh={() => handleRefreshMaterials(displaySelected)}
+                onToggleCheck={(cat, val) => handleToggleCheck(displaySelected, cat, val)}
+                onClose={() => setSelectedOp(null)}
+                isPending={isPending}
+              />
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {showNovaOp && (
@@ -252,11 +401,13 @@ function OpCard({
   op,
   onSelect,
   onAdvance,
+  onDragStart,
   isPending,
 }: {
   op: ProductionOrderRow
   onSelect: () => void
   onAdvance: () => void
+  onDragStart: () => void
   isPending: boolean
 }) {
   const categories = categoriesForOp(op)
@@ -268,6 +419,8 @@ function OpCard({
       data-testid="op-card"
       role="button"
       tabIndex={0}
+      draggable
+      onDragStart={onDragStart}
       onClick={onSelect}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
     >
@@ -327,7 +480,7 @@ function OpDetailModal({
 
   return (
     <>
-      <div className="modal-header">
+      <div className="modal-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div>
           <h3>{op.variant_label}</h3>
           <div className="sub">
@@ -335,7 +488,14 @@ function OpDetailModal({
             {op.customer_name && ` · ${op.customer_name}`}
           </div>
         </div>
-        <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--text-3)', padding: '0 4px' }} onClick={onClose} data-testid="btn-close-op-detail">✕</button>
+        <button
+          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--text-3)', padding: '0 4px', lineHeight: 1, flexShrink: 0 }}
+          onClick={onClose}
+          data-testid="btn-close-op-detail"
+          aria-label="Fechar"
+        >
+          ✕
+        </button>
       </div>
 
       <div className="modal-body">

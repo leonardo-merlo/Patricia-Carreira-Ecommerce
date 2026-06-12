@@ -64,7 +64,7 @@ export async function checkAndSetMaterials(opId: string): Promise<CheckMaterials
     .from('bill_of_materials')
     .select(`
       quantity_needed,
-      material:raw_materials(id, name, category, subcategory, material_type, unit, stock_quantity)
+      material:raw_materials(id, name, category, subcategory, type_specific, unit, stock_quantity)
     `)
     .eq('product_variant_id', op.product_variant_id)
 
@@ -82,7 +82,7 @@ export async function checkAndSetMaterials(opId: string): Promise<CheckMaterials
     quantity_needed: number
     material: {
       id: string; name: string; category: string
-      subcategory: string | null; material_type: string | null; unit: string; stock_quantity: number
+      subcategory: string | null; type_specific: string | null; unit: string; stock_quantity: number
     } | null
   }
 
@@ -109,8 +109,8 @@ export async function checkAndSetMaterials(opId: string): Promise<CheckMaterials
         .eq('category', 'Couro')
         .eq('subcategory', 'bruto')
 
-      if (mat.material_type) {
-        brutoQuery.eq('material_type', mat.material_type)
+      if (mat.type_specific) {
+        brutoQuery.eq('type_specific', mat.type_specific)
       }
 
       const { data: bruto } = await brutoQuery.maybeSingle()
