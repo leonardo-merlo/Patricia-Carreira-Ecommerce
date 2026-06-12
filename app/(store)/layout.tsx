@@ -4,6 +4,7 @@ import { CartProvider } from '@/lib/cart-context'
 import { AnnouncementBanner } from '@/components/store/announcement-banner'
 import { WhatsAppButton } from '@/components/store/whatsapp-button'
 import { ClientOnlyShell } from '@/components/store/client-only-shell'
+import { CartToast } from '@/components/store/cart-toast'
 
 export default function StoreLayout({
   children,
@@ -19,6 +20,7 @@ export default function StoreLayout({
         <Footer />
         <WhatsAppButton />
         <ClientOnlyShell />
+        <CartToast />
       </div>
     </CartProvider>
   )

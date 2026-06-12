@@ -6,8 +6,18 @@ import React, {
   useReducer,
   useEffect,
   useState,
+  useCallback,
 } from "react"
 import type { Cart, CartItem, Product, ProductVariant, Coupon } from "@/lib/types"
+
+// ─── Last-added notification ──────────────────────────────────────────────────
+
+export type LastAdded = {
+  variantId: string
+  productName: string
+  variantLabel: string // e.g. "M · Azul" or "Único"
+  image: string | null
+}
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
 
@@ -121,6 +131,7 @@ function cartReducer(state: Cart, action: CartAction): Cart {
 interface CartContextValue {
   cart: Cart
   hydrated: boolean
+  lastAdded: LastAdded | null
   addItem: (variant: ProductVariant & { product: Product }, quantity?: number) => void
   removeItem: (variantId: string) => void
   updateQuantity: (variantId: string, quantity: number) => void
@@ -128,6 +139,7 @@ interface CartContextValue {
   removeCoupon: () => void
   setShipping: (amount: number) => void
   clearCart: () => void
+  clearLastAdded: () => void
 }
 
 const CartContext = createContext<CartContextValue | null>(null)
@@ -137,6 +149,7 @@ const STORAGE_KEY = "patricia-carreira-cart"
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, dispatch] = useReducer(cartReducer, EMPTY_CART)
   const [hydrated, setHydrated] = useState(false)
+  const [lastAdded, setLastAdded] = useState<LastAdded | null>(null)
 
   useEffect(() => {
     try {
@@ -152,11 +165,27 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (hydrated) localStorage.setItem(STORAGE_KEY, JSON.stringify(cart))
   }, [cart, hydrated])
 
+  const clearLastAdded = useCallback(() => setLastAdded(null), [])
+
+  const addItem = useCallback(
+    (variant: ProductVariant & { product: Product }, quantity = 1) => {
+      dispatch({ type: "ADD_ITEM", variant, quantity })
+      const label = [variant.size, variant.color].filter(Boolean).join(" · ") || "Único"
+      setLastAdded({
+        variantId: variant.id,
+        productName: variant.product.name,
+        variantLabel: label,
+        image: variant.product.images[0] ?? null,
+      })
+    },
+    []
+  )
+
   const value: CartContextValue = {
     cart,
     hydrated,
-    addItem: (variant, quantity = 1) =>
-      dispatch({ type: "ADD_ITEM", variant, quantity }),
+    lastAdded,
+    addItem,
     removeItem: (variantId) => dispatch({ type: "REMOVE_ITEM", variantId }),
     updateQuantity: (variantId, quantity) =>
       dispatch({ type: "UPDATE_QUANTITY", variantId, quantity }),
@@ -164,6 +193,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     removeCoupon: () => dispatch({ type: "REMOVE_COUPON" }),
     setShipping: (amount) => dispatch({ type: "SET_SHIPPING", amount }),
     clearCart: () => dispatch({ type: "CLEAR_CART" }),
+    clearLastAdded,
   }
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>
