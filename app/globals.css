@@ -6,6 +6,10 @@ html {
   scroll-behavior: smooth;
 }
 
+body {
+  font-family: var(--font-be-vietnam), sans-serif;
+}
+
 .full-width {
   width: 100vw;
   margin-left: calc(-50vw + 50%);

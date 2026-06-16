@@ -77,7 +77,7 @@ export function HeroCarousel() {
         <div className="bg-[#fff8ef] px-margin-mobile pb-6 pt-8">
           <h1
             key={`heading-mobile-${slide.id}`}
-            className="animate-carousel-fade font-display-lg text-[38px] font-semibold leading-[1.05] tracking-[0.03em] text-[#3d1f0e]"
+            className="animate-carousel-fade font-display-lg text-[38px] font-normal leading-[1.05] tracking-[0.02em] text-[#3d1f0e]"
           >
             {slide.heading.map((line, i) => (
               <span key={i} className="block">{line}</span>
@@ -92,7 +92,7 @@ export function HeroCarousel() {
 
           <p
             key={`body-mobile-${slide.id}`}
-            className="animate-carousel-fade font-body-md text-body-md font-semibold text-[#3d1f0e]/75"
+            className="animate-carousel-fade text-[17px] leading-relaxed font-semibold text-[#3d1f0e]/75"
           >
             {slide.body}
           </p>
@@ -100,7 +100,7 @@ export function HeroCarousel() {
           <div className="mt-6">
             <Link
               href={slide.cta.href}
-              className="inline-block bg-[#7a3a22] px-8 py-3 font-label-md text-sm uppercase tracking-widest text-white transition-colors hover:bg-[#5f2c17]"
+              className="inline-block rounded-[30px] bg-[#7a3a22] px-8 py-3 font-label-md text-sm uppercase tracking-widest text-white transition-colors hover:bg-[#5f2c17]"
             >
               {slide.cta.label}
             </Link>
@@ -184,7 +184,7 @@ export function HeroCarousel() {
         {/* Conteúdo */}
         <div key={`content-${slide.id}`} className="relative z-10 w-full animate-carousel-fade px-margin-desktop">
           <div className="ml-28 max-w-[600px]">
-            <h1 className="font-display-lg text-[86px] font-semibold leading-[1.05] tracking-[0.03em] text-[#3d1f0e]">
+            <h1 className="font-display-lg text-[86px] font-normal leading-[1.05] tracking-[0.02em] text-[#3d1f0e]">
               {slide.heading.map((line, i) => (
                 <span key={i} className="block">{line}</span>
               ))}
@@ -196,14 +196,14 @@ export function HeroCarousel() {
               <div className="h-px w-5 bg-[#3d1f0e]/45" />
             </div>
 
-            <p className="font-body-md text-body-md font-semibold text-[#3d1f0e]/75">
+            <p className="text-[20px] leading-relaxed font-semibold text-[#3d1f0e]/75">
               {slide.body}
             </p>
 
             <div className="mt-8">
               <Link
                 href={slide.cta.href}
-                className="inline-block bg-[#7a3a22] px-8 py-3 font-label-md text-sm uppercase tracking-widest text-white transition-colors hover:bg-[#5f2c17]"
+                className="inline-block rounded-[30px] bg-[#7a3a22] px-8 py-3 font-label-md text-sm uppercase tracking-widest text-white transition-colors hover:bg-[#5f2c17]"
               >
                 {slide.cta.label}
               </Link>

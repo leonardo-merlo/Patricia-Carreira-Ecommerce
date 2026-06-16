@@ -1,18 +1,18 @@
 import type { Metadata } from 'next'
-import { Cormorant_Garamond, DM_Sans } from 'next/font/google'
+import { Fraunces, Mulish } from 'next/font/google'
 import './globals.css'
 
-const cormorant = Cormorant_Garamond({
+const fraunces = Fraunces({
   subsets: ['latin'],
-  weight: ['400', '600', '700'],
+  weight: ['400', '500', '600'],
   style: ['normal', 'italic'],
   variable: '--font-playfair',
   display: 'swap',
 })
 
-const dmSans = DM_Sans({
+const mulish = Mulish({
   subsets: ['latin'],
-  weight: ['400', '600'],
+  weight: ['400', '500', '600', '700'],
   variable: '--font-be-vietnam',
   display: 'swap',
 })
@@ -33,7 +33,7 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${cormorant.variable} ${dmSans.variable}`}
+      className={`${fraunces.variable} ${mulish.variable}`}
     >
       <body className="antialiased">
         {children}

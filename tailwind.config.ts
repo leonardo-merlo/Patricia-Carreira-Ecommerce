@@ -159,8 +159,8 @@ const config: Config = {
           { lineHeight: '28px', fontWeight: '400' },
         ],
         'body-md': [
-          '16px',
-          { lineHeight: '24px', fontWeight: '400' },
+          '18px',
+          { lineHeight: '1.6', fontWeight: '400' },
         ],
         'label-md': [
           '14px',

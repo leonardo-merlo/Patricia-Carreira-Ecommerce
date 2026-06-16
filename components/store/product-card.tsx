@@ -163,17 +163,29 @@ export function ProductCard({ product, className, compact = false }: ProductCard
       </div>
 
       <div className="mt-3 space-y-1 px-1 text-center">
-        <p className="line-clamp-2 font-body-md text-body-md text-on-surface transition-colors group-hover:text-primary">
+        <p className={cn(
+          "line-clamp-2 font-medium leading-tight text-on-surface transition-colors group-hover:text-primary",
+          compact ? "text-[13px] md:text-[15px]" : "text-[17px] md:text-[19px]"
+        )}>
           {product.name}
         </p>
         {isOutOfStock ? (
-          <p className="font-label-md text-label-md text-on-surface-variant">Esgotado</p>
+          <p className={cn(
+            "text-on-surface-variant",
+            compact ? "text-[13px] md:text-[14px]" : "text-[16px] md:text-[18px]"
+          )}>Esgotado</p>
         ) : (
           <>
-            <p className="font-label-md text-label-md text-on-surface">
+            <p className={cn(
+              "font-semibold text-on-surface",
+              compact ? "text-[14px] md:text-[16px]" : "text-[19px] md:text-[22px]"
+            )}>
               {formatPrice(product.base_price)}
             </p>
-            <p className="font-caption text-caption text-on-surface-variant">
+            <p className={cn(
+              "text-on-surface-variant",
+              compact ? "text-[11px] md:text-[12px]" : "text-[13px] md:text-[15px]"
+            )}>
               6x de {formatPrice(installmentValue)} sem juros
             </p>
           </>
