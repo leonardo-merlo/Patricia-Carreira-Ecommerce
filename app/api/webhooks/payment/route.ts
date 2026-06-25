@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { decrementStockByOrderId } from '@/lib/actions/orders'
 import { recordCouponUsage } from '@/lib/actions/coupons'
 import { purchaseShippingLabel } from '@/lib/actions/label'
+import { sendOrderConfirmation } from '@/lib/integrations/resend'
 
 function validateMPSignature(req: NextRequest, dataId: string): boolean {
   const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET
@@ -110,6 +111,45 @@ export async function POST(req: NextRequest) {
       await purchaseShippingLabel(order.id)
     } catch (err) {
       console.error('[MP Webhook] erro ao comprar etiqueta ME:', err)
+    }
+
+    try {
+      const { data: orderDetails } = await supabase
+        .from('orders')
+        .select(`
+          total_amount, payment_method,
+          customer:customers(name, email),
+          items:order_items(quantity, unit_price, product_name)
+        `)
+        .eq('id', order.id)
+        .maybeSingle()
+
+      type CustomerRow = { name: string; email: string | null }
+      type ItemRow = { quantity: number; unit_price: number; product_name: string }
+
+      const customer = (
+        Array.isArray(orderDetails?.customer)
+          ? orderDetails?.customer[0]
+          : orderDetails?.customer
+      ) as CustomerRow | null | undefined
+
+      if (customer?.email) {
+        const items = (orderDetails?.items ?? []) as ItemRow[]
+        await sendOrderConfirmation({
+          to: customer.email,
+          customerName: customer.name,
+          orderId: order.id,
+          totalAmount: Number(orderDetails?.total_amount ?? 0),
+          paymentMethod: (orderDetails?.payment_method as string) ?? 'pix',
+          items: items.map((i) => ({
+            product_name: i.product_name,
+            quantity: i.quantity,
+            unit_price: Number(i.unit_price),
+          })),
+        })
+      }
+    } catch (err) {
+      console.error('[MP Webhook] erro ao enviar email de confirmação:', err)
     }
 
     console.log('[MP Webhook] pedido aprovado:', order.id)

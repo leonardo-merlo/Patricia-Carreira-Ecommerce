@@ -7,7 +7,6 @@ import {
   type MPPaymentResult,
 } from '@/lib/integrations/mercadopago'
 import { saveOrder, type OrderFormData, type OrderLineItem } from '@/lib/actions/orders'
-import { sendOrderConfirmation } from '@/lib/integrations/resend'
 import { createClient } from '@/lib/supabase/server'
 
 export type PaymentMethod = 'pix' | 'credit_card' | 'boleto'
@@ -107,20 +106,6 @@ export async function createPayment(
       })
       if (saved.ok) {
         orderId = saved.orderId
-        if (input.orderData.formData.email) {
-          sendOrderConfirmation({
-            to: input.orderData.formData.email,
-            customerName: input.orderData.formData.name,
-            orderId: saved.orderId,
-            totalAmount: input.amount,
-            paymentMethod: input.method,
-            items: input.orderData.lineItems.map((i) => ({
-              product_name: i.productName,
-              quantity: i.quantity,
-              unit_price: i.basePrice,
-            })),
-          }).catch((err) => console.error('[createPayment] email error:', err))
-        }
       } else {
         console.error('[createPayment] saveOrder failed:', saved.error)
         // Payment processed — don't block the user but log for manual reconciliation
