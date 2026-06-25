@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { decrementStockByOrderId } from '@/lib/actions/orders'
 import { recordCouponUsage } from '@/lib/actions/coupons'
 import { purchaseShippingLabel } from '@/lib/actions/label'
+import { emitirNfe } from '@/lib/actions/nfe'
 import { sendOrderConfirmation } from '@/lib/integrations/resend'
 
 function validateMPSignature(req: NextRequest, dataId: string): boolean {
@@ -111,6 +112,12 @@ export async function POST(req: NextRequest) {
       await purchaseShippingLabel(order.id)
     } catch (err) {
       console.error('[MP Webhook] erro ao comprar etiqueta ME:', err)
+    }
+
+    try {
+      await emitirNfe(order.id)
+    } catch (err) {
+      console.error('[MP Webhook] erro ao emitir NF-e:', err)
     }
 
     try {
