@@ -83,6 +83,9 @@ export type Product = {
   height_cm: number | null;
   // Tabela de medidas — apenas para roupas
   measurements: ProductMeasurements | null;
+  // Códigos fiscais para emissão de NF-e
+  ncm: string | null; // código NCM 8 dígitos (ex: "42022200")
+  cfop: string | null; // código fiscal de operação (ex: "6102")
   created_at: string;
 
   // Relação carregada via JOIN — presente só quando explicitamente solicitado
@@ -202,6 +205,13 @@ export type OrderStatus =
 export type PaymentStatus = "pending" | "paid" | "failed";
 export type PaymentMethod = "pix" | "credit_card" | "boleto";
 
+/**
+ * Status de NF-e.
+ * pending → processando → autorizado | erro
+ * cancelado, denegado → estados terminais
+ */
+export type NfeStatus = "pending" | "processando" | "autorizado" | "erro" | "cancelado" | "denegado";
+
 export type OrderItem = {
   id: string;
   order_id: string;
@@ -230,6 +240,8 @@ export type Order = {
   coupon_id: string | null;
   nfe_number: string | null; // número da NF-e emitida
   nfe_url: string | null; // URL do DANFE para download
+  nfe_status: NfeStatus; // status de processamento da NF-e
+  nfe_access_key: string | null; // chave de acesso da NF-e
   notes: string | null;
   created_at: string;
   updated_at: string;
