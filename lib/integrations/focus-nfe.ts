@@ -1,4 +1,4 @@
-import type { Customer, Order, OrderItem, PaymentMethod, Product, ProductVariant } from '@/lib/types'
+import type { Customer, NfeStatus, Order, OrderItem, PaymentMethod, Product, ProductVariant } from '@/lib/types'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TIPOS
@@ -131,7 +131,20 @@ function mapPaymentMethod(method: PaymentMethod | null): string {
 
 // Interpreta a resposta HTTP da API Focus NFe e normaliza para FocusNfeResponse
 async function parseResponse(res: Response): Promise<FocusNfeResponse> {
-  const body: unknown = await res.json()
+  let body: unknown
+  try {
+    body = await res.json()
+  } catch {
+    throw new Error(
+      `[Focus NFe] Resposta inválida da API (HTTP ${res.status}): corpo não é JSON`
+    )
+  }
+
+  if (!res.ok) {
+    const data = body as Record<string, unknown>
+    const msg = (data['mensagem'] as string | null) ?? `HTTP ${res.status}`
+    throw new Error(`[Focus NFe] Erro da API: ${msg}`)
+  }
 
   // A API Focus NFe retorna campos em snake_case na raiz do objeto
   const data = body as Record<string, unknown>
@@ -144,6 +157,18 @@ async function parseResponse(res: Response): Promise<FocusNfeResponse> {
     caminho_xml: (data['caminho_xml'] as string | null) ?? null,
     mensagem_sefaz: (data['mensagem_sefaz'] as string | null) ?? null,
     numero_protocolo: (data['numero_protocolo'] as string | null) ?? null,
+  }
+}
+
+// Mapeia o status da API Focus NFe para o valor aceito pelo CHECK constraint do banco
+export function toNfeStatus(apiStatus: FocusNfeStatus): NfeStatus {
+  switch (apiStatus) {
+    case 'autorizado':               return 'autorizado'
+    case 'processando_autorizacao':  return 'processando'
+    case 'erro_autorizacao':         return 'erro'
+    case 'cancelado':                return 'cancelado'
+    case 'denegado':                 return 'denegado'
+    default:                         return 'erro'
   }
 }
 
@@ -231,9 +256,28 @@ export function buildNfePayload(
     )
   }
 
-  // Timestamp de emissão em formato ISO 8601 com timezone BRT (-03:00)
-  const now = new Date()
-  const dataEmissao = now.toISOString().replace('Z', '-03:00')
+  // Timestamp de emissão em formato ISO 8601 com timezone BRT (-03:00).
+  // Offset UTC por -3h antes de formatar para não rotular horário UTC como BRT.
+  const brtOffsetMs = -3 * 60 * 60 * 1000
+  const brtDate = new Date(Date.now() + brtOffsetMs)
+  const dataEmissao = brtDate.toISOString().replace('Z', '-03:00')
+
+  // Valida que todos os itens possuem NCM antes de montar o payload.
+  // Um NCM errado ou ausente causa rejeição pela SEFAZ.
+  for (const item of items) {
+    const ncm = item.product_variant?.product?.ncm
+    if (!ncm) {
+      throw new Error(
+        `[Focus NFe] Produto "${item.product_variant?.product?.name ?? item.product_variant_id}" não possui NCM cadastrado. Cadastre o NCM no painel antes de emitir NF-e.`
+      )
+    }
+  }
+
+  // Total fiscal calculado a partir dos itens para garantir coerência com SEFAZ.
+  const fiscalTotal =
+    items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0) +
+    order.shipping_amount -
+    order.discount_amount
 
   return {
     natureza_operacao: 'Venda de mercadoria',
@@ -274,8 +318,9 @@ export function buildNfePayload(
     },
     items: items.map((item, index) => ({
       numero_item: index + 1,
-      codigo_ncm: item.product_variant?.product?.ncm ?? '62034200', // fallback NCM roupas
-      cfop: determineCfop(customer.address!.state),
+      // NCM já validado acima — cast seguro
+      codigo_ncm: item.product_variant!.product!.ncm!,
+      cfop: item.product_variant?.product?.cfop ?? determineCfop(customer.address!.state),
       descricao: item.product_variant?.product?.name ?? 'Produto',
       quantidade_comercial: item.quantity,
       quantidade_tributavel: item.quantity,
@@ -292,7 +337,7 @@ export function buildNfePayload(
     formas_pagamento: [
       {
         forma_pagamento: mapPaymentMethod(order.payment_method),
-        valor_pagamento: order.total_amount,
+        valor_pagamento: fiscalTotal,
       },
     ],
     valor_frete: order.shipping_amount,
