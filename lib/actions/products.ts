@@ -23,6 +23,8 @@ export type UpdateProductData = {
   is_active: boolean
   images: string[]
   tags: string[]
+  ncm: string | null
+  cfop: string | null
 }
 
 export async function updateProduct(productId: string, data: UpdateProductData): Promise<void> {
@@ -52,6 +54,8 @@ export type CreateProductInput = {
   is_active: boolean
   images: string[]
   tags: string[]
+  ncm: string | null
+  cfop: string | null
   variants: NewVariantInput[]
 }
 
@@ -81,6 +85,8 @@ export async function createProduct(data: CreateProductInput): Promise<string> {
       is_active: data.is_active,
       images: data.images,
       tags: data.tags ?? [],
+      ncm: data.ncm ?? null,
+      cfop: data.cfop ?? null,
     })
     .select('id')
     .single()
