@@ -13,6 +13,7 @@ import { createWholesaleOrder, previewOrderCheck, type ItemCheckResult } from '@
 import { createPurchaseRequests } from '@/lib/actions/raw-materials'
 import { updateOrderStatus } from '@/lib/actions/orders'
 import { generateShippingLabel, getLabelPrintUrl } from '@/lib/actions/label'
+import { emitirNfe } from '@/lib/actions/nfe'
 
 interface PedidosClientProps {
   varejo: RetailOrderRow[]
@@ -57,6 +58,20 @@ function getPaymentMethodLabel(method: string | null): string {
   return { pix: 'PIX', credit_card: 'Cartão de crédito', boleto: 'Boleto' }[method] ?? method
 }
 
+const NFE_STATUS_MAP: Record<string, { cls: string; txt: string }> = {
+  pending:     { cls: 'neutral',   txt: 'NF-e pendente' },
+  processando: { cls: 'pendente',  txt: 'Emitindo...' },
+  autorizado:  { cls: 'pago',      txt: 'NF-e emitida' },
+  erro:        { cls: 'cancelado', txt: 'Erro na emissão' },
+  cancelado:   { cls: 'neutral',   txt: 'Cancelada' },
+  denegado:    { cls: 'cancelado', txt: 'Denegada' },
+}
+
+function NFeBadge({ status }: { status: string }) {
+  const s = NFE_STATUS_MAP[status] ?? { cls: 'neutral', txt: status }
+  return <span className={`badge ${s.cls}`}><span className="dot" />{s.txt}</span>
+}
+
 type LineItem = { variantId: string; qty: number }
 
 export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVariants }: PedidosClientProps) {
@@ -82,6 +97,8 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
   const [isPending, startTransition] = useTransition()
   const [labelLoading, setLabelLoading] = useState<string | null>(null) // order id being processed
   const [labelError, setLabelError] = useState<Record<string, string>>({}) // orderId → error
+  const [nfeLoading, setNfeLoading] = useState<string | null>(null) // orderId em processamento
+  const [nfeError, setNfeError] = useState<Record<string, string>>({}) // orderId → mensagem de erro
   const [opCreated, setOpCreated] = useState(false)
   const [opError, setOpError] = useState('')
   const [purchasesCreated, setPurchasesCreated] = useState(false)
@@ -368,6 +385,43 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                                       <div className="cust-meta">Não disponível</div>
                                     )}
                                   </div>
+                                  <div>
+                                    <div className="cust-meta" style={{ marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 500 }}>Nota Fiscal</div>
+                                    <div style={{ marginBottom: nfeError[o.id] ? 6 : 0 }}>
+                                      <NFeBadge status={o.nfe_status} />
+                                    </div>
+                                    {o.nfe_status === 'autorizado' && o.nfe_url && (
+                                      <a href={o.nfe_url} target="_blank" rel="noopener noreferrer"
+                                        className="btn" style={{ fontSize: 12, padding: '5px 10px', marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <AdminIcon name="download" size={11} />
+                                        Baixar DANFE
+                                      </a>
+                                    )}
+                                    {(o.nfe_status === 'erro' || o.nfe_status === 'pending') && o.payment_status === 'paid' && (
+                                      <button className="btn" style={{ fontSize: 12, padding: '5px 10px', marginTop: 6 }}
+                                        id={`btn-emitir-nfe-${o.id}`}
+                                        data-testid="btn-emitir-nfe"
+                                        disabled={nfeLoading === o.id}
+                                        onClick={async () => {
+                                          setNfeLoading(o.id)
+                                          setNfeError((prev) => ({ ...prev, [o.id]: '' }))
+                                          const res = await emitirNfe(o.id)
+                                          setNfeLoading(null)
+                                          if (!res.success) {
+                                            setNfeError((prev) => ({ ...prev, [o.id]: res.error ?? 'Erro desconhecido' }))
+                                          } else {
+                                            window.location.reload()
+                                          }
+                                        }}
+                                      >
+                                        <AdminIcon name="checkCircle" size={11} />
+                                        {nfeLoading === o.id ? 'Emitindo...' : o.nfe_status === 'erro' ? 'Tentar novamente' : 'Emitir NF-e'}
+                                      </button>
+                                    )}
+                                    {nfeError[o.id] && (
+                                      <div style={{ fontSize: 11, color: 'var(--error, #e53e3e)', marginTop: 4 }}>{nfeError[o.id]}</div>
+                                    )}
+                                  </div>
                                   {o.melhor_envio_order_id && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                       {!o.tracking_code && (
@@ -446,7 +500,14 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                         </td>
                         <td className="num">{o.item_count}</td>
                         <td className="num" style={{ fontWeight: 500 }}>{formatPrice(o.total)}</td>
-                        <td><span className={`badge ${s.cls}`}><span className="dot" />{s.txt}</span></td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span className={`badge ${s.cls}`}><span className="dot" />{s.txt}</span>
+                            {o.nfe_status === 'autorizado' && (
+                              <span className="badge pago" style={{ fontSize: 10.5 }}><span className="dot" />NF-e ✓</span>
+                            )}
+                          </div>
+                        </td>
                         <td>
                           <div className="row" style={{ justifyContent: 'flex-end', gap: 4 }}>
                             <button
@@ -496,40 +557,99 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
             minWidth: 190,
             padding: '4px 0',
           }}>
-            {[
-              { label: 'Confirmar pedido', value: 'confirmed', icon: 'checkCircle' as const },
-              { label: 'Em produção', value: 'in_production', icon: 'factory' as const },
-              { label: 'Enviado', value: 'shipped', icon: 'truck' as const },
-              { label: 'Entregue', value: 'delivered', icon: 'check' as const },
-              { label: 'Cancelar pedido', value: 'cancelled', icon: 'xCircle' as const },
-            ].map((opt, i) => (
-              <>
-                {i === 4 && <div key="sep" style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />}
-                <button
-                  key={opt.value}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    width: '100%', padding: '8px 14px', fontSize: 12.5,
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    color: opt.value === 'cancelled' ? 'var(--red)' : 'var(--text)',
-                    textAlign: 'left',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-2)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                  disabled={statusLoading === openActionsFor}
-                  onClick={async () => {
-                    setStatusLoading(openActionsFor)
-                    await updateOrderStatus(openActionsFor, opt.value)
-                    setStatusLoading(null)
-                    setOpenActionsFor(null)
-                    setDropdownPos(null)
-                  }}
-                >
-                  <AdminIcon name={opt.icon} size={13} />
-                  {opt.label}
-                </button>
-              </>
-            ))}
+            {(() => {
+              const currentOrder = atacado.find((o) => o.id === openActionsFor)
+              const showNfe = currentOrder && (currentOrder.nfe_status === 'pending' || currentOrder.nfe_status === 'erro')
+              return (
+                <>
+                  {[
+                    { label: 'Confirmar pedido', value: 'confirmed', icon: 'checkCircle' as const },
+                    { label: 'Em produção', value: 'in_production', icon: 'factory' as const },
+                    { label: 'Enviado', value: 'shipped', icon: 'truck' as const },
+                    { label: 'Entregue', value: 'delivered', icon: 'check' as const },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        width: '100%', padding: '8px 14px', fontSize: 12.5,
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--text)', textAlign: 'left',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-2)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                      disabled={statusLoading === openActionsFor}
+                      onClick={async () => {
+                        setStatusLoading(openActionsFor)
+                        await updateOrderStatus(openActionsFor!, opt.value)
+                        setStatusLoading(null)
+                        setOpenActionsFor(null)
+                        setDropdownPos(null)
+                      }}
+                    >
+                      <AdminIcon name={opt.icon} size={13} />
+                      {opt.label}
+                    </button>
+                  ))}
+                  {showNfe && (
+                    <>
+                      <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+                      <button
+                        id="btn-emitir-nfe"
+                        data-testid="btn-emitir-nfe"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          width: '100%', padding: '8px 14px', fontSize: 12.5,
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: 'var(--text)', textAlign: 'left',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-2)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                        disabled={nfeLoading === openActionsFor}
+                        onClick={async () => {
+                          const orderId = openActionsFor!
+                          setNfeLoading(orderId)
+                          setOpenActionsFor(null)
+                          setDropdownPos(null)
+                          const res = await emitirNfe(orderId)
+                          setNfeLoading(null)
+                          if (!res.success) {
+                            setNfeError((prev) => ({ ...prev, [orderId]: res.error ?? 'Erro desconhecido' }))
+                          } else {
+                            window.location.reload()
+                          }
+                        }}
+                      >
+                        <AdminIcon name="checkCircle" size={13} />
+                        {nfeLoading === openActionsFor ? 'Emitindo...' : currentOrder?.nfe_status === 'erro' ? 'Tentar NF-e novamente' : 'Emitir NF-e'}
+                      </button>
+                    </>
+                  )}
+                  <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+                  <button
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      width: '100%', padding: '8px 14px', fontSize: 12.5,
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'var(--red)', textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-2)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                    disabled={statusLoading === openActionsFor}
+                    onClick={async () => {
+                      setStatusLoading(openActionsFor)
+                      await updateOrderStatus(openActionsFor!, 'cancelled')
+                      setStatusLoading(null)
+                      setOpenActionsFor(null)
+                      setDropdownPos(null)
+                    }}
+                  >
+                    <AdminIcon name="xCircle" size={13} />
+                    Cancelar pedido
+                  </button>
+                </>
+              )
+            })()}
           </div>
         </>
       )}

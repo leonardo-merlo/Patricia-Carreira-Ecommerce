@@ -77,6 +77,9 @@ export function ProdutoDrawer({ mode, product, onClose }: ProdutoDrawerProps) {
       : [emptyVariant()],
   )
 
+  const [ncm, setNcm] = useState(product?.ncm ?? '')
+  const [cfop, setCfop] = useState(product?.cfop ?? '6102')
+
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -146,6 +149,8 @@ export function ProdutoDrawer({ mode, product, onClose }: ProdutoDrawerProps) {
           is_active: isActive,
           images: finalImages,
           tags,
+          ncm: ncm.trim() || null,
+          cfop: cfop.trim() || null,
           variants: variants.map((v) => ({
             color: v.color.trim() || null,
             size: v.size.trim() || 'Único',
@@ -165,6 +170,8 @@ export function ProdutoDrawer({ mode, product, onClose }: ProdutoDrawerProps) {
           is_active: isActive,
           images: finalImages,
           tags,
+          ncm: ncm.trim() || null,
+          cfop: cfop.trim() || null,
         }
         await updateProduct(product.id, data)
       }
@@ -291,6 +298,48 @@ export function ProdutoDrawer({ mode, product, onClose }: ProdutoDrawerProps) {
               </div>
               <div className="cust-meta" style={{ marginTop: 6 }}>
                 Rótulos visuais no card do produto. &quot;Bazar&quot; aqui é só etiqueta — não muda a categoria. &quot;Esgotado&quot; e &quot;Última Peça&quot; continuam automáticos pelo estoque.
+              </div>
+            </div>
+          </div>
+
+          {/* Dados Fiscais */}
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Dados Fiscais</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="field">
+                <label>
+                  NCM{' '}
+                  <a
+                    href="https://www.gov.br/receitafederal/pt-br/assuntos/aduana-e-comercio-exterior/ncm"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: 11, color: 'var(--accent)', marginLeft: 4 }}
+                  >
+                    Consultar NCM
+                  </a>
+                </label>
+                <input
+                  className="input"
+                  value={ncm}
+                  onChange={(e) => setNcm(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                  placeholder="Ex: 42022200"
+                  maxLength={8}
+                  style={{ fontFamily: 'monospace' }}
+                  data-testid="input-ncm"
+                />
+                <div className="cust-meta" style={{ marginTop: 4 }}>8 dígitos. Obrigatório para emissão de NF-e.</div>
+              </div>
+              <div className="field">
+                <label>CFOP</label>
+                <select
+                  className="select"
+                  value={cfop}
+                  onChange={(e) => setCfop(e.target.value)}
+                  data-testid="select-cfop"
+                >
+                  <option value="5102">5102 — Venda mesmo estado</option>
+                  <option value="6102">6102 — Venda interestadual</option>
+                </select>
               </div>
             </div>
           </div>

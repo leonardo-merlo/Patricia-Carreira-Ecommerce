@@ -84,3 +84,51 @@ export async function sendOrderConfirmation(input: OrderConfirmationInput): Prom
     `,
   })
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NF-e — envia DANFE por email após autorização
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type NfeEmailInput = {
+  to: string
+  customerName: string
+  orderId: string
+  danfeUrl: string
+}
+
+export async function sendNfeEmail(input: NfeEmailInput): Promise<void> {
+  const shortId = input.orderId.slice(0, 8).toUpperCase()
+  const from = process.env.RESEND_FROM || 'onboarding@resend.dev'
+
+  const resend = getResend()
+  if (!resend) {
+    console.warn('[Resend] RESEND_API_KEY não configurada — email de NF-e não enviado')
+    return
+  }
+
+  await resend.emails.send({
+    from,
+    to: input.to,
+    subject: `Sua Nota Fiscal — Pedido #${shortId} — Patrícia Carreira`,
+    html: `
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <body style="font-family:sans-serif;color:#1c1c1e;max-width:560px;margin:0 auto;padding:24px">
+        <h2 style="color:#1c1c1e">Olá, ${input.customerName}!</h2>
+        <p>Sua Nota Fiscal Eletrônica referente ao Pedido <strong>#${shortId}</strong> foi emitida com sucesso.</p>
+
+        <p style="margin-top:24px">
+          <a href="${input.danfeUrl}" style="background:#1c1c1e;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block">
+            Baixar DANFE (PDF)
+          </a>
+        </p>
+
+        <p style="margin-top:32px;font-size:13px;color:#999">
+          Qualquer dúvida, entre em contato pelo Instagram
+          <a href="https://instagram.com/patriciacarreira" style="color:#999">@patriciacarreira</a>.
+        </p>
+      </body>
+      </html>
+    `,
+  })
+}
