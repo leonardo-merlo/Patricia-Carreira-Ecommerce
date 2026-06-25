@@ -1,0 +1,301 @@
+import type { Customer, Order, OrderItem, PaymentMethod, Product, ProductVariant } from '@/lib/types'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TIPOS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type FocusNfeStatus =
+  | 'autorizado'
+  | 'processando_autorizacao'
+  | 'erro_autorizacao'
+  | 'cancelado'
+  | 'denegado'
+
+export type FocusNfeResponse = {
+  status: FocusNfeStatus
+  numero: string | null          // número da NF-e (ex: "000000042")
+  chave_nfe: string | null       // chave de acesso 44 dígitos
+  caminho_danfe: string | null   // URL do DANFE (PDF)
+  caminho_xml: string | null     // URL do XML
+  mensagem_sefaz: string | null  // mensagem de erro/sucesso da SEFAZ
+  numero_protocolo: string | null
+}
+
+export type OrderItemWithProduct = OrderItem & {
+  product_variant?: ProductVariant & { product?: Product }
+}
+
+// Payload enviado à API Focus NFe para emissão de NF-e
+export type FocusNfePayload = {
+  natureza_operacao: string
+  data_emissao: string
+  data_entrada_saida: string
+  tipo_documento: number
+  finalidade_emissao: number
+  consumidor_final: number
+  presenca_comprador: number
+  modalidade_frete: number
+  emitente: {
+    cnpj: string
+    inscricao_estadual: string
+    nome: string
+    logradouro: string
+    numero: string
+    complemento: string
+    bairro: string
+    municipio: string
+    uf: string
+    cep: string
+    codigo_regime_tributario: number
+  }
+  destinatario: {
+    cpf_cnpj: string
+    nome_completo: string
+    email: string
+    endereco: {
+      logradouro: string
+      numero: string
+      complemento: string
+      bairro: string
+      municipio: string
+      uf: string
+      cep: string
+    }
+    indicador_inscricao_estadual: number
+  }
+  items: Array<{
+    numero_item: number
+    codigo_ncm: string
+    cfop: string
+    descricao: string
+    quantidade_comercial: number
+    quantidade_tributavel: number
+    unidade_comercial: string
+    unidade_tributavel: string
+    valor_unitario_comercial: number
+    valor_unitario_tributavel: number
+    valor_bruto: number
+    icms_origem: number
+    icms_modalidade: string
+    pis_modalidade: string
+    cofins_modalidade: string
+  }>
+  formas_pagamento: Array<{
+    forma_pagamento: string
+    valor_pagamento: number
+  }>
+  valor_frete: number
+  valor_desconto: number
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS INTERNOS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function getBaseUrl(): string {
+  const ambiente = process.env.FOCUS_NFE_AMBIENTE ?? 'producao'
+  return ambiente === 'homologacao'
+    ? 'https://homologacao.focusnfe.com.br/v2'
+    : 'https://api.focusnfe.com.br/v2'
+}
+
+function getAuthHeader(): string {
+  const token = process.env.FOCUS_NFE_TOKEN
+  if (!token) {
+    throw new Error(
+      '[Focus NFe] FOCUS_NFE_TOKEN não configurado. Defina a variável de ambiente antes de emitir NF-e.'
+    )
+  }
+  return `Basic ${Buffer.from(`${token}:`).toString('base64')}`
+}
+
+// Determina CFOP baseado no estado do destinatário vs estado do emitente
+function determineCfop(destinatarioUf: string): string {
+  const emitenteUf = process.env.STORE_ESTADO ?? ''
+  return destinatarioUf.toUpperCase() === emitenteUf.toUpperCase() ? '5102' : '6102'
+}
+
+// Mapeia método de pagamento do sistema para código Focus NFe
+function mapPaymentMethod(method: PaymentMethod | null): string {
+  switch (method) {
+    case 'pix':
+      return '17'
+    case 'credit_card':
+      return '03'
+    case 'boleto':
+      return '15'
+    default:
+      return '99' // outros
+  }
+}
+
+// Interpreta a resposta HTTP da API Focus NFe e normaliza para FocusNfeResponse
+async function parseResponse(res: Response): Promise<FocusNfeResponse> {
+  const body: unknown = await res.json()
+
+  // A API Focus NFe retorna campos em snake_case na raiz do objeto
+  const data = body as Record<string, unknown>
+
+  return {
+    status: (data['status'] as FocusNfeStatus) ?? 'erro_autorizacao',
+    numero: (data['numero'] as string | null) ?? null,
+    chave_nfe: (data['chave_nfe'] as string | null) ?? null,
+    caminho_danfe: (data['caminho_danfe'] as string | null) ?? null,
+    caminho_xml: (data['caminho_xml'] as string | null) ?? null,
+    mensagem_sefaz: (data['mensagem_sefaz'] as string | null) ?? null,
+    numero_protocolo: (data['numero_protocolo'] as string | null) ?? null,
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FUNÇÕES PÚBLICAS — chamadas HTTP à API Focus NFe
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Emite uma NF-e de forma assíncrona.
+ * O status retornado geralmente é 'processando_autorizacao'.
+ * Use consultarNfe() para verificar quando foi autorizada.
+ */
+export async function emitirNfe(ref: string, payload: FocusNfePayload): Promise<FocusNfeResponse> {
+  const auth = getAuthHeader()
+  const url = `${getBaseUrl()}/nfe?ref=${encodeURIComponent(ref)}`
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: auth,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  return parseResponse(res)
+}
+
+/**
+ * Consulta o status atual de uma NF-e pelo ref interno.
+ */
+export async function consultarNfe(ref: string): Promise<FocusNfeResponse> {
+  const auth = getAuthHeader()
+  const url = `${getBaseUrl()}/nfe/${encodeURIComponent(ref)}`
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: auth,
+    },
+  })
+
+  return parseResponse(res)
+}
+
+/**
+ * Cancela uma NF-e autorizada.
+ * Só é possível cancelar quando status = 'autorizado'.
+ * A justificativa deve ter entre 15 e 255 caracteres.
+ */
+export async function cancelarNfe(ref: string, justificativa: string): Promise<FocusNfeResponse> {
+  const auth = getAuthHeader()
+  const url = `${getBaseUrl()}/nfe/${encodeURIComponent(ref)}`
+
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      Authorization: auth,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ justificativa }),
+  })
+
+  return parseResponse(res)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// buildNfePayload — monta o payload a partir dos dados do pedido
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Constrói o payload da NF-e a partir dos dados do pedido, itens e cliente.
+ * Não faz chamadas HTTP nem acessa o banco de dados.
+ *
+ * Pré-condição: customer.address não pode ser null (validar antes de chamar).
+ */
+export function buildNfePayload(
+  order: Order,
+  items: OrderItemWithProduct[],
+  customer: Customer
+): FocusNfePayload {
+  if (!customer.address) {
+    throw new Error(
+      `[Focus NFe] Cliente ${customer.id} não possui endereço cadastrado. Impossível emitir NF-e.`
+    )
+  }
+
+  // Timestamp de emissão em formato ISO 8601 com timezone BRT (-03:00)
+  const now = new Date()
+  const dataEmissao = now.toISOString().replace('Z', '-03:00')
+
+  return {
+    natureza_operacao: 'Venda de mercadoria',
+    data_emissao: dataEmissao,
+    data_entrada_saida: dataEmissao,
+    tipo_documento: 1,       // saída
+    finalidade_emissao: 1,   // normal
+    consumidor_final: 1,
+    presenca_comprador: 2,   // operação não presencial / internet
+    modalidade_frete: 1,     // CIF (por conta do emitente)
+    emitente: {
+      cnpj: process.env.STORE_CNPJ ?? '',
+      inscricao_estadual: process.env.STORE_IE ?? '',
+      nome: process.env.STORE_NOME ?? '',
+      logradouro: process.env.STORE_LOGRADOURO ?? '',
+      numero: process.env.STORE_NUMERO ?? '',
+      complemento: process.env.STORE_COMPLEMENTO ?? '',
+      bairro: process.env.STORE_BAIRRO ?? '',
+      municipio: process.env.STORE_CIDADE ?? '',
+      uf: process.env.STORE_ESTADO ?? '',
+      cep: process.env.STORE_CEP_ORIGEM ?? '',
+      codigo_regime_tributario: Number(process.env.FOCUS_NFE_REGIME_TRIBUTARIO ?? '1'),
+    },
+    destinatario: {
+      cpf_cnpj: customer.cpf_cnpj ?? '',
+      nome_completo: customer.name,
+      email: customer.email ?? '',
+      endereco: {
+        logradouro: customer.address.street,
+        numero: customer.address.number,
+        complemento: customer.address.complement ?? '',
+        bairro: customer.address.neighborhood,
+        municipio: customer.address.city,
+        uf: customer.address.state,
+        cep: customer.address.zip.replace('-', ''),
+      },
+      indicador_inscricao_estadual: 9, // não contribuinte
+    },
+    items: items.map((item, index) => ({
+      numero_item: index + 1,
+      codigo_ncm: item.product_variant?.product?.ncm ?? '62034200', // fallback NCM roupas
+      cfop: determineCfop(customer.address!.state),
+      descricao: item.product_variant?.product?.name ?? 'Produto',
+      quantidade_comercial: item.quantity,
+      quantidade_tributavel: item.quantity,
+      unidade_comercial: 'UN',
+      unidade_tributavel: 'UN',
+      valor_unitario_comercial: item.unit_price,
+      valor_unitario_tributavel: item.unit_price,
+      valor_bruto: item.quantity * item.unit_price,
+      icms_origem: 0,
+      icms_modalidade: '400',  // Simples Nacional: não tributado
+      pis_modalidade: '07',    // operação isenta
+      cofins_modalidade: '07', // operação isenta
+    })),
+    formas_pagamento: [
+      {
+        forma_pagamento: mapPaymentMethod(order.payment_method),
+        valor_pagamento: order.total_amount,
+      },
+    ],
+    valor_frete: order.shipping_amount,
+    valor_desconto: order.discount_amount,
+  }
+}

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * lib/mock-data.ts — Patrícia Carreira
  *
  * Dados mockados para desenvolvimento sem Supabase.
@@ -59,6 +59,7 @@ import type {
   StockAlert,
   DashboardStats,
   UserProfile,
+  NfeStatus,
 } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -123,6 +124,8 @@ const BOLSAS: Product[] = [
     width_cm: 8,
     height_cm: 20,
     measurements: null,
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(20),
     variants: [
       { id: uuid(1001), product_id: uuid(101), sku: "BOL-BRIA-TURQ-UNICO", size: "Único", color: "Azul Turquesa", stock_quantity: 4, created_at: daysAgo(20) },
@@ -158,6 +161,8 @@ const BOLSAS: Product[] = [
     width_cm: 10,
     height_cm: 24,
     measurements: null,
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(15),
     variants: [
       { id: uuid(1011), product_id: uuid(102), sku: "BOL-FLOR-TURQ-UNICO", size: "Único", color: "Azul Turquesa", stock_quantity: 3, created_at: daysAgo(15) },
@@ -191,6 +196,8 @@ const BOLSAS: Product[] = [
     width_cm: 12,
     height_cm: 26,
     measurements: null,
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(25),
     variants: [
       { id: uuid(1021), product_id: uuid(103), sku: "BOL-LIB-NAT-UNICO", size: "Único", color: "Natural", stock_quantity: 3, created_at: daysAgo(25) },
@@ -219,6 +226,8 @@ const BOLSAS: Product[] = [
     width_cm: 10,
     height_cm: 28,
     measurements: null,
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(30),
     variants: [
       { id: uuid(1031), product_id: uuid(104), sku: "BOL-LYRA-CAQUI-UNICO", size: "Único", color: "Cáqui", stock_quantity: 4, created_at: daysAgo(30) },
@@ -251,6 +260,8 @@ const BOLSAS: Product[] = [
     width_cm: 14,
     height_cm: 30,
     measurements: null,
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(18),
     variants: [
       { id: uuid(1041), product_id: uuid(105), sku: "BOL-MAND-CAQUI-UNICO", size: "Único", color: "Cáqui", stock_quantity: 3, created_at: daysAgo(18) },
@@ -284,6 +295,8 @@ const BOLSAS: Product[] = [
     width_cm: 10,
     height_cm: 22,
     measurements: null,
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(10),
     variants: [
       { id: uuid(1051), product_id: uuid(106), sku: "BOL-NIRV-TURQ-UNICO", size: "Único", color: "Azul Turquesa", stock_quantity: 3, created_at: daysAgo(10) },
@@ -315,6 +328,8 @@ const BOLSAS: Product[] = [
     width_cm: 9,
     height_cm: 22,
     measurements: null,
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(40),
     variants: [
       { id: uuid(1061), product_id: uuid(107), sku: "BOL-ROMA-NAT-UNICO", size: "Único", color: "Natural", stock_quantity: 0, created_at: daysAgo(40) },
@@ -342,6 +357,8 @@ const BOLSAS: Product[] = [
     width_cm: 12,
     height_cm: 26,
     measurements: null,
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(35),
     variants: [
       { id: uuid(1071), product_id: uuid(108), sku: "BOL-SEMP-NAT-UNICO", size: "Único", color: "Natural", stock_quantity: 2, created_at: daysAgo(35) },
@@ -369,6 +386,8 @@ const BOLSAS: Product[] = [
     width_cm: 14,
     height_cm: 38,
     measurements: null,
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(45),
     variants: [
       { id: uuid(1081), product_id: uuid(109), sku: "MOC-WOOD-V1-UNICO", size: "Único", color: "Variante 1", stock_quantity: 3, created_at: daysAgo(45) },
@@ -399,6 +418,8 @@ const BOLSAS: Product[] = [
     width_cm: 6,
     height_cm: 16,
     measurements: null,
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(50),
     variants: [
       { id: uuid(1091), product_id: uuid(110), sku: "POCH-V1-UNICO", size: "Único", color: "Variante 1", stock_quantity: 4, created_at: daysAgo(50) },
@@ -432,6 +453,8 @@ const BOLSAS: Product[] = [
     width_cm: 9,
     height_cm: 21,
     measurements: null,
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(3),
     variants: [
       { id: uuid(1101), product_id: uuid(111), sku: "BOL-MAIA-V1-UNICO", size: "Único", color: "Variante 1", stock_quantity: 5, created_at: daysAgo(3) },
@@ -488,6 +511,8 @@ const VESTIDOS: Product[] = [
     width_cm: 5,
     height_cm: 30,
     measurements: measurementsVestido(108),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(20),
     variants: vestidoVariants(201, 2001, "VES-HAVA", [3, 5, 2]),
   },
@@ -514,6 +539,8 @@ const VESTIDOS: Product[] = [
     width_cm: 5,
     height_cm: 28,
     measurements: measurementsVestido(100),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(25),
     variants: vestidoVariants(202, 2011, "VES-DANI", [4, 6, 3]),
   },
@@ -540,6 +567,8 @@ const VESTIDOS: Product[] = [
     width_cm: 5,
     height_cm: 30,
     measurements: measurementsVestido(105),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(18),
     variants: vestidoVariants(203, 2021, "VES-FIJI", [3, 4, 2]),
   },
@@ -565,6 +594,8 @@ const VESTIDOS: Product[] = [
     width_cm: 5,
     height_cm: 28,
     measurements: measurementsVestido(102),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(22),
     variants: vestidoVariants(204, 2031, "VES-MONA", [3, 5, 2]),
   },
@@ -590,6 +621,8 @@ const VESTIDOS: Product[] = [
     width_cm: 5,
     height_cm: 30,
     measurements: measurementsVestido(110),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(30),
     variants: vestidoVariants(205, 2041, "VES-VERO", [2, 4, 3]),
   },
@@ -615,6 +648,8 @@ const VESTIDOS: Product[] = [
     width_cm: 5,
     height_cm: 25,
     measurements: measurementsVestido(92),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(15),
     variants: vestidoVariants(206, 2051, "VES-MAIA", [4, 7, 3]),
   },
@@ -641,6 +676,8 @@ const VESTIDOS: Product[] = [
     width_cm: 5,
     height_cm: 36,
     measurements: measurementsVestido(138),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(28),
     variants: vestidoVariants(207, 2061, "VES-VIEN", [3, 5, 2]),
   },
@@ -667,6 +704,8 @@ const VESTIDOS: Product[] = [
     width_cm: 5,
     height_cm: 28,
     measurements: measurementsVestido(106),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(12),
     variants: vestidoVariants(208, 2071, "VES-CANC", [3, 6, 2]),
   },
@@ -692,6 +731,8 @@ const VESTIDOS: Product[] = [
     width_cm: 5,
     height_cm: 30,
     measurements: measurementsVestido(108),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(35),
     variants: vestidoVariants(209, 2081, "VES-INCA", [2, 4, 3]),
   },
@@ -717,6 +758,8 @@ const VESTIDOS: Product[] = [
     width_cm: 5,
     height_cm: 30,
     measurements: measurementsVestido(106),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(8),
     variants: vestidoVariants(210, 2091, "VES-BALI", [3, 5, 2]),
   },
@@ -770,6 +813,8 @@ const BATAS: Product[] = [
     width_cm: 4,
     height_cm: 26,
     measurements: measurementsBata(72),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(30),
     variants: bataVariants(301, [
       { id: 3001, sku: "BAT-ASTE-V1-UNICO", imgFile: "produto_pagina_79_bata_asteca_0.jpeg", stock: 5 },
@@ -798,6 +843,8 @@ const BATAS: Product[] = [
     width_cm: 4,
     height_cm: 28,
     measurements: measurementsBata(74),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(22),
     variants: bataVariants(302, [
       { id: 3011, sku: "BAT-YOKO-V1-UNICO", imgFile: "produto_pagina_81_bata_yoko_0.jpeg", stock: 4 },
@@ -827,6 +874,8 @@ const BATAS: Product[] = [
     width_cm: 3,
     height_cm: 24,
     measurements: measurementsBata(70),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(18),
     variants: bataVariants(303, [
       { id: 3021, sku: "BAT-MAIB-V1-UNICO", imgFile: "produto_pagina_83_bata_maia_0.jpeg", stock: 6 },
@@ -857,6 +906,8 @@ const BATAS: Product[] = [
     width_cm: 4,
     height_cm: 26,
     measurements: measurementsBata(72),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(14),
     variants: bataVariants(304, [
       { id: 3031, sku: "BAT-HELO-V1-UNICO", imgFile: "produto_pagina_89_bata_helô_0.jpeg", stock: 4 },
@@ -886,6 +937,8 @@ const BATAS: Product[] = [
     width_cm: 4,
     height_cm: 26,
     measurements: measurementsBata(72),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(35),
     variants: bataVariants(305, [
       { id: 3041, sku: "BAT-INCC-V1-UNICO", imgFile: "produto_pagina_92_bata_inca_0.jpeg", stock: 5 },
@@ -914,6 +967,8 @@ const BATAS: Product[] = [
     width_cm: 4,
     height_cm: 25,
     measurements: measurementsBata(70),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(40),
     variants: bataVariants(306, [
       { id: 3051, sku: "BAT-MALU-V1-UNICO", imgFile: "produto_pagina_94_bata_malu_0.jpeg", stock: 6 },
@@ -942,6 +997,8 @@ const BATAS: Product[] = [
     width_cm: 4,
     height_cm: 24,
     measurements: measurementsBata(70),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(25),
     variants: bataVariants(307, [
       { id: 3061, sku: "BAT-JU-V1-UNICO", imgFile: "produto_pagina_96_bata_jú_0.jpeg", stock: 5 },
@@ -970,6 +1027,8 @@ const BATAS: Product[] = [
     width_cm: 4,
     height_cm: 26,
     measurements: measurementsBata(72),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(10),
     variants: [
       { id: uuid(3071), product_id: uuid(308), sku: "BAT-SINO-NAT-UNICO", size: "Único", color: "Natural", stock_quantity: 4, created_at: daysAgo(10) },
@@ -997,6 +1056,8 @@ const BATAS: Product[] = [
     width_cm: 4,
     height_cm: 26,
     measurements: measurementsBata(72),
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(6),
     variants: bataVariants(309, [
       { id: 3081, sku: "BAT-BIA-V1-UNICO", imgFile: "produto_pagina_99_bata_bia_0.jpeg", stock: 4 },
@@ -1032,6 +1093,8 @@ const BAZAR: Product[] = [
     width_cm: 4,
     height_cm: 26,
     measurements: { Único: "Busto até 106cm · Comprimento 72cm" },
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(5),
     variants: [
       { id: uuid(3500), product_id: uuid(350), sku: "BAZ-BATA1-UNICO", size: "Único", color: "Natural", stock_quantity: 2, created_at: daysAgo(5) },
@@ -1057,6 +1120,8 @@ const BAZAR: Product[] = [
     width_cm: 4,
     height_cm: 24,
     measurements: { Único: "Busto até 106cm · Comprimento 70cm" },
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(5),
     variants: [
       { id: uuid(3501), product_id: uuid(351), sku: "BAZ-BATA2-UNICO", size: "Único", color: "Natural", stock_quantity: 1, created_at: daysAgo(5) },
@@ -1082,6 +1147,8 @@ const BAZAR: Product[] = [
     width_cm: 4,
     height_cm: 25,
     measurements: { Único: "Busto até 106cm · Comprimento 70cm" },
+    ncm: null,
+    cfop: null,
     created_at: daysAgo(5),
     variants: [
       { id: uuid(3502), product_id: uuid(352), sku: "BAZ-BATA3-UNICO", size: "Único", color: "Natural", stock_quantity: 1, created_at: daysAgo(5) },
@@ -1398,6 +1465,8 @@ export const MOCK_ORDERS: Order[] = [
     coupon_id: null,
     nfe_number: "000042",
     nfe_url: null,
+    nfe_status: "pending" as NfeStatus,
+    nfe_access_key: null,
     notes: null,
     created_at: daysAgo(2),
     updated_at: daysAgo(2),
@@ -1429,6 +1498,8 @@ export const MOCK_ORDERS: Order[] = [
     coupon_id: uuid(702),
     nfe_number: null,
     nfe_url: null,
+    nfe_status: "pending" as NfeStatus,
+    nfe_access_key: null,
     notes: "Cupom VERAO2026 aplicado.",
     created_at: daysAgo(1),
     updated_at: daysAgo(1),
@@ -1468,6 +1539,8 @@ export const MOCK_ORDERS: Order[] = [
     coupon_id: null,
     nfe_number: null,
     nfe_url: null,
+    nfe_status: "pending" as NfeStatus,
+    nfe_access_key: null,
     notes: "Boutique Arraial — pedido de reposição. Prazo: 15 dias.",
     created_at: daysAgo(10),
     updated_at: daysAgo(8),
@@ -1507,6 +1580,8 @@ export const MOCK_ORDERS: Order[] = [
     coupon_id: null,
     nfe_number: null,
     nfe_url: null,
+    nfe_status: "pending" as NfeStatus,
+    nfe_access_key: null,
     notes: "Raízes Mineiras — 50% entrada, 50% na entrega.",
     created_at: daysAgo(4),
     updated_at: daysAgo(3),
