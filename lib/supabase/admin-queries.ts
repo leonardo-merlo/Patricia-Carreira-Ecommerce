@@ -174,6 +174,8 @@ export type RetailOrderRow = {
   melhor_envio_order_id: string | null
   nfe_url: string | null
   nfe_number: string | null
+  nfe_status: string
+  nfe_access_key: string | null
   items: RetailOrderItemRow[]
   address: {
     street: string
@@ -192,7 +194,7 @@ export async function getRetailOrders(limit = 50): Promise<RetailOrderRow[]> {
   const { data, error } = await supabase
     .from('orders')
     .select(`
-      id, created_at, total_amount, status, payment_status, payment_method, tracking_code, melhor_envio_order_id, nfe_url, nfe_number,
+      id, created_at, total_amount, status, payment_status, payment_method, tracking_code, melhor_envio_order_id, nfe_url, nfe_number, nfe_status, nfe_access_key,
       customer:customers(name, address),
       items:order_items(
         id, quantity, unit_price,
@@ -259,6 +261,8 @@ export async function getRetailOrders(limit = 50): Promise<RetailOrderRow[]> {
       melhor_envio_order_id: (o.melhor_envio_order_id as string | null) ?? null,
       nfe_url: (o.nfe_url as string | null) ?? null,
       nfe_number: (o.nfe_number as string | null) ?? null,
+      nfe_status: (o.nfe_status as string) ?? 'pending',
+      nfe_access_key: (o.nfe_access_key as string | null) ?? null,
       items,
       address,
     }
@@ -553,6 +557,7 @@ export type WholesaleOrderRow = {
   item_count: number
   total: number
   status: string
+  nfe_status: string
   notes: string | null
 }
 
@@ -562,7 +567,7 @@ export async function getWholesaleOrders(limit = 50): Promise<WholesaleOrderRow[
   const { data, error } = await supabase
     .from('orders')
     .select(`
-      id, created_at, total_amount, status, notes,
+      id, created_at, total_amount, status, nfe_status, notes,
       customer:customers(name, cpf_cnpj),
       items:order_items(id)
     `)
@@ -577,7 +582,7 @@ export async function getWholesaleOrders(limit = 50): Promise<WholesaleOrderRow[
 
   type OrderRaw = {
     id: string; created_at: string; total_amount: string
-    status: string; notes: string | null
+    status: string; nfe_status: string | null; notes: string | null
     customer: { name: string; cpf_cnpj: string | null } | null
     items: { id: string }[]
   }
@@ -595,6 +600,7 @@ export async function getWholesaleOrders(limit = 50): Promise<WholesaleOrderRow[
       item_count: o.items?.length ?? 0,
       total: Number(o.total_amount),
       status: o.status,
+      nfe_status: o.nfe_status ?? 'pending',
       notes: o.notes,
     }
   })
