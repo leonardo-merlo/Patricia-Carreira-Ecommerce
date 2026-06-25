@@ -10,7 +10,7 @@ import {
   type OrderItemWithProduct,
 } from '@/lib/integrations/focus-nfe'
 import { sendNfeEmail } from '@/lib/integrations/resend'
-import type { Customer, Order } from '@/lib/types'
+import type { Customer, NfeStatus, Order } from '@/lib/types'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TIPOS INTERNOS
@@ -19,7 +19,8 @@ import type { Customer, Order } from '@/lib/types'
 type ActionResult = { success: boolean; error?: string }
 
 // Shape retornada pelo join orders + customers + order_items + product_variants + products
-type OrderRow = Order & {
+// Omit overlapping fields from Order so the richer joined types take precedence
+type OrderRow = Omit<Order, 'customer' | 'items'> & {
   customer: Customer | null
   items: OrderItemWithProduct[]
 }
@@ -96,7 +97,8 @@ export async function emitirNfe(orderId: string): Promise<ActionResult> {
 
   try {
     // 7. Montar payload (pode lançar se NCM ausente)
-    const payload = buildNfePayload(order, order.items, order.customer)
+    // order.customer is guaranteed non-null — checked at step 4 above
+    const payload = buildNfePayload(order as unknown as Order, order.items, order.customer!)
 
     // 8. Chamar a API Focus NFe
     const response: FocusNfeResponse = await emitirNfeFocus(orderId, payload)
@@ -161,19 +163,33 @@ export async function cancelarNfe(orderId: string): Promise<ActionResult> {
   }
 
   // 2. Verificar que está autorizado
-  if ((data as { nfe_status: string }).nfe_status !== 'autorizado') {
+  if ((data as { id: string; nfe_status: NfeStatus }).nfe_status !== 'autorizado') {
     return { success: false, error: 'NF-e não autorizada — somente NF-es autorizadas podem ser canceladas' }
   }
 
   // 3. Cancelar via API Focus NFe
   try {
-    await cancelarNfeFocus(orderId, 'Cancelamento de pedido via sistema')
+    const response = await cancelarNfeFocus(orderId, 'Cancelamento de pedido via sistema')
+    const mappedStatus = toNfeStatus(response.status)
 
-    // 4. Atualizar status no banco
-    await supabase
+    // 4. Verificar que SEFAZ aceitou o cancelamento antes de persistir
+    if (mappedStatus !== 'cancelado') {
+      return {
+        success: false,
+        error: `SEFAZ rejeitou cancelamento: ${response.mensagem_sefaz ?? response.status}`,
+      }
+    }
+
+    // 5. Atualizar status no banco
+    const { error: updateErr } = await supabase
       .from('orders')
       .update({ nfe_status: 'cancelado', updated_at: new Date().toISOString() })
       .eq('id', orderId)
+
+    if (updateErr) {
+      console.error('[cancelarNfe] Erro ao salvar cancelamento:', updateErr)
+      return { success: false, error: 'Erro ao salvar cancelamento' }
+    }
 
     return { success: true }
   } catch (err) {
