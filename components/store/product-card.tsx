@@ -15,6 +15,7 @@ interface ProductCardProps {
   product: Product
   className?: string
   compact?: boolean
+  showLowStockWarning?: boolean
 }
 
 function tagVariant(tag: string): "default" | "secondary" | "tertiary" {
@@ -24,11 +25,11 @@ function tagVariant(tag: string): "default" | "secondary" | "tertiary" {
   return "default"
 }
 
-export function ProductCard({ product, className, compact = false }: ProductCardProps) {
+export function ProductCard({ product, className, compact = false, showLowStockWarning = false }: ProductCardProps) {
   const { addItem } = useCart()
   const [hovered, setHovered] = useState(false)
 
-  const badge = getProductBadge(product)
+  const badge = getProductBadge(product, showLowStockWarning)
   const firstImage = product.images[0] ?? null
   const isOutOfStock = badge === "Esgotado"
 
@@ -110,7 +111,7 @@ export function ProductCard({ product, className, compact = false }: ProductCard
                 variant={
                   badge === "Esgotado"
                     ? "secondary"
-                    : badge === "Última Peça"
+                    : badge === "Última Peça" || badge === "Últimas peças"
                     ? "tertiary"
                     : "default"
                 }

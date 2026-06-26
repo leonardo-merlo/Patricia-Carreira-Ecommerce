@@ -2,6 +2,7 @@
 
 import { useState, Fragment } from 'react'
 import { AdminIcon } from '@/components/admin/admin-icon'
+import { invitePartnerUser } from '@/lib/actions/partners'
 
 type HistoryEntry = {
   month: string
@@ -14,6 +15,7 @@ type HistoryEntry = {
 type Afiliada = {
   id: number
   name: string
+  email: string
   phone: string
   coupon: string
   commissionPct: number
@@ -30,7 +32,7 @@ type Afiliada = {
 
 const initialData: Afiliada[] = [
   {
-    id: 1, name: "Ana Paula Ribeiro", phone: "(31) 9 9821-4455", coupon: "ANAPAULA15",
+    id: 1, name: "Ana Paula Ribeiro", email: "ana.ribeiro@email.com", phone: "(31) 9 9821-4455", coupon: "ANAPAULA15",
     commissionPct: 15, salesMonth: 12, revenueMonth: 3640, commissionMonth: 546, paid: false,
     totalSales: 78, totalRevenue: 22840, totalCommission: 3426, joinedDate: "mar/2025",
     history: [
@@ -41,7 +43,7 @@ const initialData: Afiliada[] = [
     ]
   },
   {
-    id: 2, name: "Fernanda Costa", phone: "(21) 9 9644-7788", coupon: "FERNANDA10",
+    id: 2, name: "Fernanda Costa", email: "fernanda.costa@email.com", phone: "(21) 9 9644-7788", coupon: "FERNANDA10",
     commissionPct: 10, salesMonth: 8, revenueMonth: 2480, commissionMonth: 248, paid: true,
     totalSales: 54, totalRevenue: 16920, totalCommission: 1692, joinedDate: "jun/2025",
     history: [
@@ -52,7 +54,7 @@ const initialData: Afiliada[] = [
     ]
   },
   {
-    id: 3, name: "Juliana Alves", phone: "(11) 9 8877-3322", coupon: "JULI10",
+    id: 3, name: "Juliana Alves", email: "juliana.alves@email.com", phone: "(11) 9 8877-3322", coupon: "JULI10",
     commissionPct: 10, salesMonth: 5, revenueMonth: 1580, commissionMonth: 158, paid: false,
     totalSales: 32, totalRevenue: 9840, totalCommission: 984, joinedDate: "ago/2025",
     history: [
@@ -62,7 +64,7 @@ const initialData: Afiliada[] = [
     ]
   },
   {
-    id: 4, name: "Mariana Teixeira", phone: "(41) 9 9211-8844", coupon: "MARI15",
+    id: 4, name: "Mariana Teixeira", email: "mariana.teixeira@email.com", phone: "(41) 9 9211-8844", coupon: "MARI15",
     commissionPct: 15, salesMonth: 7, revenueMonth: 2140, commissionMonth: 321, paid: false,
     totalSales: 41, totalRevenue: 12480, totalCommission: 1872, joinedDate: "set/2025",
     history: [
@@ -72,7 +74,7 @@ const initialData: Afiliada[] = [
     ]
   },
   {
-    id: 5, name: "Camila Duarte", phone: "(48) 9 9412-6633", coupon: "CAMILA10",
+    id: 5, name: "Camila Duarte", email: "camila.duarte@email.com", phone: "(48) 9 9412-6633", coupon: "CAMILA10",
     commissionPct: 10, salesMonth: 3, revenueMonth: 940, commissionMonth: 94, paid: true,
     totalSales: 19, totalRevenue: 5920, totalCommission: 592, joinedDate: "nov/2025",
     history: [
@@ -82,7 +84,7 @@ const initialData: Afiliada[] = [
     ]
   },
   {
-    id: 6, name: "Priscila Moreira", phone: "(51) 9 8833-1177", coupon: "PRISCILA10",
+    id: 6, name: "Priscila Moreira", email: "priscila.moreira@email.com", phone: "(51) 9 8833-1177", coupon: "PRISCILA10",
     commissionPct: 10, salesMonth: 6, revenueMonth: 1940, commissionMonth: 194, paid: false,
     totalSales: 28, totalRevenue: 8840, totalCommission: 884, joinedDate: "out/2025",
     history: [
@@ -92,7 +94,7 @@ const initialData: Afiliada[] = [
     ]
   },
   {
-    id: 7, name: "Tatiane Gomes", phone: "(61) 9 9144-2255", coupon: "TATI12",
+    id: 7, name: "Tatiane Gomes", email: "tatiane.gomes@email.com", phone: "(61) 9 9144-2255", coupon: "TATI12",
     commissionPct: 12, salesMonth: 4, revenueMonth: 1180, commissionMonth: 142, paid: false,
     totalSales: 15, totalRevenue: 4320, totalCommission: 518, joinedDate: "jan/2026",
     history: [
@@ -101,7 +103,7 @@ const initialData: Afiliada[] = [
     ]
   },
   {
-    id: 8, name: "Beatriz Nascimento", phone: "(31) 9 9722-4488", coupon: "BIANE10",
+    id: 8, name: "Beatriz Nascimento", email: "beatriz.nascimento@email.com", phone: "(31) 9 9722-4488", coupon: "BIANE10",
     commissionPct: 10, salesMonth: 2, revenueMonth: 580, commissionMonth: 58, paid: true,
     totalSales: 8, totalRevenue: 2240, totalCommission: 224, joinedDate: "mar/2026",
     history: [
@@ -119,6 +121,8 @@ export default function AfiliadadosPage() {
   const [expanded, setExpanded] = useState<number | null>(null)
   const [editing, setEditing] = useState<Afiliada | null>(null)
   const [draft, setDraft] = useState<Afiliada | null>(null)
+  const [inviteState, setInviteState] = useState<"idle" | "loading" | "sent" | "error">("idle")
+  const [inviteError, setInviteError] = useState<string | null>(null)
 
   const pendingCount = afiliadas.filter(a => !a.paid).length
   const paidCount = afiliadas.filter(a => a.paid).length
@@ -139,11 +143,28 @@ export default function AfiliadadosPage() {
   const openEdit = (a: Afiliada) => {
     setEditing(a)
     setDraft({ ...a })
+    setInviteState("idle")
+    setInviteError(null)
   }
 
   const closeEdit = () => {
     setEditing(null)
     setDraft(null)
+    setInviteState("idle")
+    setInviteError(null)
+  }
+
+  const handleInvite = async () => {
+    if (!draft?.email) return
+    setInviteState("loading")
+    setInviteError(null)
+    const result = await invitePartnerUser(draft.email)
+    if (result.ok) {
+      setInviteState("sent")
+    } else {
+      setInviteState("error")
+      setInviteError(result.error ?? "Erro desconhecido")
+    }
   }
 
   const saveEdit = () => {
@@ -428,6 +449,16 @@ export default function AfiliadadosPage() {
                   />
                 </div>
                 <div className="field">
+                  <label>E-mail</label>
+                  <input
+                    className="input"
+                    type="email"
+                    value={draft.email}
+                    onChange={e => setDraft({ ...draft, email: e.target.value })}
+                    id="input-afiliada-email"
+                  />
+                </div>
+                <div className="field">
                   <label>Telefone / WhatsApp</label>
                   <input
                     className="input"
@@ -460,11 +491,33 @@ export default function AfiliadadosPage() {
                 </div>
               </div>
             </div>
-            <div className="drawer-footer">
-              <button className="btn ghost" onClick={closeEdit}>Fechar</button>
-              <button className="btn primary" onClick={saveEdit} id="btn-salvar-afiliada" data-testid="btn-salvar-afiliada">
-                Salvar
-              </button>
+            <div className="drawer-footer" style={{ flexDirection: "column", gap: 10, alignItems: "stretch" }}>
+              {inviteState === "error" && inviteError && (
+                <p style={{ fontSize: 12, color: "#dc2626", margin: 0 }}>
+                  Erro ao enviar convite: {inviteError}
+                </p>
+              )}
+              {inviteState === "sent" && (
+                <p style={{ fontSize: 12, color: "#16a34a", margin: 0 }}>
+                  Convite enviado para {draft.email}
+                </p>
+              )}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn ghost" onClick={closeEdit}>Fechar</button>
+                <button
+                  className="btn"
+                  onClick={handleInvite}
+                  disabled={inviteState === "loading" || inviteState === "sent" || !draft.email}
+                  id="btn-convidar-afiliada"
+                  data-testid="btn-convidar-afiliada"
+                  style={{ flex: 1 }}
+                >
+                  {inviteState === "loading" ? "Enviando..." : inviteState === "sent" ? "Convite enviado" : "Convidar"}
+                </button>
+                <button className="btn primary" onClick={saveEdit} id="btn-salvar-afiliada" data-testid="btn-salvar-afiliada">
+                  Salvar
+                </button>
+              </div>
             </div>
           </>
         )}

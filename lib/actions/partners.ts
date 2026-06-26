@@ -1,6 +1,7 @@
 'use server'
 
 import { createServiceClient } from '@/lib/supabase/service'
+import { createClient } from '@/lib/supabase/server'
 
 type AffiliateFormData = {
   name: string
@@ -44,4 +45,39 @@ export async function createAffiliateApplication(
   }
 
   return { success: true }
+}
+
+export async function invitePartnerUser(
+  email: string
+): Promise<{ ok: boolean; error?: string }> {
+  if (!email.trim()) return { ok: false, error: 'Email obrigatório.' }
+  const supabase = createServiceClient()
+  const { error } = await supabase.auth.admin.inviteUserByEmail(email.trim())
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
+export async function getAffiliateProfile(): Promise<{
+  name: string
+  commissionPct: number
+  paymentDay: number | null
+} | null> {
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user?.email) return null
+
+  const { data } = await supabase
+    .from('partners')
+    .select('name, contact_name, commission_pct, payment_day')
+    .eq('email', session.user.email)
+    .eq('type', 'affiliate')
+    .single()
+
+  if (!data) return null
+
+  return {
+    name: data.contact_name ?? data.name,
+    commissionPct: data.commission_pct ?? 10,
+    paymentDay: data.payment_day ?? null,
+  }
 }

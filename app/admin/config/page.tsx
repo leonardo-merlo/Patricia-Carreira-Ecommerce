@@ -4,11 +4,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { AdminIcon } from '@/components/admin/admin-icon'
 import { getStoreSettings, updateStoreSettings, type StoreSettings } from '@/lib/actions/settings'
 
-type Section = "perfil" | "usuarios" | "pagamentos" | "envio" | "fiscal" | "estoque" | "integ" | "notif"
+type Section = "perfil" | "pagamentos" | "envio" | "fiscal" | "estoque" | "integ" | "notif"
 
-const sections: { id: Section; label: string; icon: "store" | "users" | "creditCard" | "truck" | "fileText" | "box" | "plug" | "bell" }[] = [
+const sections: { id: Section; label: string; icon: "store" | "creditCard" | "truck" | "fileText" | "box" | "plug" | "bell" }[] = [
   { id: "perfil",    label: "Perfil da loja",  icon: "store" },
-  { id: "usuarios",  label: "Usuários",         icon: "users" },
   { id: "pagamentos",label: "Pagamentos",       icon: "creditCard" },
   { id: "envio",     label: "Frete e envio",    icon: "truck" },
   { id: "fiscal",    label: "Fiscal / NF-e",   icon: "fileText" },
@@ -182,30 +181,6 @@ function SectionPerfil({ s, onToggle }: { s: StoreSettings; onToggle: (key: keyo
               <select className="select"><option>Português (BR)</option></select>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Seção: Usuários ──────────────────────────────────────────────────────────
-
-function SectionUsuarios() {
-  return (
-    <div className="card">
-      <div className="card-header">
-        <h3 className="ttl">Usuários do painel</h3>
-        <span className="badge neutral" style={{ fontSize: 11 }}>Gerenciado via Supabase</span>
-      </div>
-      <div className="card-body">
-        <p style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.6 }}>
-          O gerenciamento de usuários é feito diretamente no painel do Supabase
-          em <strong>Authentication → Users</strong>. O perfil de cada usuário
-          (admin ou customer) é definido pela tabela <code>user_profiles</code>.
-        </p>
-        <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--surface-2)", borderRadius: 8, fontSize: 12.5, color: "var(--text-2)" }}>
-          Para criar um novo admin: cadastre o usuário no Supabase Authentication e depois insira
-          manualmente uma linha em <code>user_profiles</code> com <code>role = &apos;admin&apos;</code>.
         </div>
       </div>
     </div>
@@ -591,7 +566,6 @@ export default function ConfigPage() {
 
     switch (active) {
       case "perfil":     return <SectionPerfil     s={settings} onToggle={handleToggle} />
-      case "usuarios":   return <SectionUsuarios />
       case "pagamentos": return <SectionPagamentos />
       case "envio":      return <SectionEnvio       s={settings} onToggle={handleToggle} />
       case "fiscal":     return <SectionFiscal      s={settings} onToggle={handleToggle} />

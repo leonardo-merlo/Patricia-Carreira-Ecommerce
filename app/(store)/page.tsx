@@ -5,6 +5,7 @@ import { ProductCard } from "@/components/store/product-card"
 import { HeroCarousel } from "@/components/store/hero-carousel"
 import { CitySection } from "@/components/store/city-section"
 import { getFeaturedProducts } from "@/lib/supabase/products"
+import { getStoreSettings } from "@/lib/actions/settings"
 
 const CATEGORIES = [
   {
@@ -70,7 +71,11 @@ const FEATURED_SLUGS = [
 ]
 
 export default async function HomePage() {
-  const FEATURED = await getFeaturedProducts(FEATURED_SLUGS)
+  const [FEATURED, settings] = await Promise.all([
+    getFeaturedProducts(FEATURED_SLUGS),
+    getStoreSettings().catch(() => null),
+  ])
+  const showLowStockWarning = settings?.show_low_stock_warning ?? false
 
   return (
     <>
@@ -122,7 +127,7 @@ export default async function HomePage() {
         </div>
         <div className="grid grid-cols-3 gap-2 md:grid-cols-5">
           {FEATURED.map((product) => (
-            <ProductCard key={product.id} product={product} compact />
+            <ProductCard key={product.id} product={product} compact showLowStockWarning={showLowStockWarning} />
           ))}
         </div>
       </section>

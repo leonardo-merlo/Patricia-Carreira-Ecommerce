@@ -86,6 +86,153 @@ export async function sendOrderConfirmation(input: OrderConfirmationInput): Prom
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Pedido enviado — com código de rastreio
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type OrderShippedInput = {
+  to: string
+  customerName: string
+  orderId: string
+  trackingCode: string
+  shippingMethod?: string
+}
+
+export async function sendOrderShipped(input: OrderShippedInput): Promise<void> {
+  const shortId = input.orderId.slice(0, 8).toUpperCase()
+  const from = process.env.RESEND_FROM || 'onboarding@resend.dev'
+  const orderUrl = `${process.env.NEXT_PUBLIC_APP_URL}/pedido/${input.orderId}`
+
+  const resend = getResend()
+  if (!resend) {
+    console.warn('[Resend] RESEND_API_KEY não configurada — email de envio não enviado')
+    return
+  }
+
+  await resend.emails.send({
+    from,
+    to: input.to,
+    subject: `Seu pedido #${shortId} foi enviado! — Patrícia Carreira`,
+    html: `
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <body style="font-family:sans-serif;color:#1c1c1e;max-width:560px;margin:0 auto;padding:24px">
+        <h2 style="color:#1c1c1e">Seu pedido está a caminho! 🎉</h2>
+        <p>Olá, ${input.customerName}! Seu pedido <strong>#${shortId}</strong> foi enviado.</p>
+
+        <div style="margin:20px 0;padding:16px;background:#f5f5f7;border-radius:8px">
+          <div style="font-size:12px;color:#666;margin-bottom:4px">CÓDIGO DE RASTREIO</div>
+          <div style="font-family:ui-monospace,monospace;font-size:18px;font-weight:700;letter-spacing:0.06em">
+            ${input.trackingCode}
+          </div>
+          ${input.shippingMethod ? `<div style="font-size:12px;color:#666;margin-top:4px">${input.shippingMethod}</div>` : ''}
+        </div>
+
+        <p style="margin-top:24px">
+          <a href="${orderUrl}" style="background:#1c1c1e;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block">
+            Acompanhar pedido
+          </a>
+        </p>
+
+        <p style="margin-top:32px;font-size:13px;color:#999">
+          Qualquer dúvida, entre em contato pelo Instagram
+          <a href="https://instagram.com/patriciacarreira" style="color:#999">@patriciacarreira</a>.
+        </p>
+      </body>
+      </html>
+    `,
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pedido entregue
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type OrderDeliveredInput = {
+  to: string
+  customerName: string
+  orderId: string
+}
+
+export async function sendOrderDelivered(input: OrderDeliveredInput): Promise<void> {
+  const shortId = input.orderId.slice(0, 8).toUpperCase()
+  const from = process.env.RESEND_FROM || 'onboarding@resend.dev'
+  const storeUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+
+  const resend = getResend()
+  if (!resend) {
+    console.warn('[Resend] RESEND_API_KEY não configurada — email de entrega não enviado')
+    return
+  }
+
+  await resend.emails.send({
+    from,
+    to: input.to,
+    subject: `Pedido #${shortId} entregue — Patrícia Carreira`,
+    html: `
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <body style="font-family:sans-serif;color:#1c1c1e;max-width:560px;margin:0 auto;padding:24px">
+        <h2 style="color:#1c1c1e">Seu pedido chegou! ✨</h2>
+        <p>Olá, ${input.customerName}! Seu pedido <strong>#${shortId}</strong> foi entregue.</p>
+        <p>Esperamos que você ame suas peças. Se tiver qualquer dúvida sobre trocas ou devoluções,
+           é só entrar em contato.</p>
+
+        <p style="margin-top:24px">
+          <a href="${storeUrl}" style="background:#1c1c1e;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block">
+            Explorar novidades
+          </a>
+        </p>
+
+        <p style="margin-top:32px;font-size:13px;color:#999">
+          Qualquer dúvida, entre em contato pelo Instagram
+          <a href="https://instagram.com/patriciacarreira" style="color:#999">@patriciacarreira</a>.
+        </p>
+      </body>
+      </html>
+    `,
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pedido cancelado
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type OrderCancelledInput = {
+  to: string
+  customerName: string
+  orderId: string
+}
+
+export async function sendOrderCancelled(input: OrderCancelledInput): Promise<void> {
+  const shortId = input.orderId.slice(0, 8).toUpperCase()
+  const from = process.env.RESEND_FROM || 'onboarding@resend.dev'
+
+  const resend = getResend()
+  if (!resend) {
+    console.warn('[Resend] RESEND_API_KEY não configurada — email de cancelamento não enviado')
+    return
+  }
+
+  await resend.emails.send({
+    from,
+    to: input.to,
+    subject: `Pedido #${shortId} cancelado — Patrícia Carreira`,
+    html: `
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <body style="font-family:sans-serif;color:#1c1c1e;max-width:560px;margin:0 auto;padding:24px">
+        <h2 style="color:#1c1c1e">Seu pedido foi cancelado</h2>
+        <p>Olá, ${input.customerName}. Seu pedido <strong>#${shortId}</strong> foi cancelado.</p>
+        <p>Se o pagamento já foi processado, o estorno será realizado conforme a política da forma de pagamento utilizada.</p>
+        <p>Qualquer dúvida, entre em contato pelo Instagram
+           <a href="https://instagram.com/patriciacarreira">@patriciacarreira</a>.</p>
+      </body>
+      </html>
+    `,
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // NF-e — envia DANFE por email após autorização
 // ─────────────────────────────────────────────────────────────────────────────
 

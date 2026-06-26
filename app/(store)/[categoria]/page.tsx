@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import { getProductsByCategory } from "@/lib/supabase/products"
 import { CategoryPageContent } from "@/components/store/category-page-content"
+import { getStoreSettings } from "@/lib/actions/settings"
 import type { Product } from "@/lib/types"
 
 type Categoria =
@@ -114,6 +115,8 @@ export default async function CategoriaPage({ params }: PageProps) {
     products = await getProductsByCategory(categoria)
   }
 
+  const settings = await getStoreSettings().catch(() => null)
+
   return (
     <div className="mx-auto max-w-container px-margin-mobile py-10 md:px-margin-desktop">
       <CategoryPageContent
@@ -121,6 +124,7 @@ export default async function CategoriaPage({ params }: PageProps) {
         title={meta.title}
         description={meta.description}
         availableSubcategories={subcategories}
+        showLowStockWarning={settings?.show_low_stock_warning ?? false}
       />
     </div>
   )

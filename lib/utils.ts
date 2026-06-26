@@ -46,13 +46,14 @@ export function isLightColor(hex: string): boolean {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5
 }
 
-export function getProductBadge(product: Product): ProductBadge {
+export function getProductBadge(product: Product, showLowStockWarning = false): ProductBadge {
   const totalStock = (product.variants ?? []).reduce(
     (sum, v) => sum + v.stock_quantity,
     0,
   )
   if (totalStock === 0) return 'Esgotado'
   if (totalStock === 1) return 'Última Peça'
+  if (showLowStockWarning && totalStock <= 3) return 'Últimas peças'
   // "Lançamento" deixou de ser automático — agora é uma tag manual (product.tags)
   return null
 }

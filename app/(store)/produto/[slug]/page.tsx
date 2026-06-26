@@ -4,6 +4,7 @@ import { getProductBySlug, getProductsByCategory } from "@/lib/supabase/products
 import { isProductInWishlist } from "@/lib/actions/wishlist"
 import { createClient } from "@/lib/supabase/server"
 import { ProductDetail } from "@/components/store/product-detail"
+import { getStoreSettings } from "@/lib/actions/settings"
 
 interface PageProps {
   params: { slug: string }
@@ -42,11 +43,12 @@ export default async function ProdutoPage({ params }: PageProps) {
   const isLoggedIn = !!user
 
   const categoryKey = getCategoryKey(product.category, product.subcategory)
-  const [relatedProducts, initialIsFavorited] = await Promise.all([
+  const [relatedProducts, initialIsFavorited, settings] = await Promise.all([
     getProductsByCategory(categoryKey).then((ps) =>
       ps.filter((p) => p.id !== product.id).slice(0, 4)
     ),
     isProductInWishlist(product.id),
+    getStoreSettings().catch(() => null),
   ])
 
   return (
@@ -55,6 +57,7 @@ export default async function ProdutoPage({ params }: PageProps) {
       relatedProducts={relatedProducts}
       initialIsFavorited={initialIsFavorited}
       isLoggedIn={isLoggedIn}
+      showLowStockWarning={settings?.show_low_stock_warning ?? false}
     />
   )
 }

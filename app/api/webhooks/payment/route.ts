@@ -6,6 +6,7 @@ import { recordCouponUsage } from '@/lib/actions/coupons'
 import { purchaseShippingLabel } from '@/lib/actions/label'
 import { emitirNfe } from '@/lib/actions/nfe'
 import { sendOrderConfirmation } from '@/lib/integrations/resend'
+import { getStoreSettings } from '@/lib/actions/settings'
 
 function validateMPSignature(req: NextRequest, dataId: string): boolean {
   const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET
@@ -83,6 +84,8 @@ export async function POST(req: NextRequest) {
       .update({ payment_status: 'paid', status: 'paid' })
       .eq('id', order.id)
 
+    const settings = await getStoreSettings().catch(() => null)
+
     try {
       await decrementStockByOrderId(order.id)
     } catch (err) {
@@ -114,49 +117,53 @@ export async function POST(req: NextRequest) {
       console.error('[MP Webhook] erro ao comprar etiqueta ME:', err)
     }
 
-    try {
-      await emitirNfe(order.id)
-    } catch (err) {
-      console.error('[MP Webhook] erro ao emitir NF-e:', err)
+    if (settings === null || settings.auto_nfe_retail) {
+      try {
+        await emitirNfe(order.id)
+      } catch (err) {
+        console.error('[MP Webhook] erro ao emitir NF-e:', err)
+      }
     }
 
-    try {
-      const { data: orderDetails } = await supabase
-        .from('orders')
-        .select(`
-          total_amount, payment_method,
-          customer:customers(name, email),
-          items:order_items(quantity, unit_price, product_name)
-        `)
-        .eq('id', order.id)
-        .maybeSingle()
+    if (settings === null || settings.notif_order_confirmed) {
+      try {
+        const { data: orderDetails } = await supabase
+          .from('orders')
+          .select(`
+            total_amount, payment_method,
+            customer:customers(name, email),
+            items:order_items(quantity, unit_price, product_name)
+          `)
+          .eq('id', order.id)
+          .maybeSingle()
 
-      type CustomerRow = { name: string; email: string | null }
-      type ItemRow = { quantity: number; unit_price: number; product_name: string }
+        type CustomerRow = { name: string; email: string | null }
+        type ItemRow = { quantity: number; unit_price: number; product_name: string }
 
-      const customer = (
-        Array.isArray(orderDetails?.customer)
-          ? orderDetails?.customer[0]
-          : orderDetails?.customer
-      ) as CustomerRow | null | undefined
+        const customer = (
+          Array.isArray(orderDetails?.customer)
+            ? orderDetails?.customer[0]
+            : orderDetails?.customer
+        ) as CustomerRow | null | undefined
 
-      if (customer?.email) {
-        const items = (orderDetails?.items ?? []) as ItemRow[]
-        await sendOrderConfirmation({
-          to: customer.email,
-          customerName: customer.name,
-          orderId: order.id,
-          totalAmount: Number(orderDetails?.total_amount ?? 0),
-          paymentMethod: (orderDetails?.payment_method as string) ?? 'pix',
-          items: items.map((i) => ({
-            product_name: i.product_name,
-            quantity: i.quantity,
-            unit_price: Number(i.unit_price),
-          })),
-        })
+        if (customer?.email) {
+          const items = (orderDetails?.items ?? []) as ItemRow[]
+          await sendOrderConfirmation({
+            to: customer.email,
+            customerName: customer.name,
+            orderId: order.id,
+            totalAmount: Number(orderDetails?.total_amount ?? 0),
+            paymentMethod: (orderDetails?.payment_method as string) ?? 'pix',
+            items: items.map((i) => ({
+              product_name: i.product_name,
+              quantity: i.quantity,
+              unit_price: Number(i.unit_price),
+            })),
+          })
+        }
+      } catch (err) {
+        console.error('[MP Webhook] erro ao enviar email de confirmação:', err)
       }
-    } catch (err) {
-      console.error('[MP Webhook] erro ao enviar email de confirmação:', err)
     }
 
     console.log('[MP Webhook] pedido aprovado:', order.id)

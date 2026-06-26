@@ -5,9 +5,10 @@ import type { Product } from "@/lib/types"
 interface ProductGridProps {
   products: Product[]
   loading?: boolean
+  showLowStockWarning?: boolean
 }
 
-export function ProductGrid({ products, loading = false }: ProductGridProps) {
+export function ProductGrid({ products, loading = false, showLowStockWarning = false }: ProductGridProps) {
   if (loading) {
     return (
       <div className="grid content-start grid-cols-2 gap-gutter md:grid-cols-3 lg:grid-cols-4">
@@ -38,7 +39,7 @@ export function ProductGrid({ products, loading = false }: ProductGridProps) {
   return (
     <div className="grid content-start grid-cols-2 gap-gutter md:grid-cols-3 lg:grid-cols-4">
       {products.map((product) => (
-        <ProductCard key={product.id} product={product} />
+        <ProductCard key={product.id} product={product} showLowStockWarning={showLowStockWarning} />
       ))}
     </div>
   )

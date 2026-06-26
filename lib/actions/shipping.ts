@@ -1,15 +1,40 @@
 'use server'
 
 import { createServiceClient } from '@/lib/supabase/service'
-import { calculateShipping, type MEShippingItem } from '@/lib/integrations/melhor-envio'
+import { calculateShipping, type MEShippingItem, type MEQuoteResult } from '@/lib/integrations/melhor-envio'
+import { getStoreSettings } from '@/lib/actions/settings'
 import type { ShippingOption } from '@/lib/types'
+
+export type ShippingResult =
+  | { ok: true; options: ShippingOption[]; freeShippingThreshold: number }
+  | { ok: false; error: string }
+
+function matchesEnabledCarrier(quote: MEQuoteResult, enabledCarriers: string[]): boolean {
+  if (enabledCarriers.length === 0) return true
+  const co = (quote.company?.name ?? '').toLowerCase()
+  const svc = (quote.name ?? '').toLowerCase()
+  return enabledCarriers.some((c) => {
+    const cl = c.toLowerCase()
+    if (cl.startsWith('correios (pac)')) return co.includes('correo') && svc === 'pac'
+    if (cl.startsWith('correios (sedex)')) return co.includes('correo') && svc.startsWith('sedex')
+    if (cl.startsWith('jadlog')) return co.includes('jadlog')
+    if (cl.startsWith('total express')) return co.includes('total express') || svc.includes('total express')
+    return co.includes(cl.split('(')[0].trim()) || svc.includes(cl.split('(')[0].trim())
+  })
+}
 
 export async function getShippingOptions(
   destCep: string,
   cartItems: Array<{ variantId: string; quantity: number }>
-): Promise<{ ok: true; options: ShippingOption[] } | { ok: false; error: string }> {
+): Promise<ShippingResult> {
   try {
-    if (!process.env.STORE_CEP_ORIGEM) {
+    const settings = await getStoreSettings()
+    const originCep = settings?.origin_cep?.replace(/\D/g, '') || process.env.STORE_CEP_ORIGEM?.replace(/\D/g, '')
+    const freeShippingThreshold = settings?.free_shipping_threshold ?? 599
+    const extraDays = settings?.shipping_extra_days ?? 0
+    const enabledCarriers = settings?.enabled_carriers ?? []
+
+    if (!originCep) {
       return { ok: false, error: 'CEP de origem da loja não configurado' }
     }
 
@@ -61,17 +86,18 @@ export async function getShippingOptions(
       return { ok: false, error: 'Nenhum item no carrinho' }
     }
 
-    const quotes = await calculateShipping(destCep, items)
+    const quotes = await calculateShipping(destCep, items, originCep)
 
     const options: ShippingOption[] = quotes
       .filter((q) => !q.error && q.price != null)
+      .filter((q) => matchesEnabledCarrier(q, enabledCarriers))
       .map((q) => ({
         id: q.id,
         name: q.name,
         company: q.company.name,
         price: Number(String(q.price!).replace(',', '.')),
-        delivery_days_min: q.delivery_range.min,
-        delivery_days_max: q.delivery_range.max,
+        delivery_days_min: q.delivery_range.min + extraDays,
+        delivery_days_max: q.delivery_range.max + extraDays,
       }))
       .sort((a, b) => a.price - b.price)
 
@@ -82,7 +108,7 @@ export async function getShippingOptions(
       }
     }
 
-    return { ok: true, options }
+    return { ok: true, options, freeShippingThreshold }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Erro ao calcular frete'
     return { ok: false, error: msg }

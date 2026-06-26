@@ -3,6 +3,12 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import type { PaymentMethod } from '@/lib/types'
 import { recordCouponUsage } from '@/lib/actions/coupons'
+import { getStoreSettings } from '@/lib/actions/settings'
+import {
+  sendOrderShipped,
+  sendOrderDelivered,
+  sendOrderCancelled,
+} from '@/lib/integrations/resend'
 
 export type OrderFormData = {
   name: string
@@ -250,6 +256,44 @@ export async function updateOrderStatus(
   if (error) return { success: false, error: error.message }
 
   revalidatePath('/admin/pedidos')
+
+  if (status === 'shipped' || status === 'delivered' || status === 'cancelled') {
+    try {
+      const [settings, orderResult] = await Promise.all([
+        getStoreSettings().catch(() => null),
+        supabase
+          .from('orders')
+          .select('tracking_code, shipping_method, customer:customers(name, email)')
+          .eq('id', orderId)
+          .maybeSingle(),
+      ])
+
+      type CustomerRow = { name: string; email: string | null }
+      const order = orderResult.data
+      const customer = (
+        Array.isArray(order?.customer) ? order?.customer[0] : order?.customer
+      ) as CustomerRow | null | undefined
+
+      if (customer?.email) {
+        if (status === 'shipped' && (settings === null || settings.notif_order_shipped)) {
+          await sendOrderShipped({
+            to: customer.email,
+            customerName: customer.name,
+            orderId,
+            trackingCode: (order as Record<string, unknown>)?.tracking_code as string ?? '',
+            shippingMethod: (order as Record<string, unknown>)?.shipping_method as string | undefined,
+          })
+        } else if (status === 'delivered' && (settings === null || settings.notif_order_delivered)) {
+          await sendOrderDelivered({ to: customer.email, customerName: customer.name, orderId })
+        } else if (status === 'cancelled' && (settings === null || settings.notif_order_cancelled)) {
+          await sendOrderCancelled({ to: customer.email, customerName: customer.name, orderId })
+        }
+      }
+    } catch (err) {
+      console.error('[updateOrderStatus] erro ao enviar email de status:', err)
+    }
+  }
+
   return { success: true }
 }
 

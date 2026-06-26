@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { cn, formatPrice } from "@/lib/utils"
-import { useCart, FREE_SHIPPING_THRESHOLD } from "@/lib/cart-context"
+import { useCart } from "@/lib/cart-context"
 import { fetchAddressByCEP } from "@/lib/integrations/viacep"
 import { createPayment } from "@/lib/actions/payments"
 import { getShippingOptions } from "@/lib/actions/shipping"
@@ -147,6 +147,7 @@ export default function CheckoutPage() {
   const [shippingLoading, setShippingLoading] = useState(false)
   const [shippingError, setShippingError] = useState("")
   const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null)
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState(599)
   const [acceptedTerms, setAcceptedTerms] = useState(false)
 
   useEffect(() => {
@@ -206,14 +207,15 @@ export default function CheckoutPage() {
 
       if (shippingResult.ok) {
         setShippingOptions(shippingResult.options)
+        setFreeShippingThreshold(shippingResult.freeShippingThreshold)
       } else {
         setShippingError(shippingResult.error)
       }
     }
   }
 
-  // Frete grátis na opção mais econômica (geralmente PAC) quando o subtotal atinge o mínimo.
-  const qualifiesForFreeShipping = cart.subtotal >= FREE_SHIPPING_THRESHOLD
+  // Frete grátis na opção mais econômica quando o subtotal atinge o mínimo configurado.
+  const qualifiesForFreeShipping = cart.subtotal >= freeShippingThreshold
   const cheapestShippingId =
     shippingOptions.length > 0
       ? shippingOptions.reduce((min, o) => (o.price < min.price ? o : min), shippingOptions[0]).id

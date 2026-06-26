@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/service'
 import { createManualProductionOrder } from '@/lib/actions/production'
+import { getStoreSettings } from '@/lib/actions/settings'
 
 export type WholesaleOrderLineItem = {
   variant_id: string
@@ -61,6 +62,23 @@ export async function createWholesaleOrder(
   input: CreateWholesaleOrderInput,
 ): Promise<CreateWholesaleOrderResult> {
   const supabase = createServiceClient()
+
+  const wsSettings = await getStoreSettings().catch(() => null)
+  if (wsSettings?.allow_wholesale_no_stock === false) {
+    for (const item of input.items) {
+      const { data: variant } = await supabase
+        .from('product_variants')
+        .select('stock_quantity')
+        .eq('id', item.variant_id)
+        .maybeSingle()
+      if (!variant || variant.stock_quantity < item.quantity) {
+        return {
+          success: false,
+          error: `"${item.product_name} — ${item.variant_label}" não tem estoque suficiente (pedido sem estoque desabilitado nas configurações).`,
+        }
+      }
+    }
+  }
 
   const total = input.items.reduce((s, it) => s + it.unit_price * it.quantity, 0)
 

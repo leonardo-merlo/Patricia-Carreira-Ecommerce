@@ -46,15 +46,16 @@ type MEAddress = {
 
 export async function calculateShipping(
   toCep: string,
-  items: MEShippingItem[]
+  items: MEShippingItem[],
+  fromCep: string
 ): Promise<MEQuoteResult[]> {
-  const fromCep = process.env.STORE_CEP_ORIGEM!.replace(/\D/g, '')
+  const cleanFromCep = fromCep.replace(/\D/g, '')
 
   const res = await fetch(`${baseUrl()}/me/shipment/calculate`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({
-      from: { postal_code: fromCep },
+      from: { postal_code: cleanFromCep },
       to: { postal_code: toCep.replace(/\D/g, '') },
       products: items.map((i) => ({
         weight: i.weight,

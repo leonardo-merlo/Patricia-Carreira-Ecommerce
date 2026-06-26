@@ -10,6 +10,7 @@ import {
   type OrderItemWithProduct,
 } from '@/lib/integrations/focus-nfe'
 import { sendNfeEmail } from '@/lib/integrations/resend'
+import { getStoreSettings } from '@/lib/actions/settings'
 import type { Customer, NfeStatus, Order } from '@/lib/types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -255,7 +256,8 @@ export async function atualizarStatusNfe(
       const customerName = typedOrder.customer?.name ?? 'Cliente'
       const danfeUrl = data.caminho_danfe
 
-      if (customerEmail && danfeUrl) {
+      const nfeSettings = await getStoreSettings().catch(() => null)
+      if ((nfeSettings === null || nfeSettings.send_danfe_email) && customerEmail && danfeUrl) {
         await sendNfeEmail({
           to: customerEmail,
           customerName,

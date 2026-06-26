@@ -19,6 +19,7 @@ interface ProductDetailProps {
   relatedProducts?: Product[]
   initialIsFavorited?: boolean
   isLoggedIn?: boolean
+  showLowStockWarning?: boolean
 }
 
 function getCategoryLink(
@@ -39,6 +40,7 @@ export function ProductDetail({
   relatedProducts = [],
   initialIsFavorited = false,
   isLoggedIn = false,
+  showLowStockWarning = false,
 }: ProductDetailProps) {
   const [activeImageIndex, setActiveImageIndex] = useState(0)
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({})
@@ -48,7 +50,7 @@ export function ProductDetail({
   const [added, setAdded] = useState(false)
   const { addItem } = useCart()
 
-  const badge = getProductBadge(product)
+  const badge = getProductBadge(product, showLowStockWarning)
   const categoryLink = getCategoryLink(product.category, product.subcategory)
 
   const currentImage = product.images[activeImageIndex] ?? null

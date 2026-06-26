@@ -13,6 +13,7 @@ interface CategoryPageContentProps {
   title: string
   description?: string
   availableSubcategories?: string[]
+  showLowStockWarning?: boolean
 }
 
 const DEFAULT_FILTERS: FilterState = {
@@ -75,6 +76,7 @@ export function CategoryPageContent({
   title,
   description,
   availableSubcategories = [],
+  showLowStockWarning = false,
 }: CategoryPageContentProps) {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
 
@@ -141,12 +143,12 @@ export function CategoryPageContent({
       {/* Desktop: sidebar + grid */}
       <div className="hidden gap-10 md:grid md:grid-cols-[240px_1fr]">
         {filterPanel}
-        <ProductGrid products={filtered} />
+        <ProductGrid products={filtered} showLowStockWarning={showLowStockWarning} />
       </div>
 
       {/* Mobile: grid only */}
       <div className="md:hidden">
-        <ProductGrid products={filtered} />
+        <ProductGrid products={filtered} showLowStockWarning={showLowStockWarning} />
       </div>
     </>
   )

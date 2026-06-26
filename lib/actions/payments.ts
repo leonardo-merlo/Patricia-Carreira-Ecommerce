@@ -8,6 +8,8 @@ import {
 } from '@/lib/integrations/mercadopago'
 import { saveOrder, type OrderFormData, type OrderLineItem } from '@/lib/actions/orders'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
+import { getStoreSettings } from '@/lib/actions/settings'
 
 export type PaymentMethod = 'pix' | 'credit_card' | 'boleto'
 
@@ -63,6 +65,24 @@ export async function createPayment(
   console.log('[createPayment] method:', input.method, 'amount:', input.amount, 'userId:', userId)
   console.log('[createPayment] orderData keys:', input.orderData ? Object.keys(input.orderData) : 'none')
   console.log('[createPayment] shippingMethod:', input.orderData?.shippingMethod, 'serviceId:', input.orderData?.melhorEnvioServiceId)
+
+  if (input.orderData?.lineItems?.length) {
+    const paySettings = await getStoreSettings().catch(() => null)
+    if (paySettings?.block_sale_zero_stock) {
+      const paySupabase = createServiceClient()
+      for (const item of input.orderData.lineItems) {
+        if (!item.variantId) continue
+        const { data: variant } = await paySupabase
+          .from('product_variants')
+          .select('stock_quantity')
+          .eq('id', item.variantId)
+          .maybeSingle()
+        if (variant && variant.stock_quantity <= 0) {
+          return { ok: false, error: `"${item.productName}" está esgotado e não pode ser comprado no momento.` }
+        }
+      }
+    }
+  }
 
   try {
     let result: MPPaymentResult
