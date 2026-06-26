@@ -111,7 +111,7 @@ export async function getAffiliateProfile(): Promise<{
   if (!data) return null
 
   type CouponEmbed = { code: string } | null
-  const coupon = data.coupons as CouponEmbed
+  const coupon = data.coupons as unknown as CouponEmbed
 
   return {
     id: data.id as string,
