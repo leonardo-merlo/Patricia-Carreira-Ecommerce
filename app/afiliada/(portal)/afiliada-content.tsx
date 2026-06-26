@@ -1,132 +1,50 @@
 "use client" // image gallery selection + variant selection + add to cart state
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import type { MonthStats } from '@/lib/actions/partners'
 
 type Tab = 'resumo' | 'vendas' | 'pagamentos' | 'divulgar'
-type PeriodKey = 'fev' | 'mar' | 'abr' | 'mai'
-type SaleStatus = 'pago' | 'pendente' | 'processando'
-type PayStatus = 'pago' | 'pendente'
 type ProductFilter = 'todos' | 'novidades' | 'favoritos'
 
 interface AfiliadaContentProps {
   name: string
   commissionPct: number
   paymentDay: number | null
+  couponCode: string | null
+  orderHistory: MonthStats[]
 }
 
-// ── dados por período (mock — conectar ao Supabase quando coupons tiver partner_id) ─
-const periodData: Record<PeriodKey, {
-  label: string
-  labelFull: string
-  prevLabel: string
-  sales: number
-  revenue: number
-  commission: number
-  deltaSales: number
-  deltaRevenue: number
-  weekBars: [number, number, number, number]
-}> = {
-  fev: {
-    label: 'Fev', labelFull: 'fevereiro/26', prevLabel: 'jan',
-    sales: 7, revenue: 1980, commission: 297,
-    deltaSales: 2, deltaRevenue: 600,
-    weekBars: [2, 2, 1, 2],
-  },
-  mar: {
-    label: 'Mar', labelFull: 'março/26', prevLabel: 'fev',
-    sales: 11, revenue: 3180, commission: 477,
-    deltaSales: 4, deltaRevenue: 1200,
-    weekBars: [3, 3, 2, 3],
-  },
-  abr: {
-    label: 'Abr', labelFull: 'abril/26', prevLabel: 'mar',
-    sales: 9, revenue: 2820, commission: 423,
-    deltaSales: -2, deltaRevenue: -360,
-    weekBars: [2, 2, 3, 2],
-  },
-  mai: {
-    label: 'Mai', labelFull: 'maio/26', prevLabel: 'abr',
-    sales: 12, revenue: 3640, commission: 546,
-    deltaSales: 3, deltaRevenue: 820,
-    weekBars: [2, 4, 3, 3],
-  },
-}
+// Products for "Divulgar" tab — populated from the real store catalog.
+// Kept static for now; will connect to products table in a future update.
+const CATALOG_PRODUCTS = [
+  { id: 'p1', name: 'Bolsa Bucket Couro Caramelo',   category: 'bolsas', slug: 'bolsa-bucket-couro-caramelo',   price: 445, isNew: true,  thumbBg: 'linear-gradient(135deg,#e8c99a,#c9a87a)' },
+  { id: 'p2', name: 'Vestido Linho Midi Off-White',   category: 'roupas', slug: 'vestido-linho-midi-off-white',   price: 310, isNew: true,  thumbBg: 'linear-gradient(135deg,#ede8e0,#d4cfc5)' },
+  { id: 'p3', name: 'Conjunto Saia + Cropped Linho',  category: 'roupas', slug: 'conjunto-saia-cropped-linho',    price: 385, isNew: true,  thumbBg: 'linear-gradient(135deg,#d6cfc4,#b8b0a4)' },
+  { id: 'p4', name: 'Bolsa Palha Trançada Natural',   category: 'bolsas', slug: 'bolsa-palha-trancada-natural',   price: 380, isNew: false, thumbBg: 'linear-gradient(135deg,#ddd0b8,#c4b090)' },
+  { id: 'p5', name: 'Bata Algodão Bordada Cru',       category: 'roupas', slug: 'bata-algodao-bordada-cru',       price: 248, isNew: false, thumbBg: 'linear-gradient(135deg,#f0ece4,#e0d8cc)' },
+  { id: 'p6', name: 'Bolsa Tiracolo Couro Preto',     category: 'bolsas', slug: 'bolsa-tiracolo-couro-preto',     price: 298, isNew: false, thumbBg: 'linear-gradient(135deg,#555,#333)' },
+]
 
-// ── vendas por mês (mock) ───────────────────────────────────────────────────
-const salesByPeriod: Record<PeriodKey, { date: string; product: string; size: string; value: number; status: SaleStatus }[]> = {
-  fev: [
-    { date: '26 fev', product: 'Vestido Bata Linho', size: 'M', value: 187, status: 'pago' },
-    { date: '23 fev', product: 'Bolsa Tiracolo Couro Preto', size: 'Único', value: 298, status: 'pago' },
-    { date: '20 fev', product: 'Cinto Macramê', size: 'P', value: 89, status: 'pago' },
-    { date: '17 fev', product: 'Bata Algodão Bordado', size: 'G', value: 214, status: 'pago' },
-    { date: '14 fev', product: 'Vestido Linho Listrado', size: 'P', value: 255, status: 'pago' },
-    { date: '10 fev', product: 'Bolsa Palha Redonda', size: 'Único', value: 340, status: 'pago' },
-    { date: '06 fev', product: 'Sandália Macramê Natural', size: '38', value: 165, status: 'pago' },
-  ],
-  mar: [
-    { date: '28 mar', product: 'Bolsa Tiracolo Couro Preto', size: 'Único', value: 298, status: 'pago' },
-    { date: '25 mar', product: 'Bata Algodão Bordado', size: 'M', value: 214, status: 'pago' },
-    { date: '22 mar', product: 'Vestido Linho Listrado', size: 'P', value: 255, status: 'pago' },
-    { date: '18 mar', product: 'Bolsa Palha Redonda', size: 'Único', value: 340, status: 'pago' },
-    { date: '15 mar', product: 'Cinto Macramê', size: 'M', value: 89, status: 'pago' },
-    { date: '12 mar', product: 'Vestido Bata Linho', size: 'G', value: 187, status: 'pago' },
-    { date: '08 mar', product: 'Sandália Macramê Natural', size: '37', value: 165, status: 'pago' },
-    { date: '04 mar', product: 'Bolsa Saco Nylon Verde', size: 'Único', value: 268, status: 'pago' },
-  ],
-  abr: [
-    { date: '27 abr', product: 'Bolsa Bucket Couro Caramelo', size: 'Único', value: 445, status: 'pago' },
-    { date: '24 abr', product: 'Conjunto Saia + Cropped Linho', size: 'M', value: 385, status: 'pago' },
-    { date: '20 abr', product: 'Vestido Linho Midi Off-White', size: 'P', value: 310, status: 'pago' },
-    { date: '17 abr', product: 'Bata Linho Bordado', size: 'G', value: 248, status: 'pago' },
-    { date: '13 abr', product: 'Bolsa Tiracolo Couro Preto', size: 'Único', value: 298, status: 'pago' },
-    { date: '10 abr', product: 'Cinto Trançado', size: 'M', value: 75, status: 'pago' },
-    { date: '06 abr', product: 'Sandália Macramê Natural', size: '37', value: 165, status: 'pago' },
-    { date: '02 abr', product: 'Bolsa Carteira Mini', size: 'Único', value: 195, status: 'pago' },
-  ],
-  mai: [
-    { date: '28 mai', product: 'Bolsa Tiracolo Couro Preto', size: 'Único', value: 298, status: 'pago' },
-    { date: '26 mai', product: 'Vestido Bata Linho', size: 'P', value: 187, status: 'pago' },
-    { date: '24 mai', product: 'Bolsa Palha Redonda', size: 'Único', value: 340, status: 'processando' },
-    { date: '22 mai', product: 'Cinto Macramê', size: 'M', value: 89, status: 'pago' },
-    { date: '20 mai', product: 'Bata Algodão Bordado', size: 'G', value: 214, status: 'pendente' },
-    { date: '18 mai', product: 'Bolsa Tiracolo Couro Preto', size: 'Único', value: 298, status: 'pago' },
-    { date: '15 mai', product: 'Vestido Linho Listrado', size: 'M', value: 255, status: 'pago' },
-    { date: '12 mai', product: 'Sandália Macramê Natural', size: '37', value: 165, status: 'pago' },
-  ],
-}
+const catLabel: Record<string, string> = { bolsas: 'Bolsas', roupas: 'Roupas', acessorios: 'Acessórios' }
 
-const statusLabel: Record<SaleStatus, string> = {
+const statusLabel: Record<string, string> = {
   pago: 'confirmado',
   pendente: 'aguardando pagto.',
   processando: 'processando',
 }
 
-// ── histórico de pagamentos (mock) ─────────────────────────────────────────
-const paymentsHistory: { month: string; sales: number; revenue: number; commission: number; payDate: string; status: PayStatus }[] = [
-  { month: 'Maio/26',      sales: 12, revenue: 3640, commission: 546, payDate: '10 jun/26', status: 'pendente' },
-  { month: 'Abril/26',     sales: 9,  revenue: 2820, commission: 423, payDate: '10 mai/26', status: 'pago' },
-  { month: 'Março/26',     sales: 11, revenue: 3180, commission: 477, payDate: '10 abr/26', status: 'pago' },
-  { month: 'Fevereiro/26', sales: 7,  revenue: 1980, commission: 297, payDate: '10 mar/26', status: 'pago' },
-]
+const PT_MONTHS_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
 
-const timeline: { value: string; status: PayStatus; ref: string; dotYellow?: boolean }[] = [
-  { value: 'R$ 546', status: 'pendente', ref: 'Ref. mai/26 · vence 10 jun', dotYellow: true },
-  { value: 'R$ 423', status: 'pago',     ref: 'Ref. abr/26 · pago em 10 mai' },
-  { value: 'R$ 477', status: 'pago',     ref: 'Ref. mar/26 · pago em 10 abr' },
-  { value: 'R$ 297', status: 'pago',     ref: 'Ref. fev/26 · pago em 10 mar' },
-]
-
-// ── produtos para divulgar (mock) ──────────────────────────────────────────
-const products = [
-  { id: 'p1', name: 'Bolsa Bucket Couro Caramelo', category: 'bolsas', slug: 'bolsa-bucket-couro-caramelo', price: 445, isNew: true,  thumbBg: 'linear-gradient(135deg,#e8c99a,#c9a87a)' },
-  { id: 'p2', name: 'Vestido Linho Midi Off-White', category: 'roupas', slug: 'vestido-linho-midi-off-white', price: 310, isNew: true,  thumbBg: 'linear-gradient(135deg,#ede8e0,#d4cfc5)' },
-  { id: 'p3', name: 'Conjunto Saia + Cropped Linho', category: 'roupas', slug: 'conjunto-saia-cropped-linho', price: 385, isNew: true,  thumbBg: 'linear-gradient(135deg,#d6cfc4,#b8b0a4)' },
-  { id: 'p4', name: 'Bolsa Palha Trançada Natural', category: 'bolsas', slug: 'bolsa-palha-trancada-natural', price: 380, isNew: false, thumbBg: 'linear-gradient(135deg,#ddd0b8,#c4b090)' },
-  { id: 'p5', name: 'Bata Algodão Bordada Cru',     category: 'roupas', slug: 'bata-algodao-bordada-cru',     price: 248, isNew: false, thumbBg: 'linear-gradient(135deg,#f0ece4,#e0d8cc)' },
-  { id: 'p6', name: 'Bolsa Tiracolo Couro Preto',   category: 'bolsas', slug: 'bolsa-tiracolo-couro-preto',   price: 298, isNew: false, thumbBg: 'linear-gradient(135deg,#555,#333)' },
-]
-
-const catLabel: Record<string, string> = { bolsas: 'Bolsas', roupas: 'Roupas', acessorios: 'Acessórios' }
+function getPayDate(monthKey: string, paymentDay: number | null): string {
+  const [yearStr, monthStr] = monthKey.split('-')
+  const month = parseInt(monthStr) - 1
+  const nextMonth = month === 11 ? 0 : month + 1
+  const nextYear  = month === 11 ? parseInt(yearStr) + 1 : parseInt(yearStr)
+  const day = paymentDay ?? 10
+  return `${day} ${PT_MONTHS_SHORT[nextMonth]}/${String(nextYear).slice(2)}`
+}
 
 const fmt = (v: number) => `R$${v.toLocaleString('pt-BR')}`
 
@@ -179,39 +97,67 @@ function IconLink() {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-export function AfiliadaContent({ name, commissionPct, paymentDay }: AfiliadaContentProps) {
+export function AfiliadaContent({ name, commissionPct, paymentDay, couponCode, orderHistory }: AfiliadaContentProps) {
+  const router = useRouter()
+  const supabase = createClient()
+
   const firstName = name.split(' ')[0]
   const initials = name.split(' ').map((s: string) => s[0]).slice(0, 2).join('')
 
   const [tab, setTab] = useState<Tab>('resumo')
-  const [period, setPeriod] = useState<PeriodKey>('mai')
-  const [salesPeriod, setSalesPeriod] = useState<PeriodKey>('mai')
+  const [selectedKey, setSelectedKey] = useState<string>(() => orderHistory[0]?.key ?? '')
+  const [salesKey, setSalesKey] = useState<string>(() => orderHistory[0]?.key ?? '')
   const [productFilter, setProductFilter] = useState<ProductFilter>('todos')
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [copiedCoupon, setCopiedCoupon] = useState(false)
   const [copiedProductId, setCopiedProductId] = useState<string | null>(null)
 
-  const p = periodData[period]
-  const maxBar = Math.max(...p.weekBars)
+  const hasOrders = orderHistory.length > 0
+  const currentMonth = orderHistory.find(m => m.key === selectedKey)
+  const currentSalesMonth = orderHistory.find(m => m.key === salesKey)
+  const maxBar = currentMonth ? Math.max(...currentMonth.weekBars, 1) : 1
 
-  const newCount = products.filter(pr => pr.isNew).length
+  const hasCoupon = couponCode !== null
+  const payDayLabel = paymentDay ? `dia ${paymentDay}` : 'dia 10'
+
+  const pendingCommission = orderHistory[0]?.commission ?? 0
+  const pendingPayDate    = orderHistory[0] ? getPayDate(orderHistory[0].key, paymentDay) : '—'
+
+  const paymentsHistory = orderHistory.map((month, i) => ({
+    month: `${month.label}/${month.labelFull.split('/')[1]}`,
+    sales: month.sales,
+    revenue: month.revenue,
+    commission: month.commission,
+    payDate: getPayDate(month.key, paymentDay),
+    status: (i === 0 ? 'pendente' : 'pago') as 'pago' | 'pendente',
+  }))
+
+  const timeline = orderHistory.slice(0, 4).map((month, i) => ({
+    value: fmt(month.commission),
+    status: (i === 0 ? 'pendente' : 'pago') as 'pago' | 'pendente',
+    ref: i === 0
+      ? `Ref. ${month.label.toLowerCase()}/${month.labelFull.split('/')[1]} · vence ${getPayDate(month.key, paymentDay)}`
+      : `Ref. ${month.label.toLowerCase()}/${month.labelFull.split('/')[1]} · pago em ${getPayDate(month.key, paymentDay)}`,
+    dotYellow: i === 0,
+  }))
+
+  const newCount = CATALOG_PRODUCTS.filter(pr => pr.isNew).length
   const favCount = favorites.size
 
-  const visibleProducts = products.filter(pr => {
+  const visibleProducts = CATALOG_PRODUCTS.filter(pr => {
     if (productFilter === 'novidades') return pr.isNew
     if (productFilter === 'favoritos') return favorites.has(pr.id)
     return true
   })
 
-  const payDayLabel = paymentDay ? `dia ${paymentDay}` : 'dia 10'
-
-  // Coupon not yet stored in DB (needs partner_id in coupons table)
-  const coupon = '—'
-  const hasCoupon = false
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push('/afiliada/entrar')
+  }
 
   const copyCoupon = () => {
     if (!hasCoupon) return
-    navigator.clipboard.writeText(coupon).catch(() => {})
+    navigator.clipboard.writeText(couponCode!).catch(() => {})
     setCopiedCoupon(true)
     setTimeout(() => setCopiedCoupon(false), 2000)
   }
@@ -225,7 +171,8 @@ export function AfiliadaContent({ name, commissionPct, paymentDay }: AfiliadaCon
   }
 
   const copyProductLink = (slug: string, id: string) => {
-    const link = `${window.location.origin}/produto/${slug}`
+    const base = `${window.location.origin}/produto/${slug}`
+    const link = hasCoupon ? `${base}?cupom=${couponCode}` : base
     navigator.clipboard.writeText(link).catch(() => {})
     setCopiedProductId(id)
     setTimeout(() => setCopiedProductId(null), 2000)
@@ -245,6 +192,7 @@ export function AfiliadaContent({ name, commissionPct, paymentDay }: AfiliadaCon
           </div>
           <button
             className="btn ghost sm"
+            onClick={handleLogout}
             style={{ border: 'none', color: 'var(--ap-text-3)', padding: '4px 8px' }}
           >
             <IconLogout />
@@ -259,10 +207,14 @@ export function AfiliadaContent({ name, commissionPct, paymentDay }: AfiliadaCon
         {/* Hero */}
         <div className="hero">
           <div className="hero-greeting">Olá, {firstName}</div>
-          <div className="hero-sub">Aqui estão os seus dados de afiliada — {p.labelFull}</div>
+          <div className="hero-sub">
+            {hasOrders && currentMonth
+              ? `Aqui estão os seus dados de afiliada — ${currentMonth.labelFull}`
+              : 'Aqui estão os seus dados de afiliada'}
+          </div>
           <div className="cupom-block">
             <span className="cupom-label">Seu cupom</span>
-            <span className="cupom-code">{coupon}</span>
+            <span className="cupom-code">{couponCode ?? '—'}</span>
             {hasCoupon && (
               <button className="icon-btn" onClick={copyCoupon} title="Copiar código" id="btn-copiar-cupom">
                 {copiedCoupon ? <IconCheck /> : <IconCopy />}
@@ -298,106 +250,145 @@ export function AfiliadaContent({ name, commissionPct, paymentDay }: AfiliadaCon
         {/* ══════════════════════════════ */}
         {tab === 'resumo' && (
           <>
-            <div className="period-row">
-              <span className="section-label">Mês de referência</span>
-              <div className="period-sel">
-                {(['fev', 'mar', 'abr', 'mai'] as const).map(pk => (
-                  <button
-                    key={pk}
-                    className={`period-pill ${period === pk ? 'active' : ''}`}
-                    onClick={() => setPeriod(pk)}
-                  >
-                    {periodData[pk].label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="metrics-grid">
-              <div className="metric-card">
-                <div className="metric-label">Vendas no mês</div>
-                <div className="metric-value num">{p.sales}</div>
-                <div className={`metric-delta ${p.deltaSales >= 0 ? 'up' : 'down'}`}>
-                  {p.deltaSales >= 0 ? '↑' : '↓'} {Math.abs(p.deltaSales)} vs. {p.prevLabel}
-                </div>
-              </div>
-              <div className="metric-card">
-                <div className="metric-label">Receita gerada</div>
-                <div className="metric-value num" style={{ fontSize: 19 }}>{fmt(p.revenue)}</div>
-                <div className={`metric-delta ${p.deltaRevenue >= 0 ? 'up' : 'down'}`}>
-                  {p.deltaRevenue >= 0 ? '↑' : '↓'} {fmt(Math.abs(p.deltaRevenue))} vs. {p.prevLabel}
-                </div>
-              </div>
-              <div className="metric-card">
-                <div className="metric-label">Comissão do mês</div>
-                <div className="metric-value num" style={{ fontSize: 19, color: 'var(--ap-accent)' }}>
-                  {fmt(p.commission)}
-                </div>
-                <div className="metric-delta neu">{commissionPct}% sobre a receita</div>
-              </div>
-            </div>
-
-            <div className="receber-card">
-              <div>
-                <div className="rec-label">total a receber</div>
-                <div className="rec-value">R$ 546</div>
-                <div className="rec-status">
-                  <div className="status-dot yellow" />
-                  <span className="rec-status-text">Pagamento em processamento</span>
-                </div>
-              </div>
-              <div className="rec-right">
-                <div className="rec-pay-label">previsão de pagamento</div>
-                <div className="rec-pay-date">10 jun, 2026</div>
-                <div className="rec-pay-method">via PIX · {payDayLabel} do mês seguinte</div>
-              </div>
-            </div>
-
-            <div className="two-cols">
-              <div className="card">
-                <div className="card-header">
-                  <span className="card-header-title">Vendas por semana</span>
-                  <span style={{ fontSize: 11, color: 'var(--ap-text-3)' }}>{p.labelFull}</span>
-                </div>
-                <div className="card-body">
-                  {p.weekBars.map((count, i) => (
-                    <div className="bar-row" key={i}>
-                      <span className="bar-label">S{i + 1}</span>
-                      <div className="bar-track">
-                        <div className="bar-fill" style={{ width: `${(count / maxBar) * 100}%` }} />
-                      </div>
-                      <span className="bar-count num">{count}</span>
-                    </div>
+            {hasOrders && orderHistory.length > 1 && (
+              <div className="period-row">
+                <span className="section-label">Mês de referência</span>
+                <div className="period-sel">
+                  {orderHistory.map(m => (
+                    <button
+                      key={m.key}
+                      className={`period-pill ${selectedKey === m.key ? 'active' : ''}`}
+                      onClick={() => setSelectedKey(m.key)}
+                    >
+                      {m.label}
+                    </button>
                   ))}
                 </div>
               </div>
+            )}
 
-              <div className="card">
-                <div className="card-header">
-                  <span className="card-header-title">Seus pagamentos</span>
-                </div>
-                <div className="card-body">
-                  {timeline.map((item, i) => (
-                    <div className="tl-item" key={i}>
-                      <div className="tl-left">
-                        <div
-                          className={`tl-dot ${!item.dotYellow && i > 0 ? 'gray' : ''}`}
-                          style={item.dotYellow ? { background: '#fac775' } : undefined}
-                        />
-                        <div className="tl-line" />
+            {hasOrders && currentMonth ? (
+              <>
+                <div className="metrics-grid">
+                  <div className="metric-card">
+                    <div className="metric-label">Vendas no mês</div>
+                    <div className="metric-value num">{currentMonth.sales}</div>
+                    {currentMonth.deltaSales !== 0 && (
+                      <div className={`metric-delta ${currentMonth.deltaSales >= 0 ? 'up' : 'down'}`}>
+                        {currentMonth.deltaSales >= 0 ? '↑' : '↓'} {Math.abs(currentMonth.deltaSales)} vs. {currentMonth.prevLabel}
                       </div>
-                      <div>
-                        <div className="tl-title">
-                          {item.value}
-                          <span className={`badge ${item.status}`}>{item.status}</span>
+                    )}
+                  </div>
+                  <div className="metric-card">
+                    <div className="metric-label">Receita gerada</div>
+                    <div className="metric-value num" style={{ fontSize: 19 }}>{fmt(currentMonth.revenue)}</div>
+                    {currentMonth.deltaRevenue !== 0 && (
+                      <div className={`metric-delta ${currentMonth.deltaRevenue >= 0 ? 'up' : 'down'}`}>
+                        {currentMonth.deltaRevenue >= 0 ? '↑' : '↓'} {fmt(Math.abs(currentMonth.deltaRevenue))} vs. {currentMonth.prevLabel}
+                      </div>
+                    )}
+                  </div>
+                  <div className="metric-card">
+                    <div className="metric-label">Comissão do mês</div>
+                    <div className="metric-value num" style={{ fontSize: 19, color: 'var(--ap-accent)' }}>
+                      {fmt(currentMonth.commission)}
+                    </div>
+                    <div className="metric-delta neu">{commissionPct}% sobre a receita</div>
+                  </div>
+                </div>
+
+                <div className="receber-card">
+                  <div>
+                    <div className="rec-label">total a receber</div>
+                    <div className="rec-value">{fmt(pendingCommission)}</div>
+                    <div className="rec-status">
+                      {pendingCommission > 0 ? (
+                        <>
+                          <div className="status-dot yellow" />
+                          <span className="rec-status-text">Pagamento em processamento</span>
+                        </>
+                      ) : (
+                        <span className="rec-status-text" style={{ color: 'var(--ap-text-3)' }}>
+                          Nenhuma comissão pendente
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="rec-right">
+                    <div className="rec-pay-label">previsão de pagamento</div>
+                    <div className="rec-pay-date">{pendingCommission > 0 ? pendingPayDate : '—'}</div>
+                    <div className="rec-pay-method">via PIX · {payDayLabel} do mês seguinte</div>
+                  </div>
+                </div>
+
+                <div className="two-cols">
+                  <div className="card">
+                    <div className="card-header">
+                      <span className="card-header-title">Vendas por semana</span>
+                      <span style={{ fontSize: 11, color: 'var(--ap-text-3)' }}>{currentMonth.labelFull}</span>
+                    </div>
+                    <div className="card-body">
+                      {currentMonth.weekBars.map((count, i) => (
+                        <div className="bar-row" key={i}>
+                          <span className="bar-label">S{i + 1}</span>
+                          <div className="bar-track">
+                            <div className="bar-fill" style={{ width: `${(count / maxBar) * 100}%` }} />
+                          </div>
+                          <span className="bar-count num">{count}</span>
                         </div>
-                        <div className="tl-meta">{item.ref}</div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+
+                  <div className="card">
+                    <div className="card-header">
+                      <span className="card-header-title">Seus pagamentos</span>
+                    </div>
+                    <div className="card-body">
+                      {timeline.length > 0 ? timeline.map((item, i) => (
+                        <div className="tl-item" key={i}>
+                          <div className="tl-left">
+                            <div
+                              className={`tl-dot ${!item.dotYellow && i > 0 ? 'gray' : ''}`}
+                              style={item.dotYellow ? { background: '#fac775' } : undefined}
+                            />
+                            <div className="tl-line" />
+                          </div>
+                          <div>
+                            <div className="tl-title">
+                              {item.value}
+                              <span className={`badge ${item.status}`}>{item.status}</span>
+                            </div>
+                            <div className="tl-meta">{item.ref}</div>
+                          </div>
+                        </div>
+                      )) : (
+                        <p style={{ fontSize: 12, color: 'var(--ap-text-3)', margin: 0 }}>
+                          Nenhum pagamento ainda.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div style={{
+                textAlign: 'center',
+                padding: '48px 20px',
+                background: 'var(--ap-bg)',
+                borderRadius: 12,
+                border: '1px solid var(--ap-border)',
+              }}>
+                <div style={{ fontSize: 13, color: 'var(--ap-text-2)', marginBottom: 8, fontWeight: 500 }}>
+                  Nenhuma venda registrada ainda
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--ap-text-3)' }}>
+                  {hasCoupon
+                    ? `Compartilhe o cupom ${couponCode} com seus seguidores para começar.`
+                    : 'Aguarde o Henrique configurar seu cupom no painel.'}
                 </div>
               </div>
-            </div>
+            )}
           </>
         )}
 
@@ -406,75 +397,94 @@ export function AfiliadaContent({ name, commissionPct, paymentDay }: AfiliadaCon
         {/* ══════════════════════════════ */}
         {tab === 'vendas' && (
           <>
-            <div className="period-row" style={{ marginBottom: 14 }}>
-              <span className="section-label">Mês</span>
-              <div className="period-sel">
-                {(['fev', 'mar', 'abr', 'mai'] as const).map(pk => (
-                  <button
-                    key={pk}
-                    className={`period-pill ${salesPeriod === pk ? 'active' : ''}`}
-                    onClick={() => setSalesPeriod(pk)}
-                  >
-                    {periodData[pk].label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="card-header">
-                <span className="card-header-title">Vendas com seu cupom</span>
-                <span style={{ fontSize: 11, color: 'var(--ap-text-3)' }}>
-                  {periodData[salesPeriod].sales} vendas em {periodData[salesPeriod].labelFull}
-                </span>
-              </div>
-              <div className="card-body flush">
-                <div className="table-wrap">
-                  <table className="tbl">
-                    <thead>
-                      <tr>
-                        <th>Data</th>
-                        <th>Produto</th>
-                        <th>Tamanho</th>
-                        <th style={{ textAlign: 'right' }}>Valor</th>
-                        <th style={{ textAlign: 'right' }}>Comissão</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {salesByPeriod[salesPeriod].map((s, i) => (
-                        <tr key={i}>
-                          <td className="num" style={{ color: 'var(--ap-text-3)' }}>{s.date}</td>
-                          <td>{s.product}</td>
-                          <td style={{ color: 'var(--ap-text-3)' }}>{s.size}</td>
-                          <td className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(s.value)}</td>
-                          <td className="num" style={{ textAlign: 'right', color: 'var(--ap-accent)', fontWeight: 500 }}>
-                            {fmt(Math.round(s.value * commissionPct / 100))}
-                          </td>
-                          <td>
-                            <span className={`badge ${s.status}`}>{statusLabel[s.status]}</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr style={{ borderTop: '1px solid var(--ap-border)' }}>
-                        <td colSpan={3} style={{ fontSize: 12, color: 'var(--ap-text-2)', fontWeight: 500 }}>
-                          Total do mês ({periodData[salesPeriod].sales} vendas)
-                        </td>
-                        <td className="num" style={{ textAlign: 'right', fontWeight: 600 }}>
-                          {fmt(periodData[salesPeriod].revenue)}
-                        </td>
-                        <td className="num" style={{ textAlign: 'right', fontWeight: 700, color: 'var(--ap-accent)' }}>
-                          {fmt(periodData[salesPeriod].commission)}
-                        </td>
-                        <td />
-                      </tr>
-                    </tfoot>
-                  </table>
+            {hasOrders && orderHistory.length > 1 && (
+              <div className="period-row" style={{ marginBottom: 14 }}>
+                <span className="section-label">Mês</span>
+                <div className="period-sel">
+                  {orderHistory.map(m => (
+                    <button
+                      key={m.key}
+                      className={`period-pill ${salesKey === m.key ? 'active' : ''}`}
+                      onClick={() => setSalesKey(m.key)}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
                 </div>
               </div>
-            </div>
+            )}
+
+            {hasOrders && currentSalesMonth ? (
+              <div className="card">
+                <div className="card-header">
+                  <span className="card-header-title">Vendas com seu cupom</span>
+                  <span style={{ fontSize: 11, color: 'var(--ap-text-3)' }}>
+                    {currentSalesMonth.sales} {currentSalesMonth.sales === 1 ? 'venda' : 'vendas'} em {currentSalesMonth.labelFull}
+                  </span>
+                </div>
+                <div className="card-body flush">
+                  <div className="table-wrap">
+                    <table className="tbl">
+                      <thead>
+                        <tr>
+                          <th>Data</th>
+                          <th>Produto</th>
+                          <th>Tamanho</th>
+                          <th style={{ textAlign: 'right' }}>Valor</th>
+                          <th style={{ textAlign: 'right' }}>Comissão</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {currentSalesMonth.items.map((s, i) => (
+                          <tr key={i}>
+                            <td className="num" style={{ color: 'var(--ap-text-3)' }}>{s.date}</td>
+                            <td>{s.product}</td>
+                            <td style={{ color: 'var(--ap-text-3)' }}>{s.size}</td>
+                            <td className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(s.value)}</td>
+                            <td className="num" style={{ textAlign: 'right', color: 'var(--ap-accent)', fontWeight: 500 }}>
+                              {fmt(Math.round(s.value * commissionPct / 100))}
+                            </td>
+                            <td>
+                              <span className={`badge ${s.status}`}>{statusLabel[s.status]}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ borderTop: '1px solid var(--ap-border)' }}>
+                          <td colSpan={3} style={{ fontSize: 12, color: 'var(--ap-text-2)', fontWeight: 500 }}>
+                            Total do mês ({currentSalesMonth.sales} {currentSalesMonth.sales === 1 ? 'venda' : 'vendas'})
+                          </td>
+                          <td className="num" style={{ textAlign: 'right', fontWeight: 600 }}>
+                            {fmt(currentSalesMonth.revenue)}
+                          </td>
+                          <td className="num" style={{ textAlign: 'right', fontWeight: 700, color: 'var(--ap-accent)' }}>
+                            {fmt(currentSalesMonth.commission)}
+                          </td>
+                          <td />
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                textAlign: 'center',
+                padding: '48px 20px',
+                background: 'var(--ap-bg)',
+                borderRadius: 12,
+                border: '1px solid var(--ap-border)',
+              }}>
+                <div style={{ fontSize: 13, color: 'var(--ap-text-2)', marginBottom: 8, fontWeight: 500 }}>
+                  Nenhuma venda registrada ainda
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--ap-text-3)' }}>
+                  As vendas feitas com o seu cupom aparecerão aqui.
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -483,58 +493,75 @@ export function AfiliadaContent({ name, commissionPct, paymentDay }: AfiliadaCon
         {/* ══════════════════════════════ */}
         {tab === 'pagamentos' && (
           <>
-            <div className="card">
-              <div className="card-header">
-                <span className="card-header-title">Histórico de pagamentos</span>
-                <span style={{ fontSize: 11, color: 'var(--ap-text-3)' }}>
-                  {fmt(paymentsHistory.reduce((s, ph) => s + ph.commission, 0))} recebidos no total
-                </span>
-              </div>
-              <div className="card-body flush">
-                <div className="table-wrap">
-                  <table className="tbl">
-                    <thead>
-                      <tr>
-                        <th>Mês ref.</th>
-                        <th style={{ textAlign: 'right' }}>Vendas</th>
-                        <th style={{ textAlign: 'right' }}>Receita gerada</th>
-                        <th style={{ textAlign: 'right' }}>Sua comissão</th>
-                        <th>Pagamento</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paymentsHistory.map((ph, i) => (
-                        <tr key={i}>
-                          <td style={{ fontWeight: 500 }}>{ph.month}</td>
-                          <td className="num" style={{ textAlign: 'right' }}>{ph.sales}</td>
-                          <td className="num" style={{ textAlign: 'right' }}>{fmt(ph.revenue)}</td>
-                          <td
-                            className="num"
-                            style={{
-                              textAlign: 'right',
-                              fontWeight: 600,
-                              color: ph.status === 'pendente' ? 'var(--ap-accent)' : undefined,
-                            }}
-                          >
-                            {fmt(ph.commission)}
-                          </td>
-                          <td className="num" style={{ color: 'var(--ap-text-3)' }}>{ph.payDate}</td>
-                          <td>
-                            <span className={`badge ${ph.status}`}>{ph.status}</span>
-                          </td>
+            {paymentsHistory.length > 0 ? (
+              <div className="card">
+                <div className="card-header">
+                  <span className="card-header-title">Histórico de pagamentos</span>
+                  <span style={{ fontSize: 11, color: 'var(--ap-text-3)' }}>
+                    {fmt(paymentsHistory.filter(ph => ph.status === 'pago').reduce((s, ph) => s + ph.commission, 0))} recebidos no total
+                  </span>
+                </div>
+                <div className="card-body flush">
+                  <div className="table-wrap">
+                    <table className="tbl">
+                      <thead>
+                        <tr>
+                          <th>Mês ref.</th>
+                          <th style={{ textAlign: 'right' }}>Vendas</th>
+                          <th style={{ textAlign: 'right' }}>Receita gerada</th>
+                          <th style={{ textAlign: 'right' }}>Sua comissão</th>
+                          <th>Pagamento</th>
+                          <th>Status</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {paymentsHistory.map((ph, i) => (
+                          <tr key={i}>
+                            <td style={{ fontWeight: 500 }}>{ph.month}</td>
+                            <td className="num" style={{ textAlign: 'right' }}>{ph.sales}</td>
+                            <td className="num" style={{ textAlign: 'right' }}>{fmt(ph.revenue)}</td>
+                            <td
+                              className="num"
+                              style={{
+                                textAlign: 'right',
+                                fontWeight: 600,
+                                color: ph.status === 'pendente' ? 'var(--ap-accent)' : undefined,
+                              }}
+                            >
+                              {fmt(ph.commission)}
+                            </td>
+                            <td className="num" style={{ color: 'var(--ap-text-3)' }}>{ph.payDate}</td>
+                            <td>
+                              <span className={`badge ${ph.status}`}>{ph.status}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div style={{
+                textAlign: 'center',
+                padding: '48px 20px',
+                background: 'var(--ap-bg)',
+                borderRadius: 12,
+                border: '1px solid var(--ap-border)',
+                marginBottom: 16,
+              }}>
+                <div style={{ fontSize: 13, color: 'var(--ap-text-2)', marginBottom: 8, fontWeight: 500 }}>
+                  Nenhum pagamento ainda
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--ap-text-3)' }}>
+                  Seu histórico de comissões aparecerá aqui conforme as vendas forem confirmadas.
+                </div>
+              </div>
+            )}
 
             <div className="card">
               <div className="card-header">
                 <span className="card-header-title">Dados para recebimento</span>
-                <button className="btn ghost sm">Editar</button>
               </div>
               <div className="card-body">
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, fontSize: 13 }}>
@@ -561,14 +588,15 @@ export function AfiliadaContent({ name, commissionPct, paymentDay }: AfiliadaCon
           <>
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 13, color: 'var(--ap-text-2)', marginBottom: 14 }}>
-                Escolha os produtos que quer divulgar e copie o link com o seu cupom já incluído.
+                Escolha os produtos que quer divulgar e copie o link
+                {hasCoupon ? ' com o seu cupom já incluído.' : '.'}
               </div>
               <div className="products-filter">
                 <button
                   className={`filter-pill ${productFilter === 'todos' ? 'active' : ''}`}
                   onClick={() => setProductFilter('todos')}
                 >
-                  Todos ({products.length})
+                  Todos ({CATALOG_PRODUCTS.length})
                 </button>
                 <button
                   className={`filter-pill ${productFilter === 'novidades' ? 'active' : ''}`}
