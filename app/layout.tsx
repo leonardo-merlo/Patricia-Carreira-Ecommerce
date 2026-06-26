@@ -21,7 +21,17 @@ export const metadata: Metadata = {
   title: 'Patrícia Carreira',
   description: "Moda artesanal brasileira — bolsas, vestidos e batas feitos à mão. Presentes em Arraial d'Ajuda, BA e em todo o Brasil.",
   openGraph: {
-    images: ['/og-image.jpg'],
+    title: 'Patrícia Carreira',
+    description: "Moda artesanal brasileira — bolsas, vestidos e batas feitos à mão. Presentes em Arraial d'Ajuda, BA e em todo o Brasil.",
+    url: 'https://patriciacarreira.com.br',
+    siteName: 'Patrícia Carreira',
+    locale: 'pt_BR',
+    type: 'website',
+    images: ['/images/refs2/hero-oficial.png'],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: ['/images/refs2/hero-oficial.png'],
   },
 }
 

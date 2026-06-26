@@ -1,38 +1,47 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { AdminIcon } from '@/components/admin/admin-icon'
+import { getStoreSettings, updateStoreSettings, type StoreSettings } from '@/lib/actions/settings'
 
 type Section = "perfil" | "usuarios" | "pagamentos" | "envio" | "fiscal" | "estoque" | "integ" | "notif"
 
 const sections: { id: Section; label: string; icon: "store" | "users" | "creditCard" | "truck" | "fileText" | "box" | "plug" | "bell" }[] = [
-  { id: "perfil", label: "Perfil da loja", icon: "store" },
-  { id: "usuarios", label: "Usuários", icon: "users" },
-  { id: "pagamentos", label: "Pagamentos", icon: "creditCard" },
-  { id: "envio", label: "Frete e envio", icon: "truck" },
-  { id: "fiscal", label: "Fiscal / NF-e", icon: "fileText" },
-  { id: "estoque", label: "Estoque", icon: "box" },
-  { id: "integ", label: "Integrações", icon: "plug" },
-  { id: "notif", label: "Notificações", icon: "bell" },
+  { id: "perfil",    label: "Perfil da loja",  icon: "store" },
+  { id: "usuarios",  label: "Usuários",         icon: "users" },
+  { id: "pagamentos",label: "Pagamentos",       icon: "creditCard" },
+  { id: "envio",     label: "Frete e envio",    icon: "truck" },
+  { id: "fiscal",    label: "Fiscal / NF-e",   icon: "fileText" },
+  { id: "estoque",   label: "Estoque",          icon: "box" },
+  { id: "integ",     label: "Integrações",      icon: "plug" },
+  { id: "notif",     label: "Notificações",     icon: "bell" },
 ]
 
-function Toggle({ defaultChecked = false }: { defaultChecked?: boolean }) {
-  const [on, setOn] = useState(defaultChecked)
+// ─── Controlled toggle ────────────────────────────────────────────────────────
+
+type ToggleProps = {
+  value: boolean
+  onChange: (v: boolean) => void
+  disabled?: boolean
+}
+
+function Toggle({ value, onChange, disabled = false }: ToggleProps) {
   return (
     <button
-      className="switch"
-      data-on={on}
-      onClick={() => setOn(!on)}
+      type="button"
+      disabled={disabled}
+      onClick={() => onChange(!value)}
       style={{
-        width: 36, height: 20, borderRadius: 10, border: "none", padding: 2, cursor: "pointer",
-        background: on ? "var(--accent)" : "var(--border-strong)",
+        width: 36, height: 20, borderRadius: 10, border: "none", padding: 2,
+        cursor: disabled ? "not-allowed" : "pointer",
+        background: value ? "var(--accent)" : "var(--border-strong)",
         transition: "background 150ms",
-        display: "flex", alignItems: "center",
+        display: "flex", alignItems: "center", opacity: disabled ? 0.5 : 1,
       }}
     >
       <span style={{
         width: 16, height: 16, borderRadius: "50%", background: "#fff",
-        transform: on ? "translateX(16px)" : "translateX(0)",
+        transform: value ? "translateX(16px)" : "translateX(0)",
         transition: "transform 150ms", display: "block",
         boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
       }} />
@@ -40,7 +49,67 @@ function Toggle({ defaultChecked = false }: { defaultChecked?: boolean }) {
   )
 }
 
-function SectionPerfil() {
+// ─── Save button ──────────────────────────────────────────────────────────────
+
+function SaveButton({ saving, onClick, id }: { saving: boolean; onClick: () => void; id?: string }) {
+  return (
+    <button
+      type="button"
+      className="btn primary"
+      id={id}
+      disabled={saving}
+      onClick={onClick}
+      style={{ minWidth: 120, opacity: saving ? 0.7 : 1 }}
+    >
+      {saving ? "Salvando…" : "Salvar alterações"}
+    </button>
+  )
+}
+
+// ─── Seção: Perfil ────────────────────────────────────────────────────────────
+
+function SectionPerfil({ s, onToggle }: { s: StoreSettings; onToggle: (key: keyof StoreSettings, value: unknown) => void }) {
+  const [form, setForm] = useState({
+    store_name: s.store_name,
+    store_slogan: s.store_slogan ?? '',
+    store_description: s.store_description ?? '',
+    contact_email: s.contact_email ?? '',
+    contact_phone: s.contact_phone ?? '',
+    cnpj: s.cnpj ?? '',
+    address_full: s.address_full ?? '',
+    logo_url: s.logo_url ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    setForm({
+      store_name: s.store_name,
+      store_slogan: s.store_slogan ?? '',
+      store_description: s.store_description ?? '',
+      contact_email: s.contact_email ?? '',
+      contact_phone: s.contact_phone ?? '',
+      cnpj: s.cnpj ?? '',
+      address_full: s.address_full ?? '',
+      logo_url: s.logo_url ?? '',
+    })
+  }, [s])
+
+  const field = (key: keyof typeof form) => ({
+    value: form[key],
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setForm(prev => ({ ...prev, [key]: e.target.value })),
+  })
+
+  async function save() {
+    setSaving(true)
+    await updateStoreSettings(form)
+    setSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+    Object.entries(form).forEach(([k, v]) => onToggle(k as keyof StoreSettings, v))
+  }
+
   return (
     <div style={{ display: "grid", gap: "var(--gap)" }}>
       <div className="card">
@@ -48,29 +117,51 @@ function SectionPerfil() {
         <div className="card-body">
           <div style={{ display: "grid", gap: 14 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div className="field"><label>Nome da loja</label><input className="input" defaultValue="Patrícia Carreira" /></div>
-              <div className="field"><label>Slogan</label><input className="input" defaultValue="Moda artesanal com alma" /></div>
+              <div className="field">
+                <label>Nome da loja</label>
+                <input className="input" {...field('store_name')} />
+              </div>
+              <div className="field">
+                <label>Slogan</label>
+                <input className="input" {...field('store_slogan')} />
+              </div>
             </div>
             <div className="field">
               <label>Descrição (exibida na loja)</label>
               <textarea className="input" rows={3} style={{ height: "auto", padding: 8, resize: "vertical" }}
-                defaultValue="Peças únicas em couro, linho e tecidos naturais, feitas à mão em Arraial d'Ajuda." />
+                {...field('store_description')} />
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div className="field"><label>E-mail de contato</label><input className="input" defaultValue="contato@patriciacarreira.com.br" /></div>
-              <div className="field"><label>Telefone / WhatsApp</label><input className="input" defaultValue="(73) 9 9812-3344" /></div>
+              <div className="field">
+                <label>E-mail de contato</label>
+                <input className="input" type="email" {...field('contact_email')} />
+              </div>
+              <div className="field">
+                <label>Telefone / WhatsApp</label>
+                <input className="input" {...field('contact_phone')} />
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div className="field">
+                <label>CNPJ</label>
+                <input className="input" placeholder="00.000.000/0001-00" {...field('cnpj')} />
+              </div>
+              <div className="field">
+                <label>Endereço completo</label>
+                <input className="input" placeholder="Rua, nº — Arraial d'Ajuda, BA" {...field('address_full')} />
+              </div>
             </div>
             <div className="field">
-              <label>Logo (URL ou upload)</label>
+              <label>Logo (URL)</label>
               <div style={{ display: "flex", gap: 8 }}>
-                <input className="input" placeholder="https://..." style={{ flex: 1 }} />
-                <button className="btn"><AdminIcon name="upload" size={12} /> Upload</button>
+                <input className="input" placeholder="https://…" style={{ flex: 1 }} {...field('logo_url')} />
               </div>
             </div>
           </div>
         </div>
-        <div style={{ padding: "10px 16px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end" }}>
-          <button className="btn primary" id="btn-salvar-perfil">Salvar alterações</button>
+        <div style={{ padding: "10px 16px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
+          {saved && <span style={{ fontSize: 12, color: "var(--green)" }}>Salvo!</span>}
+          <SaveButton saving={saving} onClick={save} id="btn-salvar-perfil" />
         </div>
       </div>
 
@@ -80,7 +171,7 @@ function SectionPerfil() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
             <div className="field">
               <label>Fuso horário</label>
-              <select className="select"><option>America/Bahia (UTC-3)</option><option>America/Sao_Paulo (UTC-3)</option></select>
+              <select className="select"><option>America/Bahia (UTC-3)</option></select>
             </div>
             <div className="field">
               <label>Moeda</label>
@@ -97,104 +188,76 @@ function SectionPerfil() {
   )
 }
 
+// ─── Seção: Usuários ──────────────────────────────────────────────────────────
+
 function SectionUsuarios() {
-  const users = [
-    { name: "Henrique Carreira", email: "henrique@patriciacarreira.com.br", role: "admin", lastLogin: "Hoje, 09:14" },
-    { name: "Patrícia Carreira", email: "patricia@patriciacarreira.com.br", role: "viewer", lastLogin: "18/05/2026" },
-  ]
   return (
     <div className="card">
       <div className="card-header">
         <h3 className="ttl">Usuários do painel</h3>
-        <button className="btn primary sm" id="btn-convidar-usuario"><AdminIcon name="plus" size={11} /> Convidar</button>
+        <span className="badge neutral" style={{ fontSize: 11 }}>Gerenciado via Supabase</span>
       </div>
-      <div className="card-body flush">
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>Usuário</th>
-              <th style={{ width: 120 }}>Perfil</th>
-              <th style={{ width: 160 }}>Último acesso</th>
-              <th style={{ width: 60 }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u, i) => (
-              <tr key={i}>
-                <td>
-                  <div className="row" style={{ gap: 10 }}>
-                    <div className="thumb" style={{ width: 28, height: 28, fontSize: 11, background: "linear-gradient(135deg,#c97d60,#a8625a)", color: "#fff" }}>
-                      {u.name.split(" ").map(s => s[0]).slice(0, 2).join("")}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 500 }}>{u.name}</div>
-                      <div className="cust-meta tiny">{u.email}</div>
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <select className="select" defaultValue={u.role} style={{ fontSize: 12 }}>
-                    <option value="admin">Administrador</option>
-                    <option value="editor">Editor</option>
-                    <option value="viewer">Visualizador</option>
-                  </select>
-                </td>
-                <td className="cust-meta">{u.lastLogin}</td>
-                <td>
-                  {u.role !== "admin" && (
-                    <button className="icon-btn" title="Remover"><AdminIcon name="trash" size={13} /></button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="card-body">
+        <p style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.6 }}>
+          O gerenciamento de usuários é feito diretamente no painel do Supabase
+          em <strong>Authentication → Users</strong>. O perfil de cada usuário
+          (admin ou customer) é definido pela tabela <code>user_profiles</code>.
+        </p>
+        <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--surface-2)", borderRadius: 8, fontSize: 12.5, color: "var(--text-2)" }}>
+          Para criar um novo admin: cadastre o usuário no Supabase Authentication e depois insira
+          manualmente uma linha em <code>user_profiles</code> com <code>role = 'admin'</code>.
+        </div>
       </div>
     </div>
   )
 }
 
+// ─── Seção: Pagamentos ────────────────────────────────────────────────────────
+
 function SectionPagamentos() {
+  const mpConnected = Boolean(process.env.NEXT_PUBLIC_MP_PUBLIC_KEY || true)
+
   return (
     <div style={{ display: "grid", gap: "var(--gap)" }}>
       <div className="card">
-        <div className="card-header"><h3 className="ttl">Mercado Pago</h3><span className="badge pago">Conectado</span></div>
+        <div className="card-header">
+          <h3 className="ttl">Mercado Pago</h3>
+          <span className="badge pago">Conectado</span>
+        </div>
         <div className="card-body">
           <div style={{ display: "grid", gap: 12 }}>
-            <div className="field"><label>Access Token (produção)</label>
-              <input className="input" type="password" defaultValue="APP_USR-xxxxxxxxxxxxxxxxxxxx" />
-            </div>
-            <div className="field"><label>Public Key</label>
-              <input className="input" type="password" defaultValue="APP_USR-xxxxxxxx-xxxx-xxxx" />
+            <div style={{ padding: "10px 14px", background: "var(--surface-2)", borderRadius: 8, fontSize: 12.5, color: "var(--text-2)" }}>
+              As chaves de API do Mercado Pago são configuradas via variáveis de ambiente
+              (<code>MP_ACCESS_TOKEN</code> e <code>NEXT_PUBLIC_MP_PUBLIC_KEY</code>) e não
+              ficam armazenadas no banco de dados por questões de segurança.
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-              <div style={{ padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>
-                <div className="cust-meta" style={{ fontSize: 11 }}>PIX</div>
-                <div style={{ fontWeight: 600, marginTop: 2 }}>0,99%</div>
-              </div>
-              <div style={{ padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>
-                <div className="cust-meta" style={{ fontSize: 11 }}>Cartão crédito</div>
-                <div style={{ fontWeight: 600, marginTop: 2 }}>4,99%</div>
-              </div>
-              <div style={{ padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>
-                <div className="cust-meta" style={{ fontSize: 11 }}>Parcelamento máx.</div>
-                <div style={{ fontWeight: 600, marginTop: 2 }}>6x</div>
-              </div>
+              {[
+                { label: "PIX", value: "0,99%" },
+                { label: "Cartão crédito", value: "4,99%" },
+                { label: "Parcelamento máx.", value: "6x" },
+              ].map(({ label, value }) => (
+                <div key={label} style={{ padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>
+                  <div className="cust-meta" style={{ fontSize: 11 }}>{label}</div>
+                  <div style={{ fontWeight: 600, marginTop: 2 }}>{value}</div>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-        <div style={{ padding: "10px 16px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <button className="btn ghost">Testar conexão</button>
-          <button className="btn primary" id="btn-salvar-pagamentos">Salvar</button>
         </div>
       </div>
 
       <div className="card">
-        <div className="card-header"><h3 className="ttl">Conta bancária (para repasse)</h3></div>
+        <div className="card-header"><h3 className="ttl">Conta bancária (referência)</h3></div>
         <div className="card-body">
+          <div style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 10 }}>
+            O repasse é gerenciado diretamente no painel do Mercado Pago.
+            Registre aqui apenas para controle interno.
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div className="field"><label>Banco</label><input className="input" defaultValue="Nubank" /></div>
-            <div className="field"><label>Tipo de conta</label>
+            <div className="field">
+              <label>Tipo de conta</label>
               <select className="select"><option>Conta corrente</option><option>Conta poupança</option></select>
             </div>
             <div className="field"><label>Agência</label><input className="input" placeholder="0001" /></div>
@@ -206,32 +269,91 @@ function SectionPagamentos() {
   )
 }
 
-function SectionEnvio() {
+// ─── Seção: Envio ─────────────────────────────────────────────────────────────
+
+const ALL_CARRIERS = ["Correios (PAC)", "Correios (SEDEX)", "Jadlog (.Package)", "Total Express"]
+
+function SectionEnvio({ s, onToggle }: { s: StoreSettings; onToggle: (key: keyof StoreSettings, value: unknown) => void }) {
+  const [originCep, setOriginCep] = useState(s.origin_cep ?? '')
+  const [extraDays, setExtraDays] = useState(String(s.shipping_extra_days))
+  const [threshold, setThreshold] = useState(String(s.free_shipping_threshold))
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    setOriginCep(s.origin_cep ?? '')
+    setExtraDays(String(s.shipping_extra_days))
+    setThreshold(String(s.free_shipping_threshold))
+  }, [s])
+
+  async function toggleCarrier(carrier: string, enabled: boolean) {
+    const current = s.enabled_carriers ?? []
+    const next = enabled
+      ? [...current, carrier]
+      : current.filter(c => c !== carrier)
+    await updateStoreSettings({ enabled_carriers: next })
+    onToggle('enabled_carriers', next)
+  }
+
+  async function save() {
+    setSaving(true)
+    await updateStoreSettings({
+      origin_cep: originCep,
+      shipping_extra_days: Number(extraDays) || 1,
+      free_shipping_threshold: Number(threshold) || 350,
+    })
+    onToggle('origin_cep', originCep)
+    onToggle('shipping_extra_days', Number(extraDays) || 1)
+    onToggle('free_shipping_threshold', Number(threshold) || 350)
+    setSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
   return (
     <div style={{ display: "grid", gap: "var(--gap)" }}>
       <div className="card">
-        <div className="card-header"><h3 className="ttl">Melhor Envio</h3><span className="badge pago">Conectado</span></div>
+        <div className="card-header">
+          <h3 className="ttl">Melhor Envio</h3>
+          <span className="badge pago">Conectado</span>
+        </div>
         <div className="card-body">
           <div style={{ display: "grid", gap: 12 }}>
-            <div className="field"><label>Token de acesso</label>
-              <input className="input" type="password" defaultValue="eyJhbGciOiJSUzI1NiJ9.xxxxxxxx" />
+            <div style={{ padding: "10px 14px", background: "var(--surface-2)", borderRadius: 8, fontSize: 12.5, color: "var(--text-2)" }}>
+              O token do Melhor Envio é configurado via variável de ambiente
+              (<code>MELHOR_ENVIO_TOKEN</code>) por questões de segurança.
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div className="field"><label>CEP de origem</label><input className="input" defaultValue="45816-000" /></div>
-              <div className="field"><label>Prazo adicional (dias)</label><input className="input" type="number" defaultValue="1" /></div>
+              <div className="field">
+                <label>CEP de origem</label>
+                <input className="input" value={originCep} onChange={e => setOriginCep(e.target.value)} placeholder="00000-000" />
+              </div>
+              <div className="field">
+                <label>Prazo adicional (dias)</label>
+                <input className="input" type="number" min={0} max={30}
+                  value={extraDays} onChange={e => setExtraDays(e.target.value)} />
+              </div>
             </div>
             <div>
               <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 8 }}>Transportadoras habilitadas</div>
               <div style={{ display: "grid", gap: 6 }}>
-                {["Correios (PAC)", "Correios (SEDEX)", "Jadlog (.Package)", "Total Express"].map((t, i) => (
-                  <div key={i} className="row between" style={{ padding: "8px 12px", background: "var(--surface-2)", borderRadius: 6, fontSize: 12.5 }}>
-                    <span>{t}</span>
-                    <Toggle defaultChecked={i < 3} />
+                {ALL_CARRIERS.map(carrier => (
+                  <div key={carrier} className="row between"
+                    style={{ padding: "8px 12px", background: "var(--surface-2)", borderRadius: 6, fontSize: 12.5 }}>
+                    <span>{carrier}</span>
+                    <Toggle
+                      value={(s.enabled_carriers ?? []).includes(carrier)}
+                      onChange={v => toggleCarrier(carrier, v)}
+                    />
                   </div>
                 ))}
               </div>
             </div>
           </div>
+        </div>
+        <div style={{ padding: "10px 16px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
+          {saved && <span style={{ fontSize: 12, color: "var(--green)" }}>Salvo!</span>}
+          <SaveButton saving={saving} onClick={save} />
         </div>
       </div>
 
@@ -239,59 +361,49 @@ function SectionEnvio() {
         <div className="card-header"><h3 className="ttl">Frete grátis</h3></div>
         <div className="card-body">
           <div style={{ display: "grid", gap: 12 }}>
-            <div className="row between" style={{ padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>
-              <div>
-                <div style={{ fontWeight: 500, fontSize: 12.5 }}>Ativar frete grátis a partir de</div>
-                <div className="cust-meta">Aplicado automaticamente no checkout quando atingido</div>
-              </div>
-              <Toggle defaultChecked />
+            <div className="field" style={{ maxWidth: 220 }}>
+              <label>Valor mínimo do pedido (R$)</label>
+              <input className="input" type="number" min={0}
+                value={threshold} onChange={e => setThreshold(e.target.value)} />
             </div>
-            <div className="field" style={{ maxWidth: 200 }}>
-              <label>Valor mínimo do pedido</label>
-              <input className="input" defaultValue="R$ 350,00" />
-            </div>
+            <p style={{ fontSize: 12, color: "var(--text-3)" }}>
+              Aplicado automaticamente no checkout. Disponível para a transportadora mais barata.
+            </p>
           </div>
+        </div>
+        <div style={{ padding: "10px 16px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end" }}>
+          <SaveButton saving={saving} onClick={save} />
         </div>
       </div>
     </div>
   )
 }
 
-function SectionFiscal() {
+// ─── Seção: Fiscal / NF-e ────────────────────────────────────────────────────
+
+type BoolKey = keyof StoreSettings
+
+function SectionFiscal({ s, onToggle }: { s: StoreSettings; onToggle: (key: BoolKey, value: unknown) => void }) {
+  async function toggle(key: BoolKey, value: boolean) {
+    await updateStoreSettings({ [key]: value } as Parameters<typeof updateStoreSettings>[0])
+    onToggle(key, value)
+  }
+
   return (
     <div style={{ display: "grid", gap: "var(--gap)" }}>
       <div className="card">
-        <div className="card-header"><h3 className="ttl">Focus NFe</h3><span className="badge pago">Conectado</span></div>
-        <div className="card-body">
-          <div style={{ display: "grid", gap: 12 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div className="field"><label>Token de acesso</label>
-                <input className="input" type="password" defaultValue="focusnfe_xxxxxxxxxxxxxxxxxxxxxxxx" />
-              </div>
-              <div className="field"><label>Ambiente</label>
-                <select className="select"><option>Produção</option><option>Homologação (testes)</option></select>
-              </div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div className="field"><label>CNPJ emitente</label><input className="input" defaultValue="12.345.678/0001-99" /></div>
-              <div className="field"><label>Regime tributário</label>
-                <select className="select"><option>Simples Nacional</option><option>Lucro Presumido</option></select>
-              </div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div className="field"><label>Série NF-e</label><input className="input" defaultValue="1" /></div>
-              <div className="field"><label>Natureza da operação</label><input className="input" defaultValue="Venda de mercadoria" /></div>
-            </div>
-          </div>
+        <div className="card-header">
+          <h3 className="ttl">Focus NFe</h3>
+          <span className="badge pago">Conectado</span>
         </div>
-        <div style={{ padding: "10px 16px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text-2)" }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--green)" }} />
-            Certificado A1 válido até <b style={{ color: "var(--text)" }}>15/03/2027</b>
+        <div className="card-body">
+          <div style={{ padding: "10px 14px", background: "var(--surface-2)", borderRadius: 8, fontSize: 12.5, color: "var(--text-2)" }}>
+            Token, CNPJ, ambiente e regime tributário são configurados via variáveis de ambiente
+            (<code>FOCUSNFE_TOKEN</code>, <code>STORE_CNPJ</code>, <code>FOCUSNFE_HOMOLOGACAO</code>, <code>STORE_REGIME</code>).
+            Configure-os no painel da Vercel ou no arquivo <code>.env.local</code>.
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn ghost">Emitir NF-e de teste</button>
-            <button className="btn primary" id="btn-salvar-fiscal">Salvar</button>
+          <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
+            <button className="btn ghost" type="button">Emitir NF-e de teste</button>
           </div>
         </div>
       </div>
@@ -299,14 +411,15 @@ function SectionFiscal() {
       <div className="card">
         <div className="card-header"><h3 className="ttl">Emissão automática</h3></div>
         <div className="card-body" style={{ display: "grid", gap: 10 }}>
-          {[
-            { label: "Emitir NF-e automaticamente após pagamento confirmado (varejo)", defaultOn: true },
-            { label: "Enviar DANFE por e-mail ao cliente", defaultOn: true },
-            { label: "Gerar NF-e para pedidos atacado manualmente", defaultOn: false },
-          ].map((item, i) => (
-            <div key={i} className="row between" style={{ padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>
-              <span style={{ fontSize: 12.5 }}>{item.label}</span>
-              <Toggle defaultChecked={item.defaultOn} />
+          {([
+            { key: "auto_nfe_retail" as BoolKey,      label: "Emitir NF-e automaticamente após pagamento confirmado (varejo)" },
+            { key: "send_danfe_email" as BoolKey,     label: "Enviar DANFE por e-mail ao cliente" },
+            { key: "manual_nfe_wholesale" as BoolKey, label: "Gerar NF-e para pedidos atacado manualmente" },
+          ] as { key: BoolKey; label: string }[]).map(({ key, label }) => (
+            <div key={key} className="row between"
+              style={{ padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>
+              <span style={{ fontSize: 12.5 }}>{label}</span>
+              <Toggle value={Boolean(s[key])} onChange={v => toggle(key, v)} />
             </div>
           ))}
         </div>
@@ -315,21 +428,31 @@ function SectionFiscal() {
   )
 }
 
-function SectionEstoque() {
+// ─── Seção: Estoque ───────────────────────────────────────────────────────────
+
+function SectionEstoque({ s, onToggle }: { s: StoreSettings; onToggle: (key: BoolKey, value: unknown) => void }) {
+  async function toggle(key: BoolKey, value: boolean) {
+    await updateStoreSettings({ [key]: value } as Parameters<typeof updateStoreSettings>[0])
+    onToggle(key, value)
+  }
+
+  const items: { key: BoolKey; label: string }[] = [
+    { key: "alert_finished_stock",    label: "Alertar quando produto acabado atingir estoque mínimo" },
+    { key: "alert_raw_material",      label: "Alertar quando matéria-prima atingir estoque mínimo" },
+    { key: "block_sale_zero_stock",   label: "Bloquear venda quando estoque = 0 (varejo)" },
+    { key: "allow_wholesale_no_stock",label: "Permitir pedido atacado sem estoque (produzir sob demanda)" },
+    { key: "show_low_stock_warning",  label: "Exibir aviso de poucas unidades na loja (≤ 3 un.)" },
+  ]
+
   return (
     <div className="card">
       <div className="card-header"><h3 className="ttl">Alertas de estoque</h3></div>
       <div className="card-body" style={{ display: "grid", gap: 10 }}>
-        {[
-          { label: "Alertar quando produto acabado atingir estoque mínimo", defaultOn: true },
-          { label: "Alertar quando matéria-prima atingir estoque mínimo", defaultOn: true },
-          { label: "Bloquear venda quando estoque = 0 (varejo)", defaultOn: true },
-          { label: "Permitir pedido atacado sem estoque (produzir sob demanda)", defaultOn: true },
-          { label: "Exibir aviso de poucas unidades na loja (≤ 3 un.)", defaultOn: false },
-        ].map((item, i) => (
-          <div key={i} className="row between" style={{ padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>
-            <span style={{ fontSize: 12.5 }}>{item.label}</span>
-            <Toggle defaultChecked={item.defaultOn} />
+        {items.map(({ key, label }) => (
+          <div key={key} className="row between"
+            style={{ padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>
+            <span style={{ fontSize: 12.5 }}>{label}</span>
+            <Toggle value={Boolean(s[key])} onChange={v => toggle(key, v)} />
           </div>
         ))}
       </div>
@@ -337,14 +460,16 @@ function SectionEstoque() {
   )
 }
 
+// ─── Seção: Integrações ───────────────────────────────────────────────────────
+
 function SectionInteg() {
   const integrations = [
-    { name: "Mercado Pago", desc: "Gateway de pagamentos", status: "connected", icon: "creditCard" as const },
-    { name: "Melhor Envio", desc: "Cálculo de frete e etiquetas", status: "connected", icon: "truck" as const },
-    { name: "Focus NFe", desc: "Emissão automática de NF-e", status: "connected", icon: "fileText" as const },
-    { name: "Resend", desc: "E-mails transacionais", status: "connected", icon: "mail" as const },
-    { name: "OpenClaw", desc: "Automação via Telegram", status: "pending", icon: "plug" as const },
-    { name: "ViaCEP", desc: "Preenchimento de endereços", status: "active", icon: "mapPin" as const },
+    { name: "Mercado Pago",   desc: "Gateway de pagamentos",        status: "connected", icon: "creditCard" as const },
+    { name: "Melhor Envio",   desc: "Cálculo de frete e etiquetas", status: "connected", icon: "truck" as const },
+    { name: "Focus NFe",      desc: "Emissão automática de NF-e",   status: "connected", icon: "fileText" as const },
+    { name: "Resend",         desc: "E-mails transacionais",        status: "connected", icon: "mail" as const },
+    { name: "OpenClaw",       desc: "Automação via Telegram",       status: "pending",   icon: "plug" as const },
+    { name: "ViaCEP",         desc: "Preenchimento de endereços",   status: "active",    icon: "mapPin" as const },
   ]
 
   return (
@@ -358,15 +483,14 @@ function SectionInteg() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{intg.name}</span>
-                {intg.status === "connected" && <span className="badge pago" style={{ fontSize: 10.5 }}>Ativo</span>}
-                {intg.status === "pending" && <span className="badge neutral" style={{ fontSize: 10.5 }}>Pendente</span>}
-                {intg.status === "active" && <span className="badge pago" style={{ fontSize: 10.5 }}>Ativo</span>}
+                {intg.status !== "pending" && <span className="badge pago" style={{ fontSize: 10.5 }}>Ativo</span>}
+                {intg.status === "pending"  && <span className="badge neutral" style={{ fontSize: 10.5 }}>Pendente</span>}
               </div>
               <div className="cust-meta" style={{ marginTop: 2 }}>{intg.desc}</div>
             </div>
           </div>
           <div style={{ padding: "8px 16px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end" }}>
-            <button className={`btn sm ${intg.status === "pending" ? "primary" : "ghost"}`}>
+            <button className={`btn sm ${intg.status === "pending" ? "primary" : "ghost"}`} type="button">
               {intg.status === "pending" ? "Configurar" : "Ver configurações"}
             </button>
           </div>
@@ -376,22 +500,39 @@ function SectionInteg() {
   )
 }
 
-function SectionNotif() {
+// ─── Seção: Notificações ──────────────────────────────────────────────────────
+
+function SectionNotif({ s, onToggle }: { s: StoreSettings; onToggle: (key: BoolKey, value: unknown) => void }) {
+  async function toggle(key: BoolKey, value: boolean) {
+    await updateStoreSettings({ [key]: value } as Parameters<typeof updateStoreSettings>[0])
+    onToggle(key, value)
+  }
+
+  const emailItems: { key: BoolKey; label: string }[] = [
+    { key: "notif_order_confirmed", label: "Confirmação de pedido (varejo)" },
+    { key: "notif_order_shipped",   label: "Pedido enviado — com código de rastreio" },
+    { key: "notif_order_delivered", label: "Pedido entregue" },
+    { key: "notif_order_cancelled", label: "Cancelamento de pedido" },
+    { key: "notif_new_customer",    label: "Novo cadastro de cliente" },
+  ]
+
+  const internalItems: { key: BoolKey; label: string }[] = [
+    { key: "notif_new_order",          label: "Novo pedido recebido" },
+    { key: "notif_payment_confirmed",  label: "Pagamento confirmado" },
+    { key: "notif_low_stock",          label: "Estoque abaixo do mínimo" },
+    { key: "notif_low_material",       label: "Matéria-prima abaixo do mínimo" },
+  ]
+
   return (
     <div style={{ display: "grid", gap: "var(--gap)" }}>
       <div className="card">
         <div className="card-header"><h3 className="ttl">E-mail (Resend)</h3></div>
         <div className="card-body" style={{ display: "grid", gap: 10 }}>
-          {[
-            { label: "Confirmação de pedido (varejo)", defaultOn: true },
-            { label: "Pedido enviado — com código de rastreio", defaultOn: true },
-            { label: "Pedido entregue", defaultOn: false },
-            { label: "Cancelamento de pedido", defaultOn: true },
-            { label: "Novo cadastro de cliente", defaultOn: false },
-          ].map((item, i) => (
-            <div key={i} className="row between" style={{ padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>
-              <span style={{ fontSize: 12.5 }}>{item.label}</span>
-              <Toggle defaultChecked={item.defaultOn} />
+          {emailItems.map(({ key, label }) => (
+            <div key={key} className="row between"
+              style={{ padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>
+              <span style={{ fontSize: 12.5 }}>{label}</span>
+              <Toggle value={Boolean(s[key])} onChange={v => toggle(key, v)} />
             </div>
           ))}
         </div>
@@ -400,15 +541,11 @@ function SectionNotif() {
       <div className="card">
         <div className="card-header"><h3 className="ttl">Notificações internas (painel)</h3></div>
         <div className="card-body" style={{ display: "grid", gap: 10 }}>
-          {[
-            { label: "Novo pedido recebido", defaultOn: true },
-            { label: "Pagamento confirmado", defaultOn: true },
-            { label: "Estoque abaixo do mínimo", defaultOn: true },
-            { label: "Matéria-prima abaixo do mínimo", defaultOn: true },
-          ].map((item, i) => (
-            <div key={i} className="row between" style={{ padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>
-              <span style={{ fontSize: 12.5 }}>{item.label}</span>
-              <Toggle defaultChecked={item.defaultOn} />
+          {internalItems.map(({ key, label }) => (
+            <div key={key} className="row between"
+              style={{ padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>
+              <span style={{ fontSize: 12.5 }}>{label}</span>
+              <Toggle value={Boolean(s[key])} onChange={v => toggle(key, v)} />
             </div>
           ))}
         </div>
@@ -417,19 +554,52 @@ function SectionNotif() {
   )
 }
 
-const sectionContent: Record<Section, React.ReactNode> = {
-  perfil: <SectionPerfil />,
-  usuarios: <SectionUsuarios />,
-  pagamentos: <SectionPagamentos />,
-  envio: <SectionEnvio />,
-  fiscal: <SectionFiscal />,
-  estoque: <SectionEstoque />,
-  integ: <SectionInteg />,
-  notif: <SectionNotif />,
-}
+// ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function ConfigPage() {
   const [active, setActive] = useState<Section>("perfil")
+  const [settings, setSettings] = useState<StoreSettings | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    getStoreSettings().then(data => {
+      setSettings(data)
+      setLoading(false)
+    })
+  }, [])
+
+  const handleToggle = useCallback((key: keyof StoreSettings, value: unknown) => {
+    setSettings(prev => prev ? { ...prev, [key]: value } : prev)
+  }, [])
+
+  function renderSection() {
+    if (loading) {
+      return (
+        <div style={{ display: "flex", justifyContent: "center", padding: "48px 0", color: "var(--text-3)", fontSize: 13 }}>
+          Carregando configurações…
+        </div>
+      )
+    }
+
+    if (!settings) {
+      return (
+        <div style={{ padding: "24px 16px", background: "var(--surface-2)", borderRadius: 8, fontSize: 13, color: "var(--text-2)" }}>
+          Não foi possível carregar as configurações. Verifique a conexão com o Supabase.
+        </div>
+      )
+    }
+
+    switch (active) {
+      case "perfil":     return <SectionPerfil     s={settings} onToggle={handleToggle} />
+      case "usuarios":   return <SectionUsuarios />
+      case "pagamentos": return <SectionPagamentos />
+      case "envio":      return <SectionEnvio       s={settings} onToggle={handleToggle} />
+      case "fiscal":     return <SectionFiscal      s={settings} onToggle={handleToggle} />
+      case "estoque":    return <SectionEstoque     s={settings} onToggle={handleToggle} />
+      case "integ":      return <SectionInteg />
+      case "notif":      return <SectionNotif       s={settings} onToggle={handleToggle} />
+    }
+  }
 
   return (
     <div className="page">
@@ -445,6 +615,7 @@ export default function ConfigPage() {
           {sections.map(s => (
             <button
               key={s.id}
+              type="button"
               className={`sidebar-item ${active === s.id ? "active" : ""}`}
               id={`btn-config-${s.id}`}
               onClick={() => setActive(s.id)}
@@ -463,9 +634,7 @@ export default function ConfigPage() {
           ))}
         </div>
 
-        <div>
-          {sectionContent[active]}
-        </div>
+        <div>{renderSection()}</div>
       </div>
     </div>
   )

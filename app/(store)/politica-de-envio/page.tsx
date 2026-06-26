@@ -195,7 +195,7 @@ export default function PoliticaDeEnvioPage() {
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Button asChild size="lg">
             <a
-              href="https://wa.me/5500000000000"
+              href="https://wa.me/5522988223993"
               target="_blank"
               rel="noopener noreferrer"
             >

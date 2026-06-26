@@ -201,7 +201,18 @@ export default function PrivacidadePage() {
             entre em contato:
           </p>
           <ul className="ml-5 mt-3 list-disc space-y-2">
-            <li><strong className="text-on-surface">WhatsApp:</strong> disponível na loja</li>
+            <li>
+              <strong className="text-on-surface">E-mail:</strong>{" "}
+              <a href="mailto:creation@patriciacarreira.com.br" className="text-primary underline underline-offset-2">
+                creation@patriciacarreira.com.br
+              </a>
+            </li>
+            <li>
+              <strong className="text-on-surface">WhatsApp:</strong>{" "}
+              <a href="https://wa.me/5522988223993" target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2">
+                (22) 98822-3993
+              </a>
+            </li>
             <li><strong className="text-on-surface">Instagram:</strong> @patriciacarreira_</li>
           </ul>
         </section>
