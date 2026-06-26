@@ -2,9 +2,11 @@ import Link from 'next/link'
 import { Header } from '@/components/store/header'
 import { Footer } from '@/components/store/footer'
 import { Button } from '@/components/ui/button'
+import { CartProvider } from '@/lib/cart-context'
 
 export default function NotFound() {
   return (
+    <CartProvider>
     <div className="flex flex-col min-h-screen">
       <Header />
       <main className="flex-1 flex flex-col items-center justify-center gap-4 px-4 text-center">
@@ -32,5 +34,6 @@ export default function NotFound() {
       </main>
       <Footer />
     </div>
+    </CartProvider>
   )
 }
