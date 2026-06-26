@@ -205,7 +205,7 @@ function SectionUsuarios() {
         </p>
         <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--surface-2)", borderRadius: 8, fontSize: 12.5, color: "var(--text-2)" }}>
           Para criar um novo admin: cadastre o usuário no Supabase Authentication e depois insira
-          manualmente uma linha em <code>user_profiles</code> com <code>role = 'admin'</code>.
+          manualmente uma linha em <code>user_profiles</code> com <code>role = &apos;admin&apos;</code>.
         </div>
       </div>
     </div>
