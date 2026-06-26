@@ -147,6 +147,7 @@ export default function CheckoutPage() {
   const [shippingLoading, setShippingLoading] = useState(false)
   const [shippingError, setShippingError] = useState("")
   const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
 
   useEffect(() => {
     if (hydrated && cart.items.length === 0 && !loading) router.replace("/carrinho")
@@ -801,11 +802,28 @@ export default function CheckoutPage() {
                 <p className="mb-3 font-caption text-caption text-error">{errors.submit}</p>
               )}
 
+              <div className="mb-4 flex items-start gap-2">
+                <input
+                  id="checkout-terms"
+                  type="checkbox"
+                  required
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  className="mt-1 h-4 w-4 accent-primary"
+                />
+                <label htmlFor="checkout-terms" className="font-body-sm text-body-sm text-on-surface-variant">
+                  Concordo com os{" "}
+                  <Link href="/termos" className="text-primary underline underline-offset-2" target="_blank">Termos de Uso</Link>
+                  {" "}e a{" "}
+                  <Link href="/privacidade" className="text-primary underline underline-offset-2" target="_blank">Política de Privacidade</Link>
+                </label>
+              </div>
+
               <Button
                 type="submit"
                 size="lg"
                 className="w-full"
-                disabled={loading || (method === "credit_card" && !sdkLoaded)}
+                disabled={loading || !acceptedTerms || (method === "credit_card" && !sdkLoaded)}
                 id="btn-finalizar-compra"
               >
                 {loading ? (

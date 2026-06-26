@@ -1,7 +1,6 @@
-"use client" // newsletter form submit prevents default page reload
-
 import Link from "next/link"
 import { Instagram } from "lucide-react"
+import { getStoreSettings } from "@/lib/actions/settings"
 
 const STORE_LINKS = [
   { label: "Lançamentos", href: "/lancamentos" },
@@ -17,9 +16,14 @@ const INFO_LINKS = [
   { label: "Política de trocas", href: "/politica-de-trocas" },
   { label: "Política de envio",  href: "/politica-de-envio" },
   { label: "Privacidade",        href: "/privacidade" },
+  { label: "Termos de uso",      href: "/termos" },
 ]
 
-export function Footer() {
+export async function Footer() {
+  const settings = await getStoreSettings().catch(() => null)
+  const cnpj = settings?.cnpj
+  const address = settings?.address_full
+
   return (
     <footer className="border-t border-outline-variant bg-surface-container-low">
       <div className="mx-auto max-w-container px-margin-mobile py-12 md:px-margin-desktop">
@@ -81,10 +85,17 @@ export function Footer() {
         </div>
 
         {/* Copyright */}
-        <div className="mt-8 border-t border-outline-variant pt-6">
+        <div className="mt-8 border-t border-outline-variant pt-6 space-y-1">
           <p className="font-caption text-caption text-on-surface-variant">
             © {new Date().getFullYear()} Patrícia Carreira. Todos os direitos reservados.
           </p>
+          {(cnpj || address) && (
+            <p className="font-caption text-caption text-on-surface-variant opacity-70">
+              {cnpj && <>CNPJ: {cnpj}</>}
+              {cnpj && address && " · "}
+              {address}
+            </p>
+          )}
         </div>
       </div>
     </footer>

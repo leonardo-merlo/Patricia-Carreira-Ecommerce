@@ -13,6 +13,7 @@ export default function CadastrarPage() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [accepted, setAccepted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -125,11 +126,28 @@ export default function CadastrarPage() {
             </p>
           )}
 
+          <div className="flex items-start gap-2">
+            <input
+              id="terms"
+              type="checkbox"
+              required
+              checked={accepted}
+              onChange={(e) => setAccepted(e.target.checked)}
+              className="mt-1 h-4 w-4 accent-primary"
+            />
+            <label htmlFor="terms" className="font-body-sm text-body-sm text-on-surface-variant">
+              Li e aceito os{" "}
+              <Link href="/termos" className="text-primary underline underline-offset-2">Termos de Uso</Link>
+              {" "}e a{" "}
+              <Link href="/privacidade" className="text-primary underline underline-offset-2">Política de Privacidade</Link>
+            </label>
+          </div>
+
           <Button
             type="submit"
             size="lg"
             className="mt-2 w-full"
-            disabled={loading}
+            disabled={loading || !accepted}
             id="btn-criar-conta"
           >
             {loading ? "Criando conta…" : "Criar conta"}

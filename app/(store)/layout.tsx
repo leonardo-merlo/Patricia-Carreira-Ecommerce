@@ -5,6 +5,7 @@ import { AnnouncementBanner } from '@/components/store/announcement-banner'
 import { WhatsAppButton } from '@/components/store/whatsapp-button'
 import { ClientOnlyShell } from '@/components/store/client-only-shell'
 import { CartToast } from '@/components/store/cart-toast'
+import { CookieConsent } from '@/components/store/cookie-consent'
 
 export default function StoreLayout({
   children,
@@ -21,6 +22,7 @@ export default function StoreLayout({
         <WhatsAppButton />
         <ClientOnlyShell />
         <CartToast />
+        <CookieConsent />
       </div>
     </CartProvider>
   )
