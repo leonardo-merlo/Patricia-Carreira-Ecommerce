@@ -168,7 +168,7 @@ export async function getAffiliateOrderHistory(
     items: OrderRow[]
   }>()
 
-  for (const order of rawOrders as RawOrder[]) {
+  for (const order of rawOrders as unknown as RawOrder[]) {
     const d = new Date(order.created_at)
     const m = d.getMonth()
     const y = d.getFullYear()
