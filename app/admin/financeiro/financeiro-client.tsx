@@ -288,7 +288,7 @@ export function FinanceiroClient({
     if (!markPaid || !markPaid.paymentMethod) return
     startTransition(async () => {
       const result = await markAccountAsPaid(
-        markPaid.account,
+        markPaid.account.id,
         markPaid.paidAt,
         markPaid.paymentMethod as ExpensePaymentMethod
       )

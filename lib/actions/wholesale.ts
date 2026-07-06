@@ -2,8 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/service'
+import { requireAdmin } from '@/lib/server/auth'
 import { createManualProductionOrder } from '@/lib/actions/production'
-import { getStoreSettings } from '@/lib/actions/settings'
+import { getStoreSettings } from '@/lib/server/store-settings'
 
 export type WholesaleOrderLineItem = {
   variant_id: string
@@ -61,6 +62,7 @@ export type CreateWholesaleOrderResult =
 export async function createWholesaleOrder(
   input: CreateWholesaleOrderInput,
 ): Promise<CreateWholesaleOrderResult> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const wsSettings = await getStoreSettings().catch(() => null)
@@ -133,34 +135,21 @@ export async function createWholesaleOrder(
     }
   }
 
-  // Decrementa estoque de variantes com quantidade disponível em stock
+  // Decrementa estoque de variantes com quantidade disponível — via RPC atômica
+  // (decrement_stock usa FOR UPDATE e registra em stock_adjustments), evitando
+  // race condition entre venda no e-commerce e pedido atacado simultâneos.
   for (const itemCheck of check) {
     if (itemCheck.quantity_from_stock > 0) {
-      const { data: variant } = await supabase
-        .from('product_variants')
-        .select('stock_quantity')
-        .eq('id', itemCheck.variant_id)
-        .single()
-
-      if (variant) {
-        const before = Number(variant.stock_quantity)
-        const after = Math.max(0, before - itemCheck.quantity_from_stock)
-
-        await supabase
-          .from('product_variants')
-          .update({ stock_quantity: after })
-          .eq('id', itemCheck.variant_id)
-
-        await supabase.from('stock_adjustments').insert({
-          target: 'product_variant',
-          target_id: itemCheck.variant_id,
-          quantity_before: before,
-          quantity_after: after,
-          delta: -(itemCheck.quantity_from_stock),
-          reason: 'venda',
-          notes: `Pedido atacado ${order.id.slice(-6).toUpperCase()}`,
-          created_by: 'henrique',
-        })
+      const { error: stockErr } = await supabase.rpc('decrement_stock', {
+        p_variant_id: itemCheck.variant_id,
+        p_quantity: itemCheck.quantity_from_stock,
+      })
+      if (stockErr) {
+        console.error(
+          '[createWholesaleOrder] falha ao decrementar estoque da variante',
+          itemCheck.variant_id,
+          stockErr.message,
+        )
       }
     }
   }
@@ -182,6 +171,7 @@ export type PreviewOrderResult =
   | { success: false; error: string }
 
 export async function previewOrderCheck(input: PreviewOrderInput): Promise<PreviewOrderResult> {
+  await requireAdmin()
   const supabase = createServiceClient()
   try {
     const check = await Promise.all(

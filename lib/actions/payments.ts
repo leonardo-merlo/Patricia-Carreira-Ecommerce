@@ -6,28 +6,36 @@ import {
   createCardPayment,
   type MPPaymentResult,
 } from '@/lib/integrations/mercadopago'
-import { saveOrder, type OrderFormData, type OrderLineItem } from '@/lib/actions/orders'
+import { saveOrder, type OrderFormData, type OrderLineItem } from '@/lib/server/orders'
+import { validateCoupon } from '@/lib/actions/coupons'
+import { computeCouponDiscount } from '@/lib/supabase/coupons'
+import { getShippingOptions } from '@/lib/actions/shipping'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { getStoreSettings } from '@/lib/actions/settings'
+import { getStoreSettings } from '@/lib/server/store-settings'
+import type { PaymentMethod } from '@/lib/types'
 
-export type PaymentMethod = 'pix' | 'credit_card' | 'boleto'
+export type { PaymentMethod } from '@/lib/types'
+
+export type CheckoutItem = {
+  variantId: string
+  quantity: number
+}
 
 export type CreatePaymentInput = {
   method: PaymentMethod
-  amount: number
   payer: { name: string; email: string; cpf?: string }
   cardToken?: string
   paymentMethodId?: string
   installments?: number
-  orderData?: {
+  orderData: {
     formData: OrderFormData
-    lineItems: OrderLineItem[]
-    discountAmount: number
-    shippingAmount: number
-    shippingMethod: string | null
-    melhorEnvioServiceId: number | null
-    couponId: string | null
+    items: CheckoutItem[]
+    couponCode: string | null
+    shipping: { serviceId: number; destCep: string } | null
+    // Total exibido ao cliente — usado apenas para detectar preços defasados,
+    // nunca como valor cobrado. O valor cobrado é recalculado no servidor.
+    expectedTotal: number
   }
 }
 
@@ -36,6 +44,120 @@ export type PaymentData = MPPaymentResult & { method: PaymentMethod }
 export type CreatePaymentOutput =
   | { ok: true; data: PaymentData; orderId: string }
   | { ok: false; error: string }
+
+type PricedOrder = {
+  lineItems: OrderLineItem[]
+  subtotal: number
+  discountAmount: number
+  shippingAmount: number
+  shippingMethod: string | null
+  total: number
+  couponId: string | null
+}
+
+// Recalcula todos os valores do pedido a partir do banco — preços, desconto e
+// frete vindos do cliente são apenas exibição e nunca entram na cobrança.
+async function priceOrder(
+  orderData: CreatePaymentInput['orderData']
+): Promise<{ ok: true; priced: PricedOrder } | { ok: false; error: string }> {
+  if (!orderData.items.length) {
+    return { ok: false, error: 'Carrinho vazio.' }
+  }
+
+  const supabase = createServiceClient()
+  const settings = await getStoreSettings().catch(() => null)
+
+  const { data: variants, error } = await supabase
+    .from('product_variants')
+    .select('id, size, color, stock_quantity, product:products(name, base_price, is_active)')
+    .in('id', orderData.items.map((i) => i.variantId))
+
+  if (error) {
+    return { ok: false, error: 'Erro ao validar os produtos do carrinho.' }
+  }
+
+  const lineItems: OrderLineItem[] = []
+  let subtotal = 0
+
+  for (const item of orderData.items) {
+    if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+      return { ok: false, error: 'Quantidade inválida no carrinho.' }
+    }
+
+    const variant = variants?.find((v) => v.id === item.variantId)
+    const productRaw = variant?.product
+    const product = (Array.isArray(productRaw) ? productRaw[0] : productRaw) as {
+      name: string
+      base_price: number
+      is_active: boolean
+    } | null | undefined
+
+    if (!variant || !product) {
+      return { ok: false, error: 'Um dos produtos do carrinho não está mais disponível. Atualize o carrinho.' }
+    }
+    if (!product.is_active) {
+      return { ok: false, error: `"${product.name}" não está mais disponível para compra.` }
+    }
+    if (settings?.block_sale_zero_stock && Number(variant.stock_quantity) < item.quantity) {
+      return { ok: false, error: `"${product.name}" não tem estoque suficiente para a quantidade escolhida.` }
+    }
+
+    const basePrice = Number(product.base_price)
+    subtotal += basePrice * item.quantity
+
+    const label = [variant.size, variant.color].filter(Boolean).join(' · ')
+    lineItems.push({
+      variantId: variant.id,
+      productName: label ? `${product.name} — ${label}` : product.name,
+      basePrice,
+      quantity: item.quantity,
+    })
+  }
+
+  subtotal = Math.round(subtotal * 100) / 100
+
+  // Cupom: revalida e recalcula o desconto no servidor
+  let discountAmount = 0
+  let couponId: string | null = null
+  if (orderData.couponCode) {
+    const { coupon, error: couponError } = await validateCoupon(orderData.couponCode, subtotal)
+    if (!coupon) {
+      return { ok: false, error: couponError ?? 'Cupom inválido ou expirado.' }
+    }
+    discountAmount = computeCouponDiscount(coupon, subtotal)
+    couponId = coupon.id
+  }
+
+  // Frete: recotiza no Melhor Envio e aplica a regra de frete grátis do servidor
+  let shippingAmount = 0
+  let shippingMethod: string | null = null
+  if (orderData.shipping) {
+    const quote = await getShippingOptions(
+      orderData.shipping.destCep,
+      orderData.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity }))
+    )
+    if (!quote.ok) {
+      return { ok: false, error: quote.error }
+    }
+
+    const option = quote.options.find((o) => o.id === orderData.shipping!.serviceId)
+    if (!option) {
+      return { ok: false, error: 'A opção de frete selecionada não está mais disponível. Recalcule o frete.' }
+    }
+
+    const cheapest = quote.options.reduce((min, o) => (o.price < min.price ? o : min), quote.options[0])
+    const isFree = subtotal >= quote.freeShippingThreshold && option.id === cheapest.id
+    shippingAmount = isFree ? 0 : option.price
+    shippingMethod = option.name
+  }
+
+  const total = Math.round(Math.max(0, subtotal - discountAmount + shippingAmount) * 100) / 100
+
+  return {
+    ok: true,
+    priced: { lineItems, subtotal, discountAmount, shippingAmount, shippingMethod, total, couponId },
+  }
+}
 
 export async function createPayment(
   input: CreatePaymentInput
@@ -62,43 +184,36 @@ export async function createPayment(
     // proceed as guest if auth detection fails
   }
 
-  console.log('[createPayment] method:', input.method, 'amount:', input.amount, 'userId:', userId)
-  console.log('[createPayment] orderData keys:', input.orderData ? Object.keys(input.orderData) : 'none')
-  console.log('[createPayment] shippingMethod:', input.orderData?.shippingMethod, 'serviceId:', input.orderData?.melhorEnvioServiceId)
+  const pricedResult = await priceOrder(input.orderData)
+  if (!pricedResult.ok) return pricedResult
+  const priced = pricedResult.priced
 
-  if (input.orderData?.lineItems?.length) {
-    const paySettings = await getStoreSettings().catch(() => null)
-    if (paySettings?.block_sale_zero_stock) {
-      const paySupabase = createServiceClient()
-      for (const item of input.orderData.lineItems) {
-        if (!item.variantId) continue
-        const { data: variant } = await paySupabase
-          .from('product_variants')
-          .select('stock_quantity')
-          .eq('id', item.variantId)
-          .maybeSingle()
-        if (variant && variant.stock_quantity <= 0) {
-          return { ok: false, error: `"${item.productName}" está esgotado e não pode ser comprado no momento.` }
-        }
-      }
+  // Se o total exibido ao cliente divergir do recalculado (preço alterado,
+  // cupom expirado, frete atualizado), interrompe antes de cobrar.
+  if (Math.abs(priced.total - input.orderData.expectedTotal) > 0.01) {
+    return {
+      ok: false,
+      error: 'Os valores do carrinho foram atualizados. Recarregue a página e confira o total antes de finalizar.',
     }
+  }
+
+  if (priced.total <= 0) {
+    return { ok: false, error: 'Valor do pedido inválido.' }
   }
 
   try {
     let result: MPPaymentResult
 
     if (input.method === 'pix') {
-      console.log('[createPayment] calling createPixPayment')
-      result = await createPixPayment(input.amount, mpPayer)
-      console.log('[createPayment] MP result status:', result.status)
+      result = await createPixPayment(priced.total, mpPayer)
     } else if (input.method === 'boleto') {
       if (!input.payer.cpf) throw new Error('CPF obrigatório para boleto')
-      result = await createBoletoPayment(input.amount, mpPayer)
+      result = await createBoletoPayment(priced.total, mpPayer)
     } else {
       if (!input.cardToken) throw new Error('Token do cartão não informado')
       if (!input.paymentMethodId) throw new Error('Bandeira do cartão não identificada')
       result = await createCardPayment(
-        input.amount,
+        priced.total,
         input.cardToken,
         input.paymentMethodId,
         mpPayer,
@@ -107,34 +222,31 @@ export async function createPayment(
     }
 
     // Save order to DB and decrement stock (for card, immediately; for pix/boleto, on webhook)
-    console.log('[createPayment] calling saveOrder')
     let orderId = result.id
-    if (input.orderData) {
-      const saved = await saveOrder({
-        formData: input.orderData.formData,
-        lineItems: input.orderData.lineItems,
-        paymentId: result.id,
-        paymentMethod: input.method,
-        paymentStatus: result.status === 'approved' ? 'paid' : 'pending',
-        totalAmount: input.amount,
-        shippingAmount: input.orderData.shippingAmount,
-        shippingMethod: input.orderData.shippingMethod,
-        melhorEnvioServiceId: input.orderData.melhorEnvioServiceId,
-        discountAmount: input.orderData.discountAmount,
-        couponId: input.orderData.couponId,
-        userId,
-      })
-      if (saved.ok) {
-        orderId = saved.orderId
-      } else {
-        console.error('[createPayment] saveOrder failed:', saved.error)
-        // Payment processed — don't block the user but log for manual reconciliation
-      }
+    const saved = await saveOrder({
+      formData: input.orderData.formData,
+      lineItems: priced.lineItems,
+      paymentId: result.id,
+      paymentMethod: input.method,
+      paymentStatus: result.status === 'approved' ? 'paid' : 'pending',
+      totalAmount: priced.total,
+      shippingAmount: priced.shippingAmount,
+      shippingMethod: priced.shippingMethod,
+      melhorEnvioServiceId: input.orderData.shipping?.serviceId ?? null,
+      discountAmount: priced.discountAmount,
+      couponId: priced.couponId,
+      userId,
+    })
+    if (saved.ok) {
+      orderId = saved.orderId
+    } else {
+      console.error('[createPayment] saveOrder failed:', saved.error)
+      // Payment processed — don't block the user but log for manual reconciliation
     }
 
     return { ok: true, data: { ...result, method: input.method }, orderId }
   } catch (err) {
-    console.error('[createPayment] erro:', JSON.stringify(err, null, 2))
+    console.error('[createPayment] erro:', err)
     let msg = 'Erro ao processar pagamento'
     if (err instanceof Error) {
       msg = err.message

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/service'
+import { requireAdmin } from '@/lib/server/auth'
 
 export type Supplier = {
   id: string
@@ -37,6 +38,7 @@ export type SupplierResult =
   | { success: false; error: string }
 
 export async function getSuppliers(): Promise<Supplier[]> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { data, error } = await supabase
@@ -89,6 +91,7 @@ export async function getSuppliers(): Promise<Supplier[]> {
 export async function getSupplierMaterials(
   supplierId: string,
 ): Promise<{ id: string; name: string; unit: string }[]> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { data, error } = await supabase
@@ -108,6 +111,7 @@ export async function getSupplierMaterials(
 export async function createSupplier(
   formData: SupplierFormData,
 ): Promise<SupplierResult> {
+  await requireAdmin()
   if (!formData.name.trim()) {
     return { success: false, error: 'Nome do fornecedor é obrigatório.' }
   }
@@ -139,6 +143,7 @@ export async function updateSupplier(
   id: string,
   formData: SupplierFormData,
 ): Promise<SupplierResult> {
+  await requireAdmin()
   if (!formData.name.trim()) {
     return { success: false, error: 'Nome do fornecedor é obrigatório.' }
   }
@@ -171,6 +176,7 @@ export async function updateSupplier(
 }
 
 export async function deleteSupplier(id: string): Promise<SupplierResult> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { error } = await supabase

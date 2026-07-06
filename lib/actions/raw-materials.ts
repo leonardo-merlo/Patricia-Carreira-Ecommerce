@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/service'
+import { requireAdmin } from '@/lib/server/auth'
 
 export type StockEntryResult =
   | { success: true }
@@ -13,6 +14,7 @@ export async function registerMaterialEntry(input: {
   reason: 'compra' | 'ajuste' | 'devolucao'
   notes: string | null
 }): Promise<StockEntryResult> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { data: mat, error: fetchErr } = await supabase
@@ -76,6 +78,7 @@ export async function createRawMaterial(input: {
   supplier_id: string | null
   notes: string | null
 }): Promise<StockEntryResult> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { error } = await supabase.from('raw_materials').insert({
@@ -107,6 +110,7 @@ export async function addBOMEntry(input: {
   raw_material_id: string
   quantity_needed: number
 }): Promise<StockEntryResult> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { error } = await supabase.from('bill_of_materials').insert({
@@ -127,6 +131,7 @@ export async function updateBOMEntry(input: {
   bom_id: string
   quantity_needed: number
 }): Promise<StockEntryResult> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { error } = await supabase
@@ -143,6 +148,7 @@ export async function updateBOMEntry(input: {
 }
 
 export async function deleteBOMEntry(bomId: string): Promise<StockEntryResult> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { error } = await supabase.from('bill_of_materials').delete().eq('id', bomId)
@@ -168,6 +174,7 @@ export type PurchaseRequestInput = {
 export async function createPurchaseRequests(
   requests: PurchaseRequestInput[],
 ): Promise<StockEntryResult> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { error } = await supabase.from('purchase_requests').insert(
@@ -193,6 +200,7 @@ export async function receivePurchaseRequest(input: {
   raw_material_id: string
   quantity_received: number
 }): Promise<StockEntryResult> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { data: mat, error: fetchErr } = await supabase
@@ -242,6 +250,7 @@ export async function receivePurchaseRequest(input: {
 }
 
 export async function cancelPurchaseRequest(id: string): Promise<StockEntryResult> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { error } = await supabase
@@ -265,6 +274,7 @@ export async function registerMaterialExit(input: {
   reason: 'perda' | 'ajuste' | 'uso_manual'
   notes: string | null
 }): Promise<StockEntryResult> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { data: mat, error: fetchErr } = await supabase

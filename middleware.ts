@@ -46,7 +46,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // api/ excluído: webhooks têm autenticação própria (assinatura/token) e não
+  // usam sessão de cookie — rodar o middleware neles só adiciona latência.
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

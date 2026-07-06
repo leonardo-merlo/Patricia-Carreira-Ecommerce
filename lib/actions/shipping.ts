@@ -2,12 +2,22 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { calculateShipping, type MEShippingItem, type MEQuoteResult } from '@/lib/integrations/melhor-envio'
-import { getStoreSettings } from '@/lib/actions/settings'
+import { getStoreSettings } from '@/lib/server/store-settings'
 import type { ShippingOption } from '@/lib/types'
 
 export type ShippingResult =
   | { ok: true; options: ShippingOption[]; freeShippingThreshold: number }
   | { ok: false; error: string }
+
+// Valor usado quando store_settings ainda não foi configurado
+const FREE_SHIPPING_THRESHOLD_FALLBACK = 599
+
+// Leitura pública — usada pelo carrinho para exibir a barra de frete grátis
+// com o valor configurado no admin em vez de um número fixo no código.
+export async function getFreeShippingThreshold(): Promise<number> {
+  const settings = await getStoreSettings().catch(() => null)
+  return settings?.free_shipping_threshold ?? FREE_SHIPPING_THRESHOLD_FALLBACK
+}
 
 function matchesEnabledCarrier(quote: MEQuoteResult, enabledCarriers: string[]): boolean {
   if (enabledCarriers.length === 0) return true

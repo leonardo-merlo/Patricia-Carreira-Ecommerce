@@ -71,6 +71,19 @@ function FieldError({ msg }: { msg?: string }): ReactNode {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type MercadoPagoSDK = {
+  getPaymentMethods: (args: { bin: string }) => Promise<{ results?: Array<{ id: string }> }>
+  createCardToken: (args: {
+    cardNumber: string
+    cardholderName: string
+    cardExpirationMonth: string
+    cardExpirationYear: string
+    securityCode: string
+    identificationType: string
+    identificationNumber: string
+  }) => Promise<{ id: string }>
+}
+
 type Personal = { name: string; email: string; phone: string; cpf: string }
 type Address = {
   cep: string; street: string; number: string; complement: string
@@ -130,9 +143,11 @@ export default function CheckoutPage() {
   const router = useRouter()
   const { cart, hydrated, clearCart, setShipping } = useCart()
 
-  const mpRef = useRef<any>(null)
+  const mpRef = useRef<MercadoPagoSDK | null>(null)
   const [personal, setPersonal] = useState<Personal>(EMPTY_PERSONAL)
   const [address, setAddress] = useState<Address>(EMPTY_ADDRESS)
+  // Campos preenchidos pelo ViaCEP ficam readonly; digitados manualmente, não
+  const [cepAutoFilled, setCepAutoFilled] = useState({ city: false, state: false })
   const [card, setCard] = useState<Card>(EMPTY_CARD)
   const [method, setMethod] = useState<PaymentMethod | null>(null)
   const [paymentMethodId, setPaymentMethodId] = useState("")
@@ -160,7 +175,7 @@ export default function CheckoutPage() {
     if (bin.length === 6 && mpRef.current) {
       mpRef.current
         .getPaymentMethods({ bin })
-        .then((res: any) => {
+        .then((res) => {
           const id = res?.results?.[0]?.id
           if (id) setPaymentMethodId(id)
         })
@@ -201,8 +216,10 @@ export default function CheckoutPage() {
           city: addressResult.localidade,
           state: addressResult.uf,
         }))
+        setCepAutoFilled({ city: !!addressResult.localidade, state: !!addressResult.uf })
       } else {
         setCepError("CEP não encontrado")
+        setCepAutoFilled({ city: false, state: false })
       }
 
       if (shippingResult.ok) {
@@ -262,9 +279,10 @@ export default function CheckoutPage() {
         cardToken = tokenResult.id
       }
 
+      // Os preços, desconto e frete são recalculados no servidor a partir do
+      // banco — daqui saem apenas identificadores e o total exibido (checagem).
       const result = await createPayment({
         method: method!,
-        amount: cart.total,
         payer: {
           name: personal.name,
           email: personal.email,
@@ -288,17 +306,15 @@ export default function CheckoutPage() {
               zip: address.cep,
             },
           },
-          lineItems: cart.items.map((item) => ({
+          items: cart.items.map((item) => ({
             variantId: item.variant.id,
-            productName: item.variant.product.name,
-            basePrice: item.variant.product.base_price,
             quantity: item.quantity,
           })),
-          discountAmount: cart.discount_amount,
-          shippingAmount: cart.shipping_amount,
-          shippingMethod: selectedShipping?.name ?? null,
-          melhorEnvioServiceId: selectedShipping?.id ?? null,
-          couponId: null,
+          couponCode: cart.coupon?.code ?? null,
+          shipping: selectedShipping
+            ? { serviceId: selectedShipping.id, destCep: address.cep }
+            : null,
+          expectedTotal: cart.total,
         },
       })
 
@@ -320,7 +336,10 @@ export default function CheckoutPage() {
       <Script
         src="https://sdk.mercadopago.com/js/v2"
         onLoad={() => {
-          mpRef.current = new (window as any).MercadoPago(
+          const mpWindow = window as unknown as {
+            MercadoPago: new (key: string | undefined, opts: { locale: string }) => MercadoPagoSDK
+          }
+          mpRef.current = new mpWindow.MercadoPago(
             process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY,
             { locale: "pt-BR" }
           )
@@ -486,10 +505,10 @@ export default function CheckoutPage() {
                       id="city"
                       value={address.city}
                       onChange={(e) => setAddress((a) => ({ ...a, city: e.target.value }))}
-                      readOnly={!!address.city}
+                      readOnly={cepAutoFilled.city}
                       className={cn(
                         errors.city && "border-error",
-                        address.city && "bg-surface-container-low"
+                        cepAutoFilled.city && "bg-surface-container-low"
                       )}
                     />
                     <FieldError msg={errors.city} />
@@ -505,11 +524,11 @@ export default function CheckoutPage() {
                           state: e.target.value.toUpperCase().slice(0, 2),
                         }))
                       }
-                      readOnly={!!address.state}
+                      readOnly={cepAutoFilled.state}
                       maxLength={2}
                       className={cn(
                         errors.state && "border-error",
-                        address.state && "bg-surface-container-low"
+                        cepAutoFilled.state && "bg-surface-container-low"
                       )}
                     />
                     <FieldError msg={errors.state} />

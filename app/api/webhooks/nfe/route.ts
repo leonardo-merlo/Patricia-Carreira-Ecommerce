@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { atualizarStatusNfe } from '@/lib/actions/nfe'
+import { atualizarStatusNfe } from '@/lib/server/nfe'
 import type { FocusNfeResponse } from '@/lib/integrations/focus-nfe'
 
 export async function POST(req: NextRequest): Promise<NextResponse> {

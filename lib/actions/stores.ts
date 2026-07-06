@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/service'
+import { requireAdmin } from '@/lib/server/auth'
 import type { Store } from '@/lib/types'
 
 export type StoreResult =
@@ -9,6 +10,7 @@ export type StoreResult =
   | { success: false; error: string }
 
 export async function getStores(): Promise<Store[]> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { data, error } = await supabase
@@ -30,6 +32,7 @@ export async function createStore(input: {
   city: string | null
   notes: string | null
 }): Promise<StoreResult> {
+  await requireAdmin()
   if (!input.name.trim()) {
     return { success: false, error: 'Nome da loja é obrigatório.' }
   }
@@ -55,6 +58,7 @@ export async function updateStore(
   id: string,
   input: { name: string; city: string | null; notes: string | null },
 ): Promise<StoreResult> {
+  await requireAdmin()
   if (!input.name.trim()) {
     return { success: false, error: 'Nome da loja é obrigatório.' }
   }
@@ -81,6 +85,7 @@ export async function updateStore(
 }
 
 export async function deleteStore(id: string): Promise<StoreResult> {
+  await requireAdmin()
   const supabase = createServiceClient()
   const { error } = await supabase
     .from('stores')

@@ -20,53 +20,61 @@ export async function getAllCoupons(): Promise<Coupon[]> {
 export async function getCouponByCode(code: string): Promise<Coupon | null> {
   const supabase = createServiceClient()
 
-  console.log('[getCouponByCode] buscando código:', code)
-
+  // Comparação exata case-insensitive — códigos são salvos em maiúsculas.
+  // Nunca usar ilike aqui: o código vem do usuário e curingas (% e _)
+  // permitiriam casar qualquer cupom ativo.
   const { data, error } = await supabase
     .from('coupons')
     .select('*')
-    .ilike('code', code)
+    .eq('code', code.toUpperCase())
     .eq('is_active', true)
     .maybeSingle()
 
-  console.log('[getCouponByCode] resultado:', { data, error })
-
   if (error) {
-    console.error('[getCouponByCode] erro:', error)
+    console.error('[getCouponByCode]', error)
     return null
   }
 
-  if (!data) {
-    console.log('[getCouponByCode] nenhum cupom encontrado com esse código e is_active=true')
-    return null
-  }
+  if (!data) return null
 
   const coupon = data as Coupon
   const now = new Date()
 
-  console.log('[getCouponByCode] cupom encontrado:', {
-    code: coupon.code,
-    is_active: coupon.is_active,
-    valid_from: coupon.valid_from,
-    valid_until: coupon.valid_until,
-    max_uses: coupon.max_uses,
-    uses_count: coupon.uses_count,
-    now: now.toISOString(),
-  })
+  if (coupon.valid_from && new Date(coupon.valid_from) > now) return null
+  if (coupon.valid_until && new Date(coupon.valid_until) < now) return null
+  if (coupon.max_uses !== null && coupon.uses_count >= coupon.max_uses) return null
 
-  if (coupon.valid_from && new Date(coupon.valid_from) > now) {
-    console.log('[getCouponByCode] bloqueado: valid_from ainda não chegou')
-    return null
-  }
-  if (coupon.valid_until && new Date(coupon.valid_until) < now) {
-    console.log('[getCouponByCode] bloqueado: valid_until expirou')
-    return null
-  }
-  if (coupon.max_uses !== null && coupon.uses_count >= coupon.max_uses) {
-    console.log('[getCouponByCode] bloqueado: limite de usos atingido')
-    return null
-  }
-
-  console.log('[getCouponByCode] cupom válido, retornando')
   return coupon
+}
+
+// Desconto calculado no servidor a partir do cupom validado — nunca confiar
+// em valores de desconto vindos do cliente.
+export function computeCouponDiscount(coupon: Coupon, subtotal: number): number {
+  const discount =
+    coupon.type === 'percent'
+      ? subtotal * (coupon.value / 100)
+      : Math.min(coupon.value, subtotal)
+  return Math.round(discount * 100) / 100
+}
+
+export async function recordCouponUsage(
+  couponId: string,
+  orderId: string,
+  userId: string | null,
+  email: string | null,
+): Promise<void> {
+  const supabase = createServiceClient()
+
+  const { error: usageError } = await supabase.from('coupon_usages').insert({
+    coupon_id: couponId,
+    order_id: orderId,
+    user_id: userId,
+    email: email ?? null,
+  })
+  if (usageError) console.error('[recordCouponUsage] insert:', usageError)
+
+  const { error: rpcError } = await supabase.rpc('increment_coupon_uses', {
+    p_coupon_id: couponId,
+  })
+  if (rpcError) console.error('[recordCouponUsage] increment:', rpcError)
 }

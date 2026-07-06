@@ -2,6 +2,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { createClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/server/auth'
 
 type AffiliateFormData = {
   name: string
@@ -81,6 +82,7 @@ export async function createAffiliateApplication(
 export async function invitePartnerUser(
   email: string
 ): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin()
   if (!email.trim()) return { ok: false, error: 'Email obrigatório.' }
   const supabase = createServiceClient()
   const { error } = await supabase.auth.admin.inviteUserByEmail(email.trim())
@@ -96,22 +98,25 @@ export async function getAffiliateProfile(): Promise<{
   couponCode: string | null
   couponId: string | null
 } | null> {
+  // getUser valida o JWT no servidor Supabase — getSession confia no cookie sem verificar
   const userClient = createClient()
-  const { data: { session } } = await userClient.auth.getSession()
-  if (!session?.user?.email) return null
+  const { data: { user } } = await userClient.auth.getUser()
+  if (!user?.email) return null
 
   const supabase = createServiceClient()
   const { data } = await supabase
     .from('partners')
     .select('id, name, contact_name, commission_pct, payment_day, coupon_id, coupons!coupon_id(code)')
-    .eq('email', session.user.email)
+    .eq('email', user.email)
     .eq('type', 'affiliate')
     .single()
 
   if (!data) return null
 
+  // O PostgREST pode retornar o embed como objeto ou array de 1 item
   type CouponEmbed = { code: string } | null
-  const coupon = data.coupons as CouponEmbed
+  const couponRaw = data.coupons as unknown
+  const coupon = (Array.isArray(couponRaw) ? couponRaw[0] ?? null : couponRaw) as CouponEmbed
 
   return {
     id: data.id as string,
@@ -123,10 +128,14 @@ export async function getAffiliateProfile(): Promise<{
   }
 }
 
-export async function getAffiliateOrderHistory(
-  couponId: string,
-  commissionPct: number,
-): Promise<MonthStats[]> {
+// O cupom e a comissão vêm sempre do perfil da afiliada logada — nunca de
+// parâmetros do cliente, senão qualquer sessão veria vendas de outros cupons.
+export async function getAffiliateOrderHistory(): Promise<MonthStats[]> {
+  const profile = await getAffiliateProfile()
+  if (!profile?.couponId) return []
+  const couponId = profile.couponId
+  const commissionPct = profile.commissionPct
+
   const supabase = createServiceClient()
 
   const { data: rawOrders } = await supabase
@@ -168,7 +177,7 @@ export async function getAffiliateOrderHistory(
     items: OrderRow[]
   }>()
 
-  for (const order of rawOrders as RawOrder[]) {
+  for (const order of rawOrders as unknown as RawOrder[]) {
     const d = new Date(order.created_at)
     const m = d.getMonth()
     const y = d.getFullYear()

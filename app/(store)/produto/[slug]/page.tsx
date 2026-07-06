@@ -4,7 +4,7 @@ import { getProductBySlug, getProductsByCategory } from "@/lib/supabase/products
 import { isProductInWishlist } from "@/lib/actions/wishlist"
 import { createClient } from "@/lib/supabase/server"
 import { ProductDetail } from "@/components/store/product-detail"
-import { getStoreSettings } from "@/lib/actions/settings"
+import { getStoreSettings } from "@/lib/server/store-settings"
 
 interface PageProps {
   params: { slug: string }

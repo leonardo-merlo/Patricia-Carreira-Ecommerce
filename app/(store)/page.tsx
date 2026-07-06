@@ -5,7 +5,7 @@ import { ProductCard } from "@/components/store/product-card"
 import { HeroCarousel } from "@/components/store/hero-carousel"
 import { CitySection } from "@/components/store/city-section"
 import { getFeaturedProducts } from "@/lib/supabase/products"
-import { getStoreSettings } from "@/lib/actions/settings"
+import { getStoreSettings } from "@/lib/server/store-settings"
 
 const CATEGORIES = [
   {

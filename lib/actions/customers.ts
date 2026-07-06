@@ -1,6 +1,7 @@
 'use server'
 
 import { createServiceClient } from '@/lib/supabase/service'
+import { requireAdmin } from '@/lib/server/auth'
 import { revalidatePath } from 'next/cache'
 
 type Address = {
@@ -25,6 +26,7 @@ export async function updateCustomer(
     address: Address
   },
 ): Promise<{ error: string | null }> {
+  await requireAdmin()
   const supabase = createServiceClient()
   const { error } = await supabase
     .from('customers')
@@ -52,6 +54,7 @@ export async function createCustomer(data: {
   instagram: string | null
   type: 'retail' | 'wholesale'
 }): Promise<{ error: string | null }> {
+  await requireAdmin()
   const supabase = createServiceClient()
   const { error } = await supabase.from('customers').insert({
     name: data.name,

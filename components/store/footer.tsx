@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Instagram } from "lucide-react"
-import { getStoreSettings } from "@/lib/actions/settings"
+import { getStoreSettings } from "@/lib/server/store-settings"
 
 const STORE_LINKS = [
   { label: "Lançamentos", href: "/lancamentos" },

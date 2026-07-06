@@ -28,6 +28,13 @@ export type MPPaymentResult = {
   boletoBarcode?: string
 }
 
+// Campos da resposta do MP que o SDK não tipa completamente
+type MPCreateResponse = {
+  point_of_interaction?: { transaction_data?: { qr_code?: string; qr_code_base64?: string } }
+  transaction_details?: { external_resource_url?: string }
+  barcode?: { content?: string }
+}
+
 export async function createPixPayment(
   amount: number,
   payer: MPPayer
@@ -43,14 +50,17 @@ export async function createPixPayment(
       },
       description: 'Pedido Patrícia Carreira',
       notification_url: notificationUrl(),
+      // Alinhado ao prazo informado na UI de checkout ("expira em 30 minutos")
+      date_of_expiration: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     },
   })
 
+  const extra = result as MPCreateResponse
   return {
     id: String(result.id),
     status: result.status ?? 'pending',
-    pixCode: (result as any).point_of_interaction?.transaction_data?.qr_code,
-    pixQrBase64: (result as any).point_of_interaction?.transaction_data?.qr_code_base64,
+    pixCode: extra.point_of_interaction?.transaction_data?.qr_code,
+    pixQrBase64: extra.point_of_interaction?.transaction_data?.qr_code_base64,
   }
 }
 
@@ -76,11 +86,12 @@ export async function createBoletoPayment(
     },
   })
 
+  const extra = result as MPCreateResponse
   return {
     id: String(result.id),
     status: result.status ?? 'pending',
-    boletoUrl: (result as any).transaction_details?.external_resource_url,
-    boletoBarcode: (result as any).barcode?.content,
+    boletoUrl: extra.transaction_details?.external_resource_url,
+    boletoBarcode: extra.barcode?.content,
   }
 }
 

@@ -3,17 +3,17 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
-  // Verify session with user client (respects cookies)
+  // getUser valida o token junto ao Supabase — getSession só lê o cookie
   const userClient = createClient()
-  const { data: { session } } = await userClient.auth.getSession()
-  if (!session) redirect('/afiliada/entrar')
+  const { data: { user } } = await userClient.auth.getUser()
+  if (!user?.email) redirect('/afiliada/entrar')
 
   // Check partner record with service client (bypasses admin-only RLS)
   const serviceClient = createServiceClient()
   const { data: partner } = await serviceClient
     .from('partners')
     .select('id, is_active')
-    .eq('email', session.user.email!)
+    .eq('email', user.email)
     .eq('type', 'affiliate')
     .single()
 

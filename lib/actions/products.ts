@@ -1,9 +1,11 @@
 'use server'
 
 import { createServiceClient } from '@/lib/supabase/service'
+import { requireAdmin } from '@/lib/server/auth'
 import { revalidatePath } from 'next/cache'
 
 export async function toggleProductStatus(productId: string, isActive: boolean): Promise<void> {
+  await requireAdmin()
   const supabase = createServiceClient()
   const { error } = await supabase
     .from('products')
@@ -28,6 +30,7 @@ export type UpdateProductData = {
 }
 
 export async function updateProduct(productId: string, data: UpdateProductData): Promise<void> {
+  await requireAdmin()
   const supabase = createServiceClient()
   const { error } = await supabase
     .from('products')
@@ -60,6 +63,7 @@ export type CreateProductInput = {
 }
 
 export async function createProduct(data: CreateProductInput): Promise<string> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const slug =
@@ -110,9 +114,14 @@ export async function createProduct(data: CreateProductInput): Promise<string> {
   return product.id as string
 }
 
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
 export async function uploadProductImage(formData: FormData): Promise<string> {
+  await requireAdmin()
   const file = formData.get('file') as File
   if (!file || file.size === 0) throw new Error('Arquivo inválido')
+  if (!file.type.startsWith('image/')) throw new Error('Apenas imagens são permitidas')
+  if (file.size > MAX_IMAGE_BYTES) throw new Error('Imagem acima de 5MB')
 
   const supabase = createServiceClient()
   const ext = file.name.split('.').pop() ?? 'jpg'
@@ -132,6 +141,7 @@ export async function adjustVariantStock(
   variantId: string,
   newQuantity: number,
 ): Promise<void> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { data: variant, error: fetchError } = await supabase

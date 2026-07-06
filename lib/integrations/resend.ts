@@ -5,6 +5,17 @@ function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
 }
 
+// Nome do cliente e nome do produto vêm de formulários — escapar antes de
+// interpolar no HTML do email para impedir injeção de tags.
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 export type OrderConfirmationInput = {
   to: string
   customerName: string
@@ -30,7 +41,7 @@ export async function sendOrderConfirmation(input: OrderConfirmationInput): Prom
     .map(
       (i) =>
         `<tr>
-          <td style="padding:6px 0">${i.product_name}</td>
+          <td style="padding:6px 0">${escapeHtml(i.product_name)}</td>
           <td style="padding:6px 0;text-align:center">${i.quantity}</td>
           <td style="padding:6px 0;text-align:right">R$ ${(i.unit_price * i.quantity).toFixed(2).replace('.', ',')}</td>
         </tr>`
@@ -53,7 +64,7 @@ export async function sendOrderConfirmation(input: OrderConfirmationInput): Prom
       <!DOCTYPE html>
       <html lang="pt-BR">
       <body style="font-family:sans-serif;color:#1c1c1e;max-width:560px;margin:0 auto;padding:24px">
-        <h2 style="color:#1c1c1e">Olá, ${input.customerName}! 👋</h2>
+        <h2 style="color:#1c1c1e">Olá, ${escapeHtml(input.customerName)}! 👋</h2>
         <p>Seu pedido foi recebido com sucesso.</p>
 
         <table width="100%" style="border-top:1px solid #e0e0e0;border-bottom:1px solid #e0e0e0;margin:16px 0;padding:12px 0;border-collapse:collapse">
@@ -117,14 +128,14 @@ export async function sendOrderShipped(input: OrderShippedInput): Promise<void> 
       <html lang="pt-BR">
       <body style="font-family:sans-serif;color:#1c1c1e;max-width:560px;margin:0 auto;padding:24px">
         <h2 style="color:#1c1c1e">Seu pedido está a caminho! 🎉</h2>
-        <p>Olá, ${input.customerName}! Seu pedido <strong>#${shortId}</strong> foi enviado.</p>
+        <p>Olá, ${escapeHtml(input.customerName)}! Seu pedido <strong>#${shortId}</strong> foi enviado.</p>
 
         <div style="margin:20px 0;padding:16px;background:#f5f5f7;border-radius:8px">
           <div style="font-size:12px;color:#666;margin-bottom:4px">CÓDIGO DE RASTREIO</div>
           <div style="font-family:ui-monospace,monospace;font-size:18px;font-weight:700;letter-spacing:0.06em">
-            ${input.trackingCode}
+            ${escapeHtml(input.trackingCode)}
           </div>
-          ${input.shippingMethod ? `<div style="font-size:12px;color:#666;margin-top:4px">${input.shippingMethod}</div>` : ''}
+          ${input.shippingMethod ? `<div style="font-size:12px;color:#666;margin-top:4px">${escapeHtml(input.shippingMethod)}</div>` : ''}
         </div>
 
         <p style="margin-top:24px">
@@ -173,7 +184,7 @@ export async function sendOrderDelivered(input: OrderDeliveredInput): Promise<vo
       <html lang="pt-BR">
       <body style="font-family:sans-serif;color:#1c1c1e;max-width:560px;margin:0 auto;padding:24px">
         <h2 style="color:#1c1c1e">Seu pedido chegou! ✨</h2>
-        <p>Olá, ${input.customerName}! Seu pedido <strong>#${shortId}</strong> foi entregue.</p>
+        <p>Olá, ${escapeHtml(input.customerName)}! Seu pedido <strong>#${shortId}</strong> foi entregue.</p>
         <p>Esperamos que você ame suas peças. Se tiver qualquer dúvida sobre trocas ou devoluções,
            é só entrar em contato.</p>
 
@@ -222,7 +233,7 @@ export async function sendOrderCancelled(input: OrderCancelledInput): Promise<vo
       <html lang="pt-BR">
       <body style="font-family:sans-serif;color:#1c1c1e;max-width:560px;margin:0 auto;padding:24px">
         <h2 style="color:#1c1c1e">Seu pedido foi cancelado</h2>
-        <p>Olá, ${input.customerName}. Seu pedido <strong>#${shortId}</strong> foi cancelado.</p>
+        <p>Olá, ${escapeHtml(input.customerName)}. Seu pedido <strong>#${shortId}</strong> foi cancelado.</p>
         <p>Se o pagamento já foi processado, o estorno será realizado conforme a política da forma de pagamento utilizada.</p>
         <p>Qualquer dúvida, entre em contato pelo Instagram
            <a href="https://instagram.com/patriciacarreira">@patriciacarreira</a>.</p>
@@ -261,7 +272,7 @@ export async function sendNfeEmail(input: NfeEmailInput): Promise<void> {
       <!DOCTYPE html>
       <html lang="pt-BR">
       <body style="font-family:sans-serif;color:#1c1c1e;max-width:560px;margin:0 auto;padding:24px">
-        <h2 style="color:#1c1c1e">Olá, ${input.customerName}!</h2>
+        <h2 style="color:#1c1c1e">Olá, ${escapeHtml(input.customerName)}!</h2>
         <p>Sua Nota Fiscal Eletrônica referente ao Pedido <strong>#${shortId}</strong> foi emitida com sucesso.</p>
 
         <p style="margin-top:24px">

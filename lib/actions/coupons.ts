@@ -3,6 +3,7 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { createClient } from '@/lib/supabase/server'
 import { getCouponByCode } from '@/lib/supabase/coupons'
+import { requireAdmin } from '@/lib/server/auth'
 import type { Coupon } from '@/lib/types'
 import { revalidatePath } from 'next/cache'
 
@@ -61,25 +62,8 @@ export async function validateCoupon(
   return { coupon, error: null }
 }
 
-export async function recordCouponUsage(
-  couponId: string,
-  orderId: string,
-  userId: string | null,
-  email: string | null,
-): Promise<void> {
-  const supabase = createServiceClient()
-
-  await supabase.from('coupon_usages').insert({
-    coupon_id: couponId,
-    order_id: orderId,
-    user_id: userId,
-    email: email ?? null,
-  })
-
-  await supabase.rpc('increment_coupon_uses', { p_coupon_id: couponId })
-}
-
 export async function createCoupon(input: CouponInput): Promise<{ error: string | null }> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { error } = await supabase.from('coupons').insert({
@@ -102,6 +86,7 @@ export async function updateCoupon(
   id: string,
   input: CouponInput,
 ): Promise<{ error: string | null }> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { error } = await supabase
@@ -123,6 +108,7 @@ export async function toggleCouponActive(
   id: string,
   isActive: boolean,
 ): Promise<{ error: string | null }> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { error } = await supabase
@@ -140,6 +126,7 @@ export async function toggleCouponActive(
 }
 
 export async function deleteCoupon(id: string): Promise<{ error: string | null }> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { error } = await supabase.from('coupons').delete().eq('id', id)

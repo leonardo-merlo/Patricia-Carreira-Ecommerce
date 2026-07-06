@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/service'
+import { requireAdmin } from '@/lib/server/auth'
 import type { MissingMaterialEntry } from '@/lib/supabase/admin-queries'
 
 export type CreateOPResult =
@@ -18,6 +19,7 @@ export type CreateManualOPInput = {
 export async function createManualProductionOrder(
   input: CreateManualOPInput,
 ): Promise<CreateOPResult> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { data: po, error: poErr } = await supabase
@@ -48,6 +50,7 @@ export type CheckMaterialsResult =
   | { success: false; error: string }
 
 export async function checkAndSetMaterials(opId: string): Promise<CheckMaterialsResult> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { data: op, error: opErr } = await supabase
@@ -110,8 +113,13 @@ export async function checkAndSetMaterials(opId: string): Promise<CheckMaterials
         brutoQuery.eq('type_specific', mat.type_specific)
       }
 
-      const { data: bruto } = await brutoQuery.maybeSingle()
-      couroBrutoAvailable = bruto ? Number(bruto.stock_quantity) : 0
+      // Pode haver mais de um registro de couro bruto (lotes/fornecedores):
+      // soma tudo em vez de maybeSingle, que erra com múltiplas linhas.
+      const { data: brutoRows } = await brutoQuery
+      couroBrutoAvailable = (brutoRows ?? []).reduce(
+        (sum, row) => sum + Number(row.stock_quantity),
+        0,
+      )
     }
 
     missing.push({
@@ -150,6 +158,7 @@ export async function toggleMaterialCheck(
   key: string,
   checked: boolean,
 ): Promise<ToggleCheckResult> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { data: op, error: fetchErr } = await supabase
@@ -209,6 +218,7 @@ async function completeProductionOrder(
 }
 
 export async function advanceProductionOrderStatus(opId: string): Promise<AdvanceStatusResult> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { data: op, error: fetchErr } = await supabase
@@ -245,6 +255,7 @@ export async function advanceProductionOrderStatus(opId: string): Promise<Advanc
 }
 
 export async function cancelProductionOrder(opId: string): Promise<AdvanceStatusResult> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { error } = await supabase
@@ -269,6 +280,7 @@ export async function setProductionOrderStatus(
   opId: string,
   targetStatus: string,
 ): Promise<AdvanceStatusResult> {
+  await requireAdmin()
   if (!VALID_STATUSES.includes(targetStatus)) {
     return { success: false, error: `Status inválido: ${targetStatus}` }
   }

@@ -12,6 +12,21 @@ const STATUS_MAP: Record<string, string> = {
 }
 
 export async function POST(req: NextRequest) {
+  // Mesmo esquema do webhook Focus NFe: a URL cadastrada no Melhor Envio deve
+  // incluir ?token=<MELHOR_ENVIO_WEBHOOK_SECRET>. Sem isso qualquer pessoa
+  // poderia alterar status de pedidos.
+  const expectedToken = process.env.MELHOR_ENVIO_WEBHOOK_SECRET
+  if (!expectedToken) {
+    console.warn('[ME Webhook] MELHOR_ENVIO_WEBHOOK_SECRET não configurado')
+    return NextResponse.json({ error: 'not configured' }, { status: 500 })
+  }
+
+  const token = new URL(req.url).searchParams.get('token')
+  if (token !== expectedToken) {
+    console.warn('[ME Webhook] token inválido')
+    return NextResponse.json({ error: 'invalid token' }, { status: 401 })
+  }
+
   let payload: Record<string, unknown>
   try {
     payload = await req.json()
@@ -22,8 +37,6 @@ export async function POST(req: NextRequest) {
   const data = payload['data'] as Record<string, unknown> | undefined
   const meOrderId = (data?.['id'] ?? payload['id']) as string | undefined
   const status = data?.['status'] as string | undefined
-
-  console.log('[ME Webhook] payload:', JSON.stringify({ event: payload['event'], meOrderId, status }))
 
   if (!meOrderId) return NextResponse.json({ ok: true })
 

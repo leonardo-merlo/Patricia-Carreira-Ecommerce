@@ -10,7 +10,10 @@ import { Input } from "@/components/ui/input"
 function EntrarForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const next = searchParams.get("next") ?? "/conta"
+  // Aceita apenas caminhos internos — "//" e URLs absolutas permitiriam
+  // redirecionar o usuário para um site externo após o login (open redirect)
+  const rawNext = searchParams.get("next") ?? "/conta"
+  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/conta"
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")

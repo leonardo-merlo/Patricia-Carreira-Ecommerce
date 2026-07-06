@@ -2,18 +2,20 @@
 
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/service'
+import { requireAdmin } from '@/lib/server/auth'
 import { getMonthlyRevenue } from '@/lib/supabase/financeiro'
-
-export async function fetchMonthlyRevenue(year: number, month: number): Promise<{ revenue: number }> {
-  const revenue = await getMonthlyRevenue(year, month)
-  return { revenue }
-}
 import type {
   AccountPayable,
   ExpenseCategory,
   ExpensePaymentMethod,
   RecurrenceMonths,
 } from '@/lib/types'
+
+export async function fetchMonthlyRevenue(year: number, month: number): Promise<{ revenue: number }> {
+  await requireAdmin()
+  const revenue = await getMonthlyRevenue(year, month)
+  return { revenue }
+}
 
 type AccountPayableInput = {
   description: string
@@ -31,6 +33,7 @@ type AccountPayableInput = {
 export async function createAccountPayable(
   input: AccountPayableInput
 ): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { error } = await supabase.from('accounts_payable').insert({
@@ -56,6 +59,7 @@ export async function updateAccountPayable(
   id: string,
   input: Partial<AccountPayableInput>
 ): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { error } = await supabase
@@ -72,6 +76,7 @@ export async function updateAccountPayable(
 export async function deleteAccountPayable(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin()
   const supabase = createServiceClient()
 
   const { error } = await supabase
@@ -85,12 +90,43 @@ export async function deleteAccountPayable(
   return { success: true }
 }
 
+// Soma meses a uma data YYYY-MM-DD preservando o dia quando possível.
+// setMonth() estoura para o mês seguinte (31/jan + 1 mês → 03/mar); aqui o
+// dia é limitado ao último dia do mês de destino (31/jan → 28/fev).
+function addMonthsClamped(dateStr: string, months: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const totalMonths = m - 1 + months
+  const targetYear = y + Math.floor(totalMonths / 12)
+  const targetMonth = ((totalMonths % 12) + 12) % 12
+  const daysInTarget = new Date(targetYear, targetMonth + 1, 0).getDate()
+  const day = Math.min(d, daysInTarget)
+  return `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
 export async function markAccountAsPaid(
-  account: AccountPayable,
+  accountId: string,
   paidAt: string,
   paymentMethod: ExpensePaymentMethod
 ): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin()
   const supabase = createServiceClient()
+
+  // Busca a conta no banco — os dados usados para gerar a recorrência não
+  // podem vir do cliente.
+  const { data: accountRow, error: fetchError } = await supabase
+    .from('accounts_payable')
+    .select('*')
+    .eq('id', accountId)
+    .maybeSingle()
+
+  if (fetchError || !accountRow) {
+    return { success: false, error: 'Conta não encontrada' }
+  }
+  const account = accountRow as AccountPayable
+
+  if (account.paid_at) {
+    return { success: false, error: 'Conta já está marcada como paga' }
+  }
 
   const { error } = await supabase
     .from('accounts_payable')
@@ -99,14 +135,12 @@ export async function markAccountAsPaid(
       payment_method: paymentMethod,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', account.id)
+    .eq('id', accountId)
 
   if (error) return { success: false, error: error.message }
 
   if (account.is_recurring && account.recurrence_months) {
-    const nextDue = new Date(account.due_date + 'T00:00:00')
-    nextDue.setMonth(nextDue.getMonth() + account.recurrence_months)
-    const nextDueStr = nextDue.toISOString().split('T')[0]
+    const nextDueStr = addMonthsClamped(account.due_date, account.recurrence_months)
 
     await supabase.from('accounts_payable').insert({
       description: account.description,

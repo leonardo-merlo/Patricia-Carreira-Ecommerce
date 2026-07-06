@@ -2,7 +2,7 @@ import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import { getProductsByCategory } from "@/lib/supabase/products"
 import { CategoryPageContent } from "@/components/store/category-page-content"
-import { getStoreSettings } from "@/lib/actions/settings"
+import { getStoreSettings } from "@/lib/server/store-settings"
 import type { Product } from "@/lib/types"
 
 type Categoria =

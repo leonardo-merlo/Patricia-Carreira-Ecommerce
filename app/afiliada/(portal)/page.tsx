@@ -3,10 +3,7 @@ import { AfiliadaContent } from './afiliada-content'
 
 export default async function AfiliadaPage() {
   const profile = await getAffiliateProfile()
-
-  const orderHistory = profile?.couponId
-    ? await getAffiliateOrderHistory(profile.couponId, profile.commissionPct)
-    : []
+  const orderHistory = await getAffiliateOrderHistory()
 
   return (
     <AfiliadaContent

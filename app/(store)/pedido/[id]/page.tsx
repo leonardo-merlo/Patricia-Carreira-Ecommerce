@@ -17,10 +17,18 @@ function PedidoContent() {
   const [barcodeCopied, setBarcodeCopied] = useState(false)
 
   useEffect(() => {
+    // Mantém os dados de pagamento na sessão enquanto pendente: se o cliente
+    // recarregar a página, o QR Code PIX / boleto continua visível. Só remove
+    // quando o pagamento já foi aprovado (cartão).
     const stored = sessionStorage.getItem("mp_payment")
     if (stored) {
-      setPayment(JSON.parse(stored))
-      sessionStorage.removeItem("mp_payment")
+      try {
+        const parsed = JSON.parse(stored) as PaymentData
+        setPayment(parsed)
+        if (parsed.status === "approved") sessionStorage.removeItem("mp_payment")
+      } catch {
+        sessionStorage.removeItem("mp_payment")
+      }
     }
   }, [])
 

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createHmac } from 'crypto'
+import { createHmac, timingSafeEqual } from 'crypto'
 import { createServiceClient } from '@/lib/supabase/service'
-import { decrementStockByOrderId } from '@/lib/actions/orders'
-import { recordCouponUsage } from '@/lib/actions/coupons'
-import { purchaseShippingLabel } from '@/lib/actions/label'
-import { emitirNfe } from '@/lib/actions/nfe'
+import { decrementStockByOrderId, flagStockFailure } from '@/lib/server/orders'
+import { recordCouponUsage } from '@/lib/supabase/coupons'
+import { purchaseShippingLabel } from '@/lib/server/label'
+import { emitirNfe } from '@/lib/server/nfe'
 import { sendOrderConfirmation } from '@/lib/integrations/resend'
-import { getStoreSettings } from '@/lib/actions/settings'
+import { getStoreSettings } from '@/lib/server/store-settings'
 
 function validateMPSignature(req: NextRequest, dataId: string): boolean {
   const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET
@@ -15,7 +15,9 @@ function validateMPSignature(req: NextRequest, dataId: string): boolean {
   const xSignature = req.headers.get('x-signature') ?? ''
   const xRequestId = req.headers.get('x-request-id') ?? ''
 
-  const parts = Object.fromEntries(xSignature.split(',').map((p) => p.split('=')))
+  const parts = Object.fromEntries(
+    xSignature.split(',').map((p) => p.split('=').map((s) => s.trim()))
+  )
   const ts = parts['ts'] ?? ''
   const v1 = parts['v1'] ?? ''
 
@@ -24,7 +26,9 @@ function validateMPSignature(req: NextRequest, dataId: string): boolean {
   const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`
   const hmac = createHmac('sha256', secret).update(manifest).digest('hex')
 
-  return hmac === v1
+  const expected = Buffer.from(hmac, 'utf8')
+  const received = Buffer.from(v1, 'utf8')
+  return expected.length === received.length && timingSafeEqual(expected, received)
 }
 
 export async function POST(req: NextRequest) {
@@ -61,7 +65,6 @@ export async function POST(req: NextRequest) {
     .maybeSingle()
 
   if (!order) {
-    console.log('[MP Webhook] pedido não encontrado para payment_id:', paymentId)
     return NextResponse.json({ ok: true })
   }
 
@@ -78,11 +81,20 @@ export async function POST(req: NextRequest) {
   const mpPayment = (await mpRes.json()) as Record<string, unknown>
   const mpStatus = mpPayment['status'] as string
 
-  if (mpStatus === 'approved' && order.payment_status !== 'paid') {
-    await supabase
+  if (mpStatus === 'approved') {
+    // Update condicional: só a primeira notificação "reivindica" o pedido.
+    // Webhooks do MP chegam em duplicidade/concorrência — sem isso o estoque
+    // seria decrementado e o cupom consumido mais de uma vez.
+    const { data: claimed } = await supabase
       .from('orders')
       .update({ payment_status: 'paid', status: 'paid' })
       .eq('id', order.id)
+      .neq('payment_status', 'paid')
+      .select('id')
+
+    if (!claimed || claimed.length === 0) {
+      return NextResponse.json({ ok: true })
+    }
 
     const settings = await getStoreSettings().catch(() => null)
 
@@ -90,6 +102,7 @@ export async function POST(req: NextRequest) {
       await decrementStockByOrderId(order.id)
     } catch (err) {
       console.error('[MP Webhook] erro ao decrementar estoque:', err)
+      await flagStockFailure(order.id).catch(() => {})
     }
 
     if (order.coupon_id) {
@@ -165,15 +178,12 @@ export async function POST(req: NextRequest) {
         console.error('[MP Webhook] erro ao enviar email de confirmação:', err)
       }
     }
-
-    console.log('[MP Webhook] pedido aprovado:', order.id)
   } else if (mpStatus === 'rejected') {
     await supabase
       .from('orders')
       .update({ payment_status: 'failed' })
       .eq('id', order.id)
-
-    console.log('[MP Webhook] pedido rejeitado:', order.id)
+      .neq('payment_status', 'paid')
   }
 
   return NextResponse.json({ ok: true })
