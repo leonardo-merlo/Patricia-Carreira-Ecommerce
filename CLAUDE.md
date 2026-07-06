@@ -636,6 +636,7 @@ Para que o OpenClaw funcione de forma confiável, o painel admin deve:
 | NF-e                     | ✅ Focus NFe      | R$80/mês + R$0,10/nota                   |
 | Portal atacado           | ✅ Tudo via admin | Sem portal próprio para atacadistas      |
 | Pedido mínimo atacado    | ❓ Pendente       | Alinhar com Henrique                     |
+| Melhor Envio produção    | ⚠️ Sandbox ativo  | Ao migrar para a conta real: trocar `MELHOR_ENVIO_TOKEN`/`MELHOR_ENVIO_BASE_URL` e recadastrar a URL do webhook `/api/webhooks/shipping?token=<MELHOR_ENVIO_WEBHOOK_SECRET>` no painel ME de produção (config do sandbox não migra) |
 | Notificações WhatsApp    | ❓ Pendente       | Fase 2 — Z-API ou Evolution API          |
 | Domínio do site          | ❓ Pendente       | Usar existente ou criar novo             |
 | Dia fixo reunião semanal | ❓ Pendente       | Definir com Henrique                     |
