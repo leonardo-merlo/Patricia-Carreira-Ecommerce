@@ -34,7 +34,7 @@ function slugifyShort(text: string): string {
 function buildSku(name: string, color: string, size: string): string {
   const base = slugifyShort(name)
   const c = (color || 'X').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '').slice(0, 3).toUpperCase()
-  const s = (size || 'U').replace(/\s+/g, '').slice(0, 3).toUpperCase()
+  const s = (size || 'U').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '').slice(0, 3).toUpperCase()
   return `${base}-${c}-${s}`
 }
 
