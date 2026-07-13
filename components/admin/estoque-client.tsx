@@ -5,11 +5,14 @@ import { useRouter } from 'next/navigation'
 import { AdminIcon } from '@/components/admin/admin-icon'
 import { formatPrice } from '@/lib/utils'
 import { toggleProductStatus } from '@/lib/actions/products'
-import { ProdutoDrawer, AdjustStockModal, type AdjustStockTarget } from '@/components/admin/produto-drawer'
-import type { ProductWithVariants, ProductVariant } from '@/lib/types'
+import { ProdutoModal, AdjustStockModal, type AdjustStockTarget } from '@/components/admin/produto-modal'
+import { CsvImportModal } from '@/components/admin/csv-import-modal'
+import type { ProductVariant } from '@/lib/types'
+import type { ProductWithVariantsAndBom, RawMaterialRow } from '@/lib/supabase/admin-queries'
 
 interface EstoqueClientProps {
-  products: ProductWithVariants[]
+  products: ProductWithVariantsAndBom[]
+  rawMaterials: RawMaterialRow[]
 }
 
 function getCategoryLabel(cat: string): string {
@@ -38,7 +41,7 @@ function variantLabel(v: ProductVariant): string {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function EstoqueClient({ products }: EstoqueClientProps) {
+export function EstoqueClient({ products, rawMaterials }: EstoqueClientProps) {
   const router = useRouter()
 
   // Filters
@@ -52,10 +55,11 @@ export function EstoqueClient({ products }: EstoqueClientProps) {
   // Status toggle optimistic
   const [statusOverrides, setStatusOverrides] = useState<Map<string, boolean>>(new Map())
 
-  // Drawers / modals
-  const [drawer, setDrawer] = useState<'create' | null>(null)
-  const [editProduct, setEditProduct] = useState<ProductWithVariants | null>(null)
+  // Modals
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editProduct, setEditProduct] = useState<ProductWithVariantsAndBom | null>(null)
   const [adjustTarget, setAdjustTarget] = useState<AdjustStockTarget | null>(null)
+  const [showCsvImport, setShowCsvImport] = useState(false)
 
 
   // ─── Filtering ──────────────────────────────────────────────────────────────
@@ -97,10 +101,11 @@ export function EstoqueClient({ products }: EstoqueClientProps) {
 
   return (
     <div className="page">
-      {/* Drawers & modals */}
-      {drawer === 'create' && <ProdutoDrawer mode="create" onClose={() => setDrawer(null)} />}
-      {editProduct && <ProdutoDrawer mode="edit" product={editProduct} onClose={() => setEditProduct(null)} />}
+      {/* Modais */}
+      {showCreateModal && <ProdutoModal mode="create" rawMaterials={rawMaterials} onClose={() => setShowCreateModal(false)} />}
+      {editProduct && <ProdutoModal mode="edit" product={editProduct} rawMaterials={rawMaterials} onClose={() => setEditProduct(null)} />}
       {adjustTarget && <AdjustStockModal target={adjustTarget} onClose={() => setAdjustTarget(null)} />}
+      {showCsvImport && <CsvImportModal products={products} onClose={() => setShowCsvImport(false)} />}
 
       <div className="page-header">
         <div>
@@ -111,7 +116,10 @@ export function EstoqueClient({ products }: EstoqueClientProps) {
           <button className="btn" onClick={() => alert('Exportar CSV — em breve')}>
             <AdminIcon name="download" /> Exportar
           </button>
-          <button className="btn primary" id="btn-novo-produto" onClick={() => setDrawer('create')}>
+          <button className="btn" id="btn-importar-csv" onClick={() => setShowCsvImport(true)}>
+            <AdminIcon name="upload" /> Importar CSV
+          </button>
+          <button className="btn primary" id="btn-novo-produto" onClick={() => setShowCreateModal(true)}>
             <AdminIcon name="plus" /> Novo produto
           </button>
         </div>

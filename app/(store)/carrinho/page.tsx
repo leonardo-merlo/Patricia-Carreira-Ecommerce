@@ -77,7 +77,7 @@ export default function CarrinhoPage() {
           {/* Lista de itens */}
           <div className="flex flex-col gap-6">
             {cart.items.map((item) => {
-              const imgSrc = item.variant.product.images[0] ?? null
+              const imgSrc = item.variant.images[0] ?? null
               const hasError = imageErrors[item.variant.id]
               const variantLabel = [item.variant.size, item.variant.color]
                 .filter(Boolean)

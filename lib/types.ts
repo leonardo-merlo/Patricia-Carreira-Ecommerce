@@ -55,6 +55,7 @@ export type ProductVariant = {
   size: string | null; // 'P' | 'M' | 'G' | 'Único' | null
   color: string | null;
   stock_quantity: number; // >= 0, nunca negativo
+  images: string[]; // array de URLs (Supabase Storage) — fonte de verdade das fotos
   created_at: string;
 };
 
@@ -74,7 +75,9 @@ export type Product = {
   base_price: number; // preço varejo (B2C)
   wholesale_price: number | null; // null = não disponível no atacado
   is_active: boolean;
-  images: string[]; // array de URLs (Supabase Storage)
+  is_featured: boolean; // exibido na seção "Destaques" da home
+  /** @deprecated fotos vivem em ProductVariant.images — campo mantido só por compatibilidade de schema */
+  images: string[];
   tags?: string[]; // tags manuais (Lançamento, Promoção, Bazar...) — controladas pelo admin
   // Dados para cálculo de frete — obrigatórios antes de publicar
   weight_grams: number | null;

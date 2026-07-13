@@ -30,7 +30,7 @@ export function ProductCard({ product, className, compact = false, showLowStockW
   const [hovered, setHovered] = useState(false)
 
   const badge = getProductBadge(product, showLowStockWarning)
-  const firstImage = product.images[0] ?? null
+  const firstImage = product.variants?.[0]?.images?.[0] ?? null
   const isOutOfStock = badge === "Esgotado"
 
   // Build a deduplicated list of in-stock sizes, keeping the first variant per size

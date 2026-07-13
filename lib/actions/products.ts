@@ -15,6 +15,49 @@ export async function toggleProductStatus(productId: string, isActive: boolean):
   revalidatePath('/admin/estoque')
 }
 
+// ─── Variantes (compartilhado entre criar/editar) ─────────────────────────────
+
+export type VariantBomInput = {
+  raw_material_id: string
+  quantity_needed: number
+}
+
+export type VariantInput = {
+  tempId: string // chave estável do client, sempre presente
+  id?: string // presente se a variante já existe no banco
+  color: string | null
+  size: string | null
+  sku: string
+  stock_quantity: number
+  images: string[]
+  bom: VariantBomInput[] // lista completa desejada — servidor substitui a existente
+}
+
+async function saveVariantBom(
+  supabase: ReturnType<typeof createServiceClient>,
+  variantId: string,
+  bom: VariantBomInput[],
+): Promise<void> {
+  const { error: delError } = await supabase
+    .from('bill_of_materials')
+    .delete()
+    .eq('product_variant_id', variantId)
+  if (delError) throw new Error(delError.message)
+
+  if (bom.length === 0) return
+
+  const { error: insError } = await supabase.from('bill_of_materials').insert(
+    bom.map((b) => ({
+      product_variant_id: variantId,
+      raw_material_id: b.raw_material_id,
+      quantity_needed: b.quantity_needed,
+    })),
+  )
+  if (insError) throw new Error(insError.message)
+}
+
+// ─── Atualizar produto ─────────────────────────────────────────────────────────
+
 export type UpdateProductData = {
   name: string
   description: string | null
@@ -23,29 +66,80 @@ export type UpdateProductData = {
   category: string
   subcategory: string | null
   is_active: boolean
-  images: string[]
+  is_featured: boolean
+  weight_grams: number | null
+  length_cm: number | null
+  width_cm: number | null
+  height_cm: number | null
   tags: string[]
   ncm: string | null
   cfop: string | null
+  variants: VariantInput[]
 }
 
 export async function updateProduct(productId: string, data: UpdateProductData): Promise<void> {
   await requireAdmin()
   const supabase = createServiceClient()
+
   const { error } = await supabase
     .from('products')
-    .update({ ...data })
+    .update({
+      name: data.name,
+      description: data.description,
+      base_price: data.base_price,
+      wholesale_price: data.wholesale_price,
+      category: data.category,
+      subcategory: data.subcategory,
+      is_active: data.is_active,
+      is_featured: data.is_featured,
+      weight_grams: data.weight_grams,
+      length_cm: data.length_cm,
+      width_cm: data.width_cm,
+      height_cm: data.height_cm,
+      tags: data.tags,
+      ncm: data.ncm,
+      cfop: data.cfop,
+    })
     .eq('id', productId)
+
   if (error) throw new Error(error.message)
+
+  for (const v of data.variants) {
+    if (v.id) {
+      const { error: varError } = await supabase
+        .from('product_variants')
+        .update({
+          color: v.color,
+          size: v.size,
+          sku: v.sku,
+          stock_quantity: v.stock_quantity,
+          images: v.images,
+        })
+        .eq('id', v.id)
+      if (varError) throw new Error(varError.message)
+      await saveVariantBom(supabase, v.id, v.bom)
+    } else {
+      const { data: newVariant, error: insError } = await supabase
+        .from('product_variants')
+        .insert({
+          product_id: productId,
+          color: v.color,
+          size: v.size,
+          sku: v.sku,
+          stock_quantity: v.stock_quantity,
+          images: v.images,
+        })
+        .select('id')
+        .single()
+      if (insError) throw new Error(insError.message)
+      await saveVariantBom(supabase, newVariant.id as string, v.bom)
+    }
+  }
+
   revalidatePath('/admin/estoque')
 }
 
-export type NewVariantInput = {
-  color: string | null
-  size: string | null
-  sku: string
-  stock_quantity: number
-}
+// ─── Criar produto ──────────────────────────────────────────────────────────
 
 export type CreateProductInput = {
   name: string
@@ -55,11 +149,15 @@ export type CreateProductInput = {
   category: string
   subcategory: string | null
   is_active: boolean
-  images: string[]
+  is_featured: boolean
+  weight_grams: number | null
+  length_cm: number | null
+  width_cm: number | null
+  height_cm: number | null
   tags: string[]
   ncm: string | null
   cfop: string | null
-  variants: NewVariantInput[]
+  variants: VariantInput[]
 }
 
 export async function createProduct(data: CreateProductInput): Promise<string> {
@@ -87,7 +185,11 @@ export async function createProduct(data: CreateProductInput): Promise<string> {
       category: data.category,
       subcategory: data.subcategory ?? null,
       is_active: data.is_active,
-      images: data.images,
+      is_featured: data.is_featured,
+      weight_grams: data.weight_grams,
+      length_cm: data.length_cm,
+      width_cm: data.width_cm,
+      height_cm: data.height_cm,
       tags: data.tags ?? [],
       ncm: data.ncm ?? null,
       cfop: data.cfop ?? null,
@@ -97,17 +199,21 @@ export async function createProduct(data: CreateProductInput): Promise<string> {
 
   if (prodError) throw new Error(prodError.message)
 
-  if (data.variants.length > 0) {
-    const { error: varError } = await supabase.from('product_variants').insert(
-      data.variants.map((v) => ({
+  for (const v of data.variants) {
+    const { data: newVariant, error: varError } = await supabase
+      .from('product_variants')
+      .insert({
         product_id: product.id,
         sku: v.sku,
         color: v.color,
         size: v.size,
         stock_quantity: v.stock_quantity,
-      })),
-    )
+        images: v.images,
+      })
+      .select('id')
+      .single()
     if (varError) throw new Error(varError.message)
+    await saveVariantBom(supabase, newVariant.id as string, v.bom)
   }
 
   revalidatePath('/admin/estoque')
@@ -173,4 +279,79 @@ export async function adjustVariantStock(
   })
 
   revalidatePath('/admin/estoque')
+}
+
+// ─── Importação CSV (estoque/preços) ──────────────────────────────────────────
+
+export type CsvImportRow = {
+  sku: string
+  stock_quantity: number | null
+  base_price: number | null
+  wholesale_price: number | null
+}
+
+export type CsvImportResult =
+  | { success: true; updated: number; notFound: string[] }
+  | { success: false; error: string }
+
+export async function importStockPriceCsv(rows: CsvImportRow[]): Promise<CsvImportResult> {
+  await requireAdmin()
+  const supabase = createServiceClient()
+
+  const skus = rows.map((r) => r.sku)
+  const { data: variants, error: fetchError } = await supabase
+    .from('product_variants')
+    .select('id, sku, stock_quantity, product_id')
+    .in('sku', skus)
+
+  if (fetchError) return { success: false, error: fetchError.message }
+
+  type VariantRow = { id: string; sku: string; stock_quantity: number; product_id: string }
+  const bySku = new Map<string, VariantRow>((variants as VariantRow[]).map((v) => [v.sku, v]))
+  const notFound: string[] = []
+  let updated = 0
+
+  for (const row of rows) {
+    const variant = bySku.get(row.sku)
+    if (!variant) {
+      notFound.push(row.sku)
+      continue
+    }
+
+    if (row.stock_quantity !== null) {
+      const before = Number(variant.stock_quantity)
+      const { error: stockError } = await supabase
+        .from('product_variants')
+        .update({ stock_quantity: row.stock_quantity })
+        .eq('id', variant.id)
+      if (stockError) return { success: false, error: stockError.message }
+
+      await supabase.from('stock_adjustments').insert({
+        target: 'product_variant',
+        target_id: variant.id,
+        quantity_before: before,
+        quantity_after: row.stock_quantity,
+        delta: row.stock_quantity - before,
+        reason: 'ajuste_inventario',
+        notes: 'Importação CSV',
+        created_by: 'henrique',
+      })
+    }
+
+    if (row.base_price !== null || row.wholesale_price !== null) {
+      const update: Record<string, number> = {}
+      if (row.base_price !== null) update.base_price = row.base_price
+      if (row.wholesale_price !== null) update.wholesale_price = row.wholesale_price
+      const { error: priceError } = await supabase
+        .from('products')
+        .update(update)
+        .eq('id', variant.product_id)
+      if (priceError) return { success: false, error: priceError.message }
+    }
+
+    updated++
+  }
+
+  revalidatePath('/admin/estoque')
+  return { success: true, updated, notFound }
 }

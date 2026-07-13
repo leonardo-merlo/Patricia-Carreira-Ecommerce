@@ -1,5 +1,13 @@
 import { createServiceClient } from '@/lib/supabase/service'
-import type { ProductWithVariants } from '@/lib/types'
+import type { ProductWithVariants, ProductVariant } from '@/lib/types'
+
+export type ProductVariantWithBom = ProductVariant & {
+  bom: { id: string; raw_material_id: string; quantity_needed: number }[]
+}
+
+export type ProductWithVariantsAndBom = Omit<ProductWithVariants, 'variants'> & {
+  variants: ProductVariantWithBom[]
+}
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
@@ -133,12 +141,12 @@ export async function getDashboardCriticalStock(limit = 6): Promise<DashboardCri
 
 // ─── Estoque ──────────────────────────────────────────────────────────────────
 
-export async function getAllProductsWithVariants(): Promise<ProductWithVariants[]> {
+export async function getAllProductsWithVariants(): Promise<ProductWithVariantsAndBom[]> {
   const supabase = createServiceClient()
 
   const { data, error } = await supabase
     .from('products')
-    .select('*, variants:product_variants(*)')
+    .select('*, variants:product_variants(*, bom:bill_of_materials(id, raw_material_id, quantity_needed))')
     .order('name', { ascending: true })
 
   if (error) {
@@ -146,7 +154,7 @@ export async function getAllProductsWithVariants(): Promise<ProductWithVariants[
     return []
   }
 
-  return (data ?? []) as ProductWithVariants[]
+  return (data ?? []) as unknown as ProductWithVariantsAndBom[]
 }
 
 // ─── Pedidos ──────────────────────────────────────────────────────────────────
@@ -548,6 +556,14 @@ export async function getProductionOrders(limit = 50): Promise<ProductionOrderRo
 
 // ─── Atacado ──────────────────────────────────────────────────────────────────
 
+export type WholesaleOrderItemRow = {
+  id: string
+  name: string
+  sku: string
+  quantity: number
+  unit_price: number
+}
+
 export type WholesaleOrderRow = {
   id: string
   display_num: string
@@ -559,6 +575,7 @@ export type WholesaleOrderRow = {
   status: string
   nfe_status: string
   notes: string | null
+  items: WholesaleOrderItemRow[]
 }
 
 export async function getWholesaleOrders(limit = 50): Promise<WholesaleOrderRow[]> {
@@ -569,7 +586,13 @@ export async function getWholesaleOrders(limit = 50): Promise<WholesaleOrderRow[
     .select(`
       id, created_at, total_amount, status, nfe_status, notes,
       customer:customers(name, cpf_cnpj),
-      items:order_items(id)
+      items:order_items(
+        id, quantity, unit_price,
+        product_variant:product_variants(
+          sku, size, color,
+          product:products(name)
+        )
+      )
     `)
     .eq('type', 'wholesale')
     .order('created_at', { ascending: false })
@@ -580,28 +603,49 @@ export async function getWholesaleOrders(limit = 50): Promise<WholesaleOrderRow[
     return []
   }
 
+  type ItemVariant = {
+    sku: string; size: string | null; color: string | null
+    product: { name: string } | null
+  } | null
+  type ItemRaw = { id: string; quantity: number; unit_price: number; product_variant: ItemVariant }
+
   type OrderRaw = {
     id: string; created_at: string; total_amount: string
     status: string; nfe_status: string | null; notes: string | null
     customer: { name: string; cpf_cnpj: string | null } | null
-    items: { id: string }[]
+    items: ItemRaw[]
   }
 
   return ((data ?? []) as unknown as OrderRaw[]).map((o) => {
     const d = new Date(o.created_at)
     const dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
     const shortId = o.id.replace(/-/g, '').slice(-4).toUpperCase()
+
+    const items = (o.items ?? []).map((it) => {
+      const v = it.product_variant
+      const productName = v?.product?.name ?? 'Produto'
+      const variantParts = [v?.color, v?.size].filter(Boolean).join(' — ')
+      return {
+        id: it.id,
+        name: variantParts ? `${productName} — ${variantParts}` : productName,
+        sku: v?.sku ?? '',
+        quantity: it.quantity,
+        unit_price: Number(it.unit_price),
+      }
+    })
+
     return {
       id: o.id,
       display_num: `A-${shortId}`,
       date: dateStr,
       customer_name: o.customer?.name ?? '—',
       customer_cnpj: o.customer?.cpf_cnpj ?? null,
-      item_count: o.items?.length ?? 0,
+      item_count: items.length,
       total: Number(o.total_amount),
       status: o.status,
       nfe_status: o.nfe_status ?? 'pending',
       notes: o.notes,
+      items,
     }
   })
 }

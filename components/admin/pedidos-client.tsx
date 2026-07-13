@@ -485,50 +485,93 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                     const s = ATACADO_STATUS[o.status] ?? { cls: 'neutral', txt: o.status }
                     const initials = o.customer_name.split(' ').map((x) => x[0]).slice(0, 2).join('')
                     const isOpen = openActionsFor === o.id
+                    const isExpanded = expandedOrder === o.id
                     return (
-                      <tr key={o.id}>
-                        <td><span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11.5, color: 'var(--text-2)' }}>{o.display_num}</span></td>
-                        <td>{o.date}</td>
-                        <td>
-                          <div className="row" style={{ gap: 8 }}>
-                            <div className="thumb" style={{ width: 22, height: 22, fontSize: 9, background: 'linear-gradient(135deg,#d8c89a,#a08956)', color: '#fff' }}>{initials}</div>
-                            <div>
-                              <div style={{ fontWeight: 500 }}>{o.customer_name}</div>
-                              {o.customer_cnpj && <div className="cust-meta">{o.customer_cnpj}</div>}
+                      <Fragment key={o.id}>
+                        <tr style={isExpanded ? { background: 'var(--surface-2)' } : {}}>
+                          <td><span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11.5, color: 'var(--text-2)' }}>{o.display_num}</span></td>
+                          <td>{o.date}</td>
+                          <td>
+                            <div className="row" style={{ gap: 8 }}>
+                              <div className="thumb" style={{ width: 22, height: 22, fontSize: 9, background: 'linear-gradient(135deg,#d8c89a,#a08956)', color: '#fff' }}>{initials}</div>
+                              <div>
+                                <div style={{ fontWeight: 500 }}>{o.customer_name}</div>
+                                {o.customer_cnpj && <div className="cust-meta">{o.customer_cnpj}</div>}
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="num">{o.item_count}</td>
-                        <td className="num" style={{ fontWeight: 500 }}>{formatPrice(o.total)}</td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                            <span className={`badge ${s.cls}`}><span className="dot" />{s.txt}</span>
-                            {o.nfe_status === 'autorizado' && (
-                              <span className="badge pago" style={{ fontSize: 10.5 }}><span className="dot" />NF-e ✓</span>
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          <div className="row" style={{ justifyContent: 'flex-end', gap: 4 }}>
-                            <button
-                              className={`icon-btn ${isOpen ? 'active' : ''}`}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                if (isOpen) {
-                                  setOpenActionsFor(null)
-                                  setDropdownPos(null)
-                                } else {
-                                  const rect = e.currentTarget.getBoundingClientRect()
-                                  setOpenActionsFor(o.id)
-                                  setDropdownPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
-                                }
-                              }}
-                            >
-                              <AdminIcon name="edit" size={13} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="num">{o.item_count}</td>
+                          <td className="num" style={{ fontWeight: 500 }}>{formatPrice(o.total)}</td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <span className={`badge ${s.cls}`}><span className="dot" />{s.txt}</span>
+                              {o.nfe_status === 'autorizado' && (
+                                <span className="badge pago" style={{ fontSize: 10.5 }}><span className="dot" />NF-e ✓</span>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="row" style={{ justifyContent: 'flex-end', gap: 4 }}>
+                              <button
+                                className="icon-btn"
+                                title={isExpanded ? 'Fechar detalhes' : 'Ver detalhes'}
+                                data-testid="btn-ver-detalhes-atacado"
+                                onClick={() => setExpandedOrder(isExpanded ? null : o.id)}
+                              >
+                                <AdminIcon name={isExpanded ? 'chevDown' : 'chevRight'} size={12} />
+                              </button>
+                              <button
+                                className={`icon-btn ${isOpen ? 'active' : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (isOpen) {
+                                    setOpenActionsFor(null)
+                                    setDropdownPos(null)
+                                  } else {
+                                    const rect = e.currentTarget.getBoundingClientRect()
+                                    setOpenActionsFor(o.id)
+                                    setDropdownPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+                                  }
+                                }}
+                              >
+                                <AdminIcon name="edit" size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={7} style={{ padding: 0, borderBottom: 'none' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', background: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
+                                <div style={{ padding: 16, borderRight: '1px solid var(--border)' }}>
+                                  <div className="cust-meta" style={{ marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 500 }}>Itens</div>
+                                  {o.items.map((it, idx) => (
+                                    <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: idx < o.items.length - 1 ? '1px dashed var(--border)' : 'none' }}>
+                                      <div className="thumb bag" style={{ width: 28, height: 28, flexShrink: 0 }}><AdminIcon name="bag" size={12} /></div>
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontSize: 12.5, fontWeight: 500 }}>{it.name}</div>
+                                        <div className="cust-meta tiny">{it.sku} · Qtd. {it.quantity}</div>
+                                      </div>
+                                      <div className="num" style={{ fontSize: 12.5, flexShrink: 0 }}>{formatPrice(it.unit_price)}</div>
+                                    </div>
+                                  ))}
+                                  <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 600 }}>
+                                    <span>Total</span><span>{formatPrice(o.total)}</span>
+                                  </div>
+                                </div>
+                                <div style={{ padding: 16 }}>
+                                  <div className="cust-meta" style={{ marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 500 }}>Observações</div>
+                                  {o.notes ? (
+                                    <div data-testid="texto-observacoes-atacado" style={{ fontSize: 12.5, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{o.notes}</div>
+                                  ) : (
+                                    <div className="cust-meta">Nenhuma observação registrada.</div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     )
                   })
                 )}

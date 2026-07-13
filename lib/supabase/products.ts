@@ -68,22 +68,46 @@ export async function getProductsByCategory(
   return results
 }
 
-export async function getFeaturedProducts(slugs: string[]): Promise<Product[]> {
+export async function getFeaturedProducts(limit = 15): Promise<Product[]> {
   const supabase = createClient()
-  const { data, error } = await supabase
+
+  const { data: featured, error: featuredError } = await supabase
     .from('products')
     .select('*, variants:product_variants(*)')
-    .in('slug', slugs)
     .eq('is_active', true)
+    .eq('is_featured', true)
+    .order('created_at', { ascending: false })
+    .limit(limit)
 
-  if (error) {
-    console.error('[getFeaturedProducts]', error)
+  if (featuredError) {
+    console.error('[getFeaturedProducts]', featuredError)
     return []
   }
 
-  const slugOrder = new Map(slugs.map((s, i) => [s, i]))
-  return ((data ?? []) as Product[]).sort(
-    (a, b) => (slugOrder.get(a.slug) ?? 99) - (slugOrder.get(b.slug) ?? 99),
-  )
+  const results = (featured ?? []) as Product[]
+  if (results.length >= limit) return results
+
+  // Fallback: completa a grade com os produtos ativos mais recentes,
+  // evitando uma seção de Destaques vazia ou curta demais.
+  const excludeIds = results.map((p) => p.id)
+  let fallbackQuery = supabase
+    .from('products')
+    .select('*, variants:product_variants(*)')
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+    .limit(limit - results.length)
+
+  if (excludeIds.length > 0) {
+    fallbackQuery = fallbackQuery.not('id', 'in', `(${excludeIds.join(',')})`)
+  }
+
+  const { data: fallback, error: fallbackError } = await fallbackQuery
+
+  if (fallbackError) {
+    console.error('[getFeaturedProducts fallback]', fallbackError)
+    return results
+  }
+
+  return [...results, ...((fallback ?? []) as Product[])]
 }
 

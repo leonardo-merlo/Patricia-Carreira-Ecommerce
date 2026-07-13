@@ -52,27 +52,9 @@ const CATEGORIES = [
   },
 ]
 
-const FEATURED_SLUGS = [
-  "bolsa-briana",
-  "bolsa-maia",
-  "bolsa-nirvana",
-  "bolsa-romana",
-  "pochete",
-  "bolsa-liberty",
-  "bolsa-mandala",
-  "mochila-wood-stock",
-  "vestido-havana",
-  "vestido-dani",
-  "vestido-fiji",
-  "vestido-maia",
-  "vestido-viena",
-  "bata-asteca",
-  "bata-yoko",
-]
-
 export default async function HomePage() {
   const [FEATURED, settings] = await Promise.all([
-    getFeaturedProducts(FEATURED_SLUGS),
+    getFeaturedProducts(),
     getStoreSettings().catch(() => null),
   ])
   const showLowStockWarning = settings?.show_low_stock_warning ?? false

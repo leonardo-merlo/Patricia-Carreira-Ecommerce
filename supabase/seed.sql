@@ -423,3 +423,12 @@ VALUES
 ('00000000-0000-0000-0000-000000003502','00000000-0000-0000-0000-000000000352','BAZ-BATA3-UNICO','Único','Natural',1,now() - interval '5 days')
 
 ON CONFLICT (sku) DO NOTHING;
+
+-- ─── Fotos por variante (espelha o backfill da migration 025) ────────────────
+-- Variantes recém-criadas ainda não têm fotos próprias — herdam do produto.
+UPDATE public.product_variants v
+SET images = p.images
+FROM public.products p
+WHERE v.product_id = p.id
+  AND v.images = '{}'
+  AND p.images <> '{}';

@@ -13,11 +13,12 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const product = await getProductBySlug(params.slug)
   if (!product) return {}
+  const ogImage = product.variants[0]?.images?.[0]
   return {
     title: `${product.name} | Patrícia Carreira`,
     description: product.description ?? undefined,
     openGraph: {
-      images: product.images[0] ? [product.images[0]] : [],
+      images: ogImage ? [ogImage] : [],
     },
   }
 }

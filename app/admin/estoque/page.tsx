@@ -1,7 +1,10 @@
-import { getAllProductsWithVariants } from '@/lib/supabase/admin-queries'
+import { getAllProductsWithVariants, getRawMaterials } from '@/lib/supabase/admin-queries'
 import { EstoqueClient } from '@/components/admin/estoque-client'
 
 export default async function EstoquePage() {
-  const products = await getAllProductsWithVariants()
-  return <EstoqueClient products={products} />
+  const [products, rawMaterials] = await Promise.all([
+    getAllProductsWithVariants(),
+    getRawMaterials(),
+  ])
+  return <EstoqueClient products={products} rawMaterials={rawMaterials} />
 }

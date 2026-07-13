@@ -53,7 +53,8 @@ export function ProductDetail({
   const badge = getProductBadge(product, showLowStockWarning)
   const categoryLink = getCategoryLink(product.category, product.subcategory)
 
-  const currentImage = product.images[activeImageIndex] ?? null
+  const galleryImages = (selectedVariant?.images.length ? selectedVariant.images : product.variants[0]?.images) ?? []
+  const currentImage = galleryImages[activeImageIndex] ?? null
 
   const sizes = Array.from(
     new Set(
@@ -138,9 +139,9 @@ export function ProductDetail({
               )}
             </div>
 
-            {product.images.length > 1 && (
+            {galleryImages.length > 1 && (
               <div className="flex gap-2">
-                {product.images.map((img, i) => (
+                {galleryImages.map((img, i) => (
                   <button
                     key={i}
                     type="button"
@@ -215,6 +216,7 @@ export function ProductDetail({
                           if (!outOfStock && variant) {
                             setSelectedVariant(variant)
                             setAdded(false)
+                            setActiveImageIndex(0)
                           }
                         }}
                         disabled={outOfStock}
@@ -276,6 +278,7 @@ export function ProductDetail({
                           if (!outOfStock && variant) {
                             setSelectedVariant(variant)
                             setAdded(false)
+                            setActiveImageIndex(0)
                           }
                         }}
                         disabled={outOfStock}
