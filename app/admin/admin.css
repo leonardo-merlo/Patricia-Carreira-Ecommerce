@@ -598,6 +598,7 @@
   border-radius: 2px 2px 0 0;
 }
 .admin-root .tab.active .count { background: var(--accent-soft); color: var(--accent); }
+.admin-root .tab .count.alert { background: var(--red); color: #fff; }
 
 /* === DASHBOARD === */
 .admin-root .dash-row {

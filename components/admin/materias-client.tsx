@@ -57,6 +57,9 @@ function formatQty(qty: number, unit: string) {
 }
 
 export function MateriasClient({ materials, variants, purchaseRequests, suppliers }: MateriasClientProps) {
+  // ── Abas ──
+  const [tab, setTab] = useState<'insumos' | 'receitas' | 'compras'>('insumos')
+
   // ── Busca e filtro de insumos ──
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('all')
@@ -288,9 +291,6 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
           <h2 className="page-title">Matérias-Primas</h2>
           <p className="page-sub">
             {materials.length} insumo{materials.length !== 1 ? 's' : ''} cadastrado{materials.length !== 1 ? 's' : ''} · {lowCount} abaixo do mínimo
-            {purchaseRequests.length > 0 && (
-              <> · <span style={{ color: 'var(--red)', fontWeight: 500 }}>{purchaseRequests.length} compra{purchaseRequests.length !== 1 ? 's' : ''} pendente{purchaseRequests.length !== 1 ? 's' : ''}</span></>
-            )}
           </p>
         </div>
         <div className="page-actions">
@@ -300,8 +300,23 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: 'var(--gap)' }}>
-        {/* ── Tabela de insumos ── */}
+      <div className="tabs">
+        <button className={`tab ${tab === 'insumos' ? 'active' : ''}`} onClick={() => setTab('insumos')}>
+          <AdminIcon name="layers" size={13} /> Insumos <span className="count">{materials.length}</span>
+        </button>
+        <button className={`tab ${tab === 'receitas' ? 'active' : ''}`} onClick={() => setTab('receitas')}>
+          <AdminIcon name="fileText" size={13} /> Receitas
+        </button>
+        <button className={`tab ${tab === 'compras' ? 'active' : ''}`} onClick={() => setTab('compras')}>
+          <AdminIcon name="money" size={13} />
+          {purchaseRequests.length > 0 && tab !== 'compras' ? 'Compras pendentes' : 'Compras'}
+          {purchaseRequests.length > 0 && tab !== 'compras' && (
+            <span className="count alert">{purchaseRequests.length}</span>
+          )}
+        </button>
+      </div>
+
+      {tab === 'insumos' && (
         <div className="card">
           <div className="card-header" style={{ gap: 12 }}>
             <h3 className="ttl">Insumos</h3>
@@ -413,9 +428,10 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
             </div>
           </div>
         </div>
+      )}
 
-        {/* ── Receita de produto (BOM) ── */}
-        <div className="card" style={{ alignSelf: 'flex-start', position: 'sticky', top: 78 }}>
+      {tab === 'receitas' && (
+        <div className="card">
           <div className="card-header">
             <div>
               <h3 className="ttl">Receita de Produto (BOM)</h3>
@@ -609,19 +625,24 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
             </div>
           )}
         </div>
-      </div>
+      )}
 
       {/* ── Compras Pendentes ── */}
-      {purchaseRequests.length > 0 && (
-        <div className="card" style={{ marginTop: 'var(--gap)' }}>
+      {tab === 'compras' && (
+        <div className="card">
           <div className="card-header">
             <div>
-              <h3 className="ttl">Compras Pendentes</h3>
+              <h3 className="ttl">Compras</h3>
               <div className="cust-meta" style={{ marginTop: 2, fontSize: 11.5 }}>
                 Materiais registrados como necessários em pedidos de atacado.
               </div>
             </div>
           </div>
+          {purchaseRequests.length === 0 ? (
+            <div className="card-body" style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-3)', fontSize: 12.5 }}>
+              Não tem nenhuma compra pendente nesse momento.
+            </div>
+          ) : (
           <div className="card-body flush">
             <div className="table-wrap">
               <table className="tbl">
@@ -680,6 +701,7 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
               </table>
             </div>
           </div>
+          )}
         </div>
       )}
 
