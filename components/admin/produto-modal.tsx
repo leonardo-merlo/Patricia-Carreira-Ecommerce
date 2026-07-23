@@ -300,8 +300,7 @@ export function ProdutoModal({ mode, product, rawMaterials, onClose }: ProdutoMo
   }
 
   return (
-    <>
-      <div className="modal-backdrop" onClick={onClose} />
+    <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" style={{ width: 760, maxWidth: '95vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div>
@@ -626,7 +625,7 @@ export function ProdutoModal({ mode, product, rawMaterials, onClose }: ProdutoMo
           </button>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 

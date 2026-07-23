@@ -175,7 +175,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         variantId: variant.id,
         productName: variant.product.name,
         variantLabel: label,
-        image: variant.images[0] ?? null,
+        image: variant.images?.[0] ?? null,
       })
     },
     []
