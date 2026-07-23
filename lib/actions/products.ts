@@ -281,20 +281,54 @@ export async function adjustVariantStock(
   revalidatePath('/admin/estoque')
 }
 
-// ─── Importação CSV (estoque/preços) ──────────────────────────────────────────
+// ─── Importação CSV (edição em massa de produtos existentes) ──────────────────
+//
+// Cada linha do CSV é uma variante (SKU). Campos de produto (nome, categoria,
+// preço...) se repetem nas linhas de todas as variantes do mesmo produto — se
+// o CSV tiver valores diferentes para o mesmo produto em linhas diferentes, a
+// última linha processada é quem vale (mesmo aviso já feito na UI de import).
+//
+// Import só ATUALIZA SKUs existentes — nunca cria produto/variante novos.
+// Fotos, dados fiscais (NCM/CFOP) e BOM ficam de fora: exigem o modal.
+
+const CATEGORIES = new Set(['bolsas', 'roupas', 'acessorios', 'bazar'])
+const SUBCATEGORIES = new Set(['vestidos', 'batas'])
 
 export type CsvImportRow = {
   sku: string
+  product_name: string | null
+  description: string | null
+  category: string | null
+  subcategory: string | null
+  color: string | null
+  size: string | null
   stock_quantity: number | null
   base_price: number | null
   wholesale_price: number | null
+  is_active: boolean | null
+  is_featured: boolean | null
+  tags: string[] | null
+  weight_grams: number | null
+  length_cm: number | null
+  width_cm: number | null
+  height_cm: number | null
 }
 
 export type CsvImportResult =
-  | { success: true; updated: number; notFound: string[] }
+  | { success: true; updated: number; notFound: string[]; invalid: { sku: string; reason: string }[] }
   | { success: false; error: string }
 
-export async function importStockPriceCsv(rows: CsvImportRow[]): Promise<CsvImportResult> {
+function validateRow(row: CsvImportRow): string | null {
+  if (row.category !== null && !CATEGORIES.has(row.category)) {
+    return `categoria inválida "${row.category}"`
+  }
+  if (row.subcategory !== null && row.subcategory !== '' && !SUBCATEGORIES.has(row.subcategory)) {
+    return `subcategoria inválida "${row.subcategory}"`
+  }
+  return null
+}
+
+export async function importProductsCsv(rows: CsvImportRow[]): Promise<CsvImportResult> {
   await requireAdmin()
   const supabase = createServiceClient()
 
@@ -309,6 +343,7 @@ export async function importStockPriceCsv(rows: CsvImportRow[]): Promise<CsvImpo
   type VariantRow = { id: string; sku: string; stock_quantity: number; product_id: string }
   const bySku = new Map<string, VariantRow>((variants as VariantRow[]).map((v) => [v.sku, v]))
   const notFound: string[] = []
+  const invalid: { sku: string; reason: string }[] = []
   let updated = 0
 
   for (const row of rows) {
@@ -318,14 +353,27 @@ export async function importStockPriceCsv(rows: CsvImportRow[]): Promise<CsvImpo
       continue
     }
 
+    const reason = validateRow(row)
+    if (reason) {
+      invalid.push({ sku: row.sku, reason })
+      continue
+    }
+
+    const variantUpdate: Record<string, string | number> = {}
+    if (row.color !== null) variantUpdate.color = row.color
+    if (row.size !== null) variantUpdate.size = row.size
+    if (row.stock_quantity !== null) variantUpdate.stock_quantity = row.stock_quantity
+
+    if (Object.keys(variantUpdate).length > 0) {
+      const { error: varError } = await supabase
+        .from('product_variants')
+        .update(variantUpdate)
+        .eq('id', variant.id)
+      if (varError) return { success: false, error: varError.message }
+    }
+
     if (row.stock_quantity !== null) {
       const before = Number(variant.stock_quantity)
-      const { error: stockError } = await supabase
-        .from('product_variants')
-        .update({ stock_quantity: row.stock_quantity })
-        .eq('id', variant.id)
-      if (stockError) return { success: false, error: stockError.message }
-
       await supabase.from('stock_adjustments').insert({
         target: 'product_variant',
         target_id: variant.id,
@@ -338,20 +386,32 @@ export async function importStockPriceCsv(rows: CsvImportRow[]): Promise<CsvImpo
       })
     }
 
-    if (row.base_price !== null || row.wholesale_price !== null) {
-      const update: Record<string, number> = {}
-      if (row.base_price !== null) update.base_price = row.base_price
-      if (row.wholesale_price !== null) update.wholesale_price = row.wholesale_price
-      const { error: priceError } = await supabase
+    const productUpdate: Record<string, string | number | boolean | string[] | null> = {}
+    if (row.product_name !== null) productUpdate.name = row.product_name
+    if (row.description !== null) productUpdate.description = row.description
+    if (row.category !== null) productUpdate.category = row.category
+    if (row.subcategory !== null) productUpdate.subcategory = row.subcategory || null
+    if (row.base_price !== null) productUpdate.base_price = row.base_price
+    if (row.wholesale_price !== null) productUpdate.wholesale_price = row.wholesale_price
+    if (row.is_active !== null) productUpdate.is_active = row.is_active
+    if (row.is_featured !== null) productUpdate.is_featured = row.is_featured
+    if (row.tags !== null) productUpdate.tags = row.tags
+    if (row.weight_grams !== null) productUpdate.weight_grams = row.weight_grams
+    if (row.length_cm !== null) productUpdate.length_cm = row.length_cm
+    if (row.width_cm !== null) productUpdate.width_cm = row.width_cm
+    if (row.height_cm !== null) productUpdate.height_cm = row.height_cm
+
+    if (Object.keys(productUpdate).length > 0) {
+      const { error: prodError } = await supabase
         .from('products')
-        .update(update)
+        .update(productUpdate)
         .eq('id', variant.product_id)
-      if (priceError) return { success: false, error: priceError.message }
+      if (prodError) return { success: false, error: prodError.message }
     }
 
     updated++
   }
 
   revalidatePath('/admin/estoque')
-  return { success: true, updated, notFound }
+  return { success: true, updated, notFound, invalid }
 }

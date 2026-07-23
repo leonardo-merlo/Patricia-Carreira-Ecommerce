@@ -4,6 +4,7 @@ import { useState, useMemo, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { AdminIcon } from '@/components/admin/admin-icon'
 import { formatPrice } from '@/lib/utils'
+import { toCsv, downloadCsv } from '@/lib/csv'
 import type { CustomerRow } from '@/lib/supabase/customer-queries'
 import { updateCustomer, createCustomer } from '@/lib/actions/customers'
 
@@ -61,16 +62,8 @@ function exportCSV(rows: CustomerRow[]): void {
     c.total_spent.toFixed(2).replace('.', ','),
     fmtFull(c.last_order_at),
   ])
-  const csv = [headers, ...data]
-    .map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
-    .join('\n')
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `clientes-${new Date().toISOString().slice(0, 10)}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
+  const csv = toCsv(headers, data)
+  downloadCsv(`clientes-${new Date().toISOString().slice(0, 10)}.csv`, csv)
 }
 
 type EditForm = {

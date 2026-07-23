@@ -797,3 +797,140 @@ export async function getSidebarCounts(): Promise<{ open_orders: number; low_sto
     low_stock: stockRes.count ?? 0,
   }
 }
+
+// ─── Afiliadas ──────────────────────────────────────────────────────────────
+
+const PT_MONTHS_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+
+export type AffiliateMonthStats = {
+  key: string // 'YYYY-MM'
+  label: string // 'mai/2026'
+  sales: number
+  revenue: number
+  commission: number
+  paid: boolean
+}
+
+export type AffiliateRow = {
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+  couponCode: string | null
+  couponId: string | null
+  commissionPct: number
+  paymentDay: number | null
+  isActive: boolean
+  joinedDate: string
+  months: AffiliateMonthStats[] // desc, mês mais recente primeiro
+  salesMonth: number
+  revenueMonth: number
+  commissionMonth: number
+  paidMonth: boolean
+  totalSales: number
+  totalRevenue: number
+  totalCommission: number
+}
+
+export async function getAllAffiliatesWithStats(): Promise<AffiliateRow[]> {
+  const supabase = createServiceClient()
+
+  const { data: partners, error: partnersError } = await supabase
+    .from('partners')
+    .select('id, name, contact_name, email, phone, commission_pct, payment_day, coupon_id, is_active, created_at, coupons!coupon_id(code)')
+    .eq('type', 'affiliate')
+    .order('created_at', { ascending: false })
+
+  if (partnersError || !partners?.length) return []
+
+  type CouponEmbed = { code: string } | null
+  type PartnerRow = {
+    id: string; name: string; contact_name: string | null; email: string | null; phone: string | null
+    commission_pct: number | null; payment_day: number | null; coupon_id: string | null
+    is_active: boolean; created_at: string; coupons: unknown
+  }
+
+  const couponIds = (partners as PartnerRow[]).map((p) => p.coupon_id).filter((id): id is string => Boolean(id))
+
+  const { data: payments } = await supabase
+    .from('affiliate_payments')
+    .select('partner_id, month, paid')
+    .in('partner_id', (partners as PartnerRow[]).map((p) => p.id))
+
+  type PaymentRow = { partner_id: string; month: string; paid: boolean }
+  const paidByPartnerMonth = new Map<string, boolean>()
+  for (const pay of (payments ?? []) as PaymentRow[]) {
+    paidByPartnerMonth.set(`${pay.partner_id}:${pay.month}`, pay.paid)
+  }
+
+  const { data: rawOrders } = couponIds.length
+    ? await supabase
+        .from('orders')
+        .select('coupon_id, created_at, order_items(quantity, unit_price)')
+        .in('coupon_id', couponIds)
+    : { data: [] }
+
+  type RawOrder = { coupon_id: string; created_at: string; order_items: { quantity: number; unit_price: number }[] }
+
+  const monthsByCoupon = new Map<string, Map<string, { sales: number; revenue: number }>>()
+  for (const order of (rawOrders ?? []) as RawOrder[]) {
+    const d = new Date(order.created_at)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    if (!monthsByCoupon.has(order.coupon_id)) monthsByCoupon.set(order.coupon_id, new Map())
+    const monthMap = monthsByCoupon.get(order.coupon_id)!
+    if (!monthMap.has(key)) monthMap.set(key, { sales: 0, revenue: 0 })
+    const m = monthMap.get(key)!
+    for (const item of order.order_items) {
+      m.sales++
+      m.revenue += Number(item.unit_price) * item.quantity
+    }
+  }
+
+  const currentKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+
+  return (partners as PartnerRow[]).map((p) => {
+    const couponRaw = p.coupons as unknown
+    const coupon = (Array.isArray(couponRaw) ? couponRaw[0] ?? null : couponRaw) as CouponEmbed
+    const commissionPct = Number(p.commission_pct) || 10
+    const monthMap = p.coupon_id ? monthsByCoupon.get(p.coupon_id) ?? new Map() : new Map()
+
+    const months: AffiliateMonthStats[] = Array.from(monthMap.entries())
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([key, m]) => {
+        const [y, mo] = key.split('-')
+        const revenue = Math.round(m.revenue * 100) / 100
+        return {
+          key,
+          label: `${PT_MONTHS_SHORT[Number(mo) - 1]}/${y}`,
+          sales: m.sales,
+          revenue,
+          commission: Math.round(revenue * commissionPct) / 100,
+          paid: paidByPartnerMonth.get(`${p.id}:${key}`) ?? false,
+        }
+      })
+
+    const current = months.find((m) => m.key === currentKey) ?? null
+    const joined = new Date(p.created_at)
+
+    return {
+      id: p.id,
+      name: p.contact_name ?? p.name,
+      email: p.email,
+      phone: p.phone,
+      couponCode: coupon?.code ?? null,
+      couponId: p.coupon_id,
+      commissionPct,
+      paymentDay: p.payment_day,
+      isActive: p.is_active,
+      joinedDate: `${PT_MONTHS_SHORT[joined.getMonth()]}/${joined.getFullYear()}`,
+      months,
+      salesMonth: current?.sales ?? 0,
+      revenueMonth: current?.revenue ?? 0,
+      commissionMonth: current?.commission ?? 0,
+      paidMonth: current?.paid ?? false,
+      totalSales: months.reduce((s, m) => s + m.sales, 0),
+      totalRevenue: Math.round(months.reduce((s, m) => s + m.revenue, 0) * 100) / 100,
+      totalCommission: Math.round(months.reduce((s, m) => s + m.commission, 0) * 100) / 100,
+    }
+  })
+}

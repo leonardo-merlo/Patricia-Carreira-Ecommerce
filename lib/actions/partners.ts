@@ -3,6 +3,7 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/server/auth'
+import { revalidatePath } from 'next/cache'
 
 type AffiliateFormData = {
   name: string
@@ -88,6 +89,109 @@ export async function invitePartnerUser(
   const { error } = await supabase.auth.admin.inviteUserByEmail(email.trim())
   if (error) return { ok: false, error: error.message }
   return { ok: true }
+}
+
+// ─── CRUD de afiliadas (painel admin) ──────────────────────────────────────────
+
+export type AffiliateFormInput = {
+  name: string
+  email: string
+  phone: string
+  couponCode: string
+  commissionPct: number
+}
+
+async function findOrCreateCoupon(code: string, commissionPct: number): Promise<{ id: string } | { error: string }> {
+  const supabase = createServiceClient()
+  const normalized = code.trim().toUpperCase()
+  if (!normalized) return { error: 'Cupom obrigatório.' }
+
+  const { data: existing } = await supabase.from('coupons').select('id').eq('code', normalized).maybeSingle()
+  if (existing) return { id: existing.id as string }
+
+  const { data: created, error } = await supabase
+    .from('coupons')
+    .insert({ code: normalized, type: 'percent', value: commissionPct, is_active: true, description: `Cupom de afiliada — ${normalized}` })
+    .select('id')
+    .single()
+  if (error) return { error: error.message }
+  return { id: created.id as string }
+}
+
+export async function createAffiliatePartner(
+  data: AffiliateFormInput,
+): Promise<{ success: true; id: string } | { success: false; error: string }> {
+  await requireAdmin()
+  if (!data.name.trim() || !data.email.trim()) return { success: false, error: 'Nome e e-mail são obrigatórios.' }
+
+  const coupon = await findOrCreateCoupon(data.couponCode, data.commissionPct)
+  if ('error' in coupon) return { success: false, error: coupon.error }
+
+  const supabase = createServiceClient()
+  const { data: created, error } = await supabase
+    .from('partners')
+    .insert({
+      name: data.name.trim(),
+      contact_name: data.name.trim(),
+      type: 'affiliate',
+      email: data.email.trim(),
+      phone: data.phone.trim() || null,
+      commission_pct: data.commissionPct,
+      coupon_id: coupon.id,
+      is_active: true,
+    })
+    .select('id')
+    .single()
+
+  if (error) return { success: false, error: error.message }
+  revalidatePath('/admin/afiliados')
+  return { success: true, id: created.id as string }
+}
+
+export async function updateAffiliatePartner(
+  partnerId: string,
+  data: AffiliateFormInput,
+): Promise<{ success: true } | { success: false; error: string }> {
+  await requireAdmin()
+  if (!data.name.trim() || !data.email.trim()) return { success: false, error: 'Nome e e-mail são obrigatórios.' }
+
+  const coupon = await findOrCreateCoupon(data.couponCode, data.commissionPct)
+  if ('error' in coupon) return { success: false, error: coupon.error }
+
+  const supabase = createServiceClient()
+  const { error } = await supabase
+    .from('partners')
+    .update({
+      name: data.name.trim(),
+      contact_name: data.name.trim(),
+      email: data.email.trim(),
+      phone: data.phone.trim() || null,
+      commission_pct: data.commissionPct,
+      coupon_id: coupon.id,
+    })
+    .eq('id', partnerId)
+
+  if (error) return { success: false, error: error.message }
+  revalidatePath('/admin/afiliados')
+  return { success: true }
+}
+
+export async function setAffiliatePaymentStatus(
+  partnerId: string,
+  month: string,
+  paid: boolean,
+): Promise<{ success: true } | { success: false; error: string }> {
+  await requireAdmin()
+  const supabase = createServiceClient()
+  const { error } = await supabase
+    .from('affiliate_payments')
+    .upsert(
+      { partner_id: partnerId, month, paid, paid_at: paid ? new Date().toISOString() : null },
+      { onConflict: 'partner_id,month' },
+    )
+  if (error) return { success: false, error: error.message }
+  revalidatePath('/admin/afiliados')
+  return { success: true }
 }
 
 export async function getAffiliateProfile(): Promise<{

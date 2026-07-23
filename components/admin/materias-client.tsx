@@ -57,6 +57,10 @@ function formatQty(qty: number, unit: string) {
 }
 
 export function MateriasClient({ materials, variants, purchaseRequests, suppliers }: MateriasClientProps) {
+  // ── Busca e filtro de insumos ──
+  const [search, setSearch] = useState('')
+  const [catFilter, setCatFilter] = useState('all')
+
   // ── Exit modal ──
   const [exitFor, setExitFor] = useState<RawMaterialRow | null>(null)
   const [exitQty, setExitQty] = useState('1')
@@ -101,6 +105,11 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
   const [isPending, startTransition] = useTransition()
 
   const lowCount = materials.filter((m) => m.stock_quantity < m.minimum_stock).length
+  const filteredMaterials = materials.filter((m) => {
+    if (catFilter !== 'all' && m.category !== catFilter) return false
+    if (search.trim() && !m.name.toLowerCase().includes(search.trim().toLowerCase())) return false
+    return true
+  })
   const variantsWithBOM = variants.filter((v) => v.bom.length > 0)
   const selectedVariant = variants.find((v) => v.id === selectedVariantId) ?? null
 
@@ -294,8 +303,23 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
       <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: 'var(--gap)' }}>
         {/* ── Tabela de insumos ── */}
         <div className="card">
-          <div className="card-header">
+          <div className="card-header" style={{ gap: 12 }}>
             <h3 className="ttl">Insumos</h3>
+            <div className="row" style={{ flex: 1, gap: 8, justifyContent: 'flex-end' }}>
+              <div className="search-input" style={{ width: 220 }}>
+                <AdminIcon name="search" size={13} />
+                <input
+                  placeholder="Buscar matéria-prima..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <select className="select" style={{ width: 'auto' }} value={catFilter} onChange={(e) => setCatFilter(e.target.value)}>
+                <option value="all">Todas as categorias</option>
+                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <span className="chip">{filteredMaterials.length} insumo{filteredMaterials.length !== 1 ? 's' : ''}</span>
+            </div>
           </div>
           <div className="card-body flush">
             <div className="table-wrap">
@@ -312,7 +336,14 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
                   </tr>
                 </thead>
                 <tbody>
-                  {materials.map((m) => {
+                  {filteredMaterials.length === 0 && (
+                    <tr>
+                      <td colSpan={7} style={{ padding: '16px', textAlign: 'center', color: 'var(--text-3)', fontSize: 12.5 }}>
+                        Nenhum insumo encontrado.
+                      </td>
+                    </tr>
+                  )}
+                  {filteredMaterials.map((m) => {
                     const s = stockState(m.stock_quantity, m.minimum_stock)
                     return (
                       <tr key={m.id}>

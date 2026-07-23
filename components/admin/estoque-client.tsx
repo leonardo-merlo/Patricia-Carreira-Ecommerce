@@ -7,8 +7,45 @@ import { formatPrice } from '@/lib/utils'
 import { toggleProductStatus } from '@/lib/actions/products'
 import { ProdutoModal, AdjustStockModal, type AdjustStockTarget } from '@/components/admin/produto-modal'
 import { CsvImportModal } from '@/components/admin/csv-import-modal'
+import { toCsv, downloadCsv } from '@/lib/csv'
 import type { ProductVariant } from '@/lib/types'
 import type { ProductWithVariantsAndBom, RawMaterialRow } from '@/lib/supabase/admin-queries'
+
+const EXPORT_HEADERS = [
+  'sku', 'nome_produto', 'descricao', 'categoria', 'subcategoria', 'cor', 'tamanho',
+  'estoque', 'preco_varejo', 'preco_atacado', 'ativo_ecommerce', 'destaque_home', 'tags',
+  'peso_g', 'comprimento_cm', 'largura_cm', 'altura_cm',
+]
+
+function priceCell(n: number | null): string {
+  return n == null ? '' : n.toFixed(2).replace('.', ',')
+}
+
+function exportEstoqueCsv(products: ProductWithVariantsAndBom[]): void {
+  const rows = products.flatMap((p) =>
+    p.variants.map((v) => [
+      v.sku,
+      p.name,
+      p.description ?? '',
+      p.category,
+      p.subcategory ?? '',
+      v.color ?? '',
+      v.size ?? '',
+      v.stock_quantity,
+      priceCell(p.base_price),
+      priceCell(p.wholesale_price),
+      p.is_active ? 'TRUE' : 'FALSE',
+      p.is_featured ? 'TRUE' : 'FALSE',
+      (p.tags ?? []).join('|'),
+      p.weight_grams ?? '',
+      p.length_cm ?? '',
+      p.width_cm ?? '',
+      p.height_cm ?? '',
+    ]),
+  )
+  const csv = toCsv(EXPORT_HEADERS, rows)
+  downloadCsv(`estoque-${new Date().toISOString().slice(0, 10)}.csv`, csv)
+}
 
 interface EstoqueClientProps {
   products: ProductWithVariantsAndBom[]
@@ -113,7 +150,7 @@ export function EstoqueClient({ products, rawMaterials }: EstoqueClientProps) {
           <p className="page-sub">{filtered.length} produtos · {totalVariants} variantes</p>
         </div>
         <div className="page-actions">
-          <button className="btn" onClick={() => alert('Exportar CSV — em breve')}>
+          <button className="btn" onClick={() => exportEstoqueCsv(filtered)}>
             <AdminIcon name="download" /> Exportar
           </button>
           <button className="btn" id="btn-importar-csv" onClick={() => setShowCsvImport(true)}>
