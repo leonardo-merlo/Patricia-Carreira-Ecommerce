@@ -212,7 +212,10 @@ export function AfiliadosClient({ initialData }: AfiliadosClientProps) {
                 )}
                 {filtered.map((a) => (
                   <Fragment key={a.id}>
-                    <tr style={{ background: expanded === a.id ? 'var(--surface-2)' : undefined }}>
+                    <tr
+                      style={{ background: expanded === a.id ? 'var(--surface-2)' : undefined, cursor: 'default' }}
+                      onMouseEnter={() => setExpanded(a.id)}
+                    >
                       <td>
                         <button
                           className="icon-btn"

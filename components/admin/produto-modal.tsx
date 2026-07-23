@@ -97,6 +97,7 @@ export function ProdutoModal({ mode, product, rawMaterials, onClose }: ProdutoMo
   const [subcategory, setSubcategory] = useState(product?.subcategory ?? '')
   const [isActive, setIsActive] = useState(product?.is_active ?? true)
   const [isFeatured, setIsFeatured] = useState(product?.is_featured ?? false)
+  const [isAffiliatePromo, setIsAffiliatePromo] = useState(product?.is_affiliate_promo ?? false)
   const [tags, setTags] = useState<string[]>(product?.tags ?? [])
 
   const [weightGrams, setWeightGrams] = useState(product?.weight_grams != null ? String(product.weight_grams) : '')
@@ -273,6 +274,7 @@ export function ProdutoModal({ mode, product, rawMaterials, onClose }: ProdutoMo
         subcategory: category === 'roupas' && subcategory ? subcategory : null,
         is_active: isActive,
         is_featured: isFeatured,
+        is_affiliate_promo: isAffiliatePromo,
         weight_grams: weightGrams ? parseInt(weightGrams) : null,
         length_cm: lengthCm ? parseInt(lengthCm) : null,
         width_cm: widthCm ? parseInt(widthCm) : null,
@@ -353,7 +355,7 @@ export function ProdutoModal({ mode, product, rawMaterials, onClose }: ProdutoMo
                 </div>
               )}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8 }}>
                 <div>
                   <div style={{ fontWeight: 500, fontSize: 12.5 }}>Ativo no e-commerce</div>
@@ -367,6 +369,13 @@ export function ProdutoModal({ mode, product, rawMaterials, onClose }: ProdutoMo
                   <div className="cust-meta">Aparece na seção &quot;Destaques&quot;</div>
                 </div>
                 <button type="button" data-testid="checkbox-destaque" onClick={() => setIsFeatured((v) => !v)} className={`switch ${isFeatured ? 'on' : ''}`} style={{ cursor: 'pointer' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 500, fontSize: 12.5 }}>Para afiliadas</div>
+                  <div className="cust-meta">Aparece na aba &quot;Divulgar&quot; do portal</div>
+                </div>
+                <button type="button" data-testid="checkbox-afiliadas" onClick={() => setIsAffiliatePromo((v) => !v)} className={`switch ${isAffiliatePromo ? 'on' : ''}`} style={{ cursor: 'pointer' }} />
               </div>
             </div>
 

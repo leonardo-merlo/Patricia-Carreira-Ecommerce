@@ -176,21 +176,119 @@ export async function updateAffiliatePartner(
   return { success: true }
 }
 
+// Dia de vencimento da comissão de um mês de referência: payment_day (ou 10)
+// do mês seguinte — mesma regra usada no portal da afiliada (getPayDate).
+function commissionDueDate(referenceMonth: string, paymentDay: number | null): string {
+  const [y, m] = referenceMonth.split('-').map(Number)
+  const nextMonth = m === 12 ? 1 : m + 1
+  const nextYear = m === 12 ? y + 1 : y
+  const day = paymentDay ?? 10
+  return `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+// Garante que toda comissão de afiliada com venda no mês vire uma "conta a
+// pagar" de verdade (categoria "Comissão de Afiliadas"), pra aparecer no
+// Financeiro e entrar no cálculo de resultado do mês. Idempotente — só cria
+// o que ainda não existe, nunca sobrescreve valor/status já lançado.
+export async function syncAffiliateCommissionPayables(): Promise<void> {
+  const supabase = createServiceClient()
+
+  const { data: partners } = await supabase
+    .from('partners')
+    .select('id, name, contact_name, commission_pct, payment_day, coupon_id')
+    .eq('type', 'affiliate')
+    .not('coupon_id', 'is', null)
+
+  type PartnerRow = {
+    id: string; name: string; contact_name: string | null
+    commission_pct: number | null; payment_day: number | null; coupon_id: string
+  }
+  const rows = (partners ?? []) as PartnerRow[]
+  if (rows.length === 0) return
+
+  const couponIds = rows.map((p) => p.coupon_id)
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('coupon_id, created_at, order_items(quantity, unit_price)')
+    .in('coupon_id', couponIds)
+
+  type RawOrder = { coupon_id: string; created_at: string; order_items: { quantity: number; unit_price: number }[] }
+
+  const revenueByCouponMonth = new Map<string, Map<string, number>>()
+  for (const o of (orders ?? []) as RawOrder[]) {
+    const d = new Date(o.created_at)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    if (!revenueByCouponMonth.has(o.coupon_id)) revenueByCouponMonth.set(o.coupon_id, new Map())
+    const monthMap = revenueByCouponMonth.get(o.coupon_id)!
+    const revenue = o.order_items.reduce((s, it) => s + Number(it.unit_price) * it.quantity, 0)
+    monthMap.set(key, (monthMap.get(key) ?? 0) + revenue)
+  }
+
+  const toInsert: Record<string, unknown>[] = []
+  for (const p of rows) {
+    const monthMap = revenueByCouponMonth.get(p.coupon_id)
+    if (!monthMap) continue
+    const commissionPct = Number(p.commission_pct) || 10
+    const name = p.contact_name ?? p.name
+    for (const [key, revenue] of Array.from(monthMap.entries())) {
+      const commission = Math.round(revenue * commissionPct) / 100
+      if (commission <= 0) continue
+      const [y, m] = key.split('-')
+      toInsert.push({
+        description: `Comissão de afiliada — ${name} — ${PT_MONTHS_SHORT[Number(m) - 1]}/${y}`,
+        amount: commission,
+        due_date: commissionDueDate(key, p.payment_day),
+        category: 'Comissão de Afiliadas',
+        creditor: name,
+        is_recurring: false,
+        partner_id: p.id,
+        reference_month: key,
+      })
+    }
+  }
+
+  if (toInsert.length === 0) return
+
+  await supabase
+    .from('accounts_payable')
+    .upsert(toInsert, { onConflict: 'partner_id,reference_month', ignoreDuplicates: true })
+}
+
 export async function setAffiliatePaymentStatus(
   partnerId: string,
   month: string,
   paid: boolean,
 ): Promise<{ success: true } | { success: false; error: string }> {
   await requireAdmin()
+  await syncAffiliateCommissionPayables()
+
   const supabase = createServiceClient()
+  const { data: existing, error: fetchError } = await supabase
+    .from('accounts_payable')
+    .select('id')
+    .eq('partner_id', partnerId)
+    .eq('reference_month', month)
+    .maybeSingle()
+
+  if (fetchError) return { success: false, error: fetchError.message }
+
+  if (!existing) {
+    // Sem venda registrada nesse mês ainda — nada a marcar.
+    return { success: true }
+  }
+
   const { error } = await supabase
-    .from('affiliate_payments')
-    .upsert(
-      { partner_id: partnerId, month, paid, paid_at: paid ? new Date().toISOString() : null },
-      { onConflict: 'partner_id,month' },
-    )
+    .from('accounts_payable')
+    .update({
+      paid_at: paid ? new Date().toISOString().slice(0, 10) : null,
+      payment_method: paid ? 'pix' : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', existing.id)
+
   if (error) return { success: false, error: error.message }
   revalidatePath('/admin/afiliados')
+  revalidatePath('/admin/financeiro')
   return { success: true }
 }
 

@@ -76,6 +76,7 @@ export type Product = {
   wholesale_price: number | null; // null = não disponível no atacado
   is_active: boolean;
   is_featured: boolean; // exibido na seção "Destaques" da home
+  is_affiliate_promo: boolean; // disponível pra afiliadas divulgarem no portal
   /** @deprecated fotos vivem em ProductVariant.images — campo mantido só por compatibilidade de schema */
   images: string[];
   tags?: string[]; // tags manuais (Lançamento, Promoção, Bazar...) — controladas pelo admin
@@ -496,6 +497,7 @@ export const EXPENSE_CATEGORIES = [
   'Aluguel',
   'Matéria-Prima',
   'Marketing',
+  'Comissão de Afiliadas',
   'Frete / Logística',
   'Fornecedores',
   'Serviços / Software',
@@ -530,6 +532,8 @@ export type AccountPayable = {
   notes: string | null
   created_at: string
   updated_at: string
+  partner_id: string | null // preenchido quando a conta é comissão de afiliada
+  reference_month: string | null // 'YYYY-MM' — mês de referência da comissão
 }
 
 export type Store = {

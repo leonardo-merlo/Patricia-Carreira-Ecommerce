@@ -68,6 +68,25 @@ export async function getProductsByCategory(
   return results
 }
 
+// Produtos marcados pelo admin como "para afiliadas divulgarem" — aba
+// Divulgar do portal. Fica vazio até algum produto ser marcado; sem fallback.
+export async function getAffiliatePromoProducts(): Promise<Product[]> {
+  const supabase = createClient()
+
+  const { data, error } = await supabase
+    .from('products')
+    .select('*, variants:product_variants(*)')
+    .eq('is_active', true)
+    .eq('is_affiliate_promo', true)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('[getAffiliatePromoProducts]', error)
+    return []
+  }
+  return (data ?? []) as Product[]
+}
+
 export async function getFeaturedProducts(limit = 15): Promise<Product[]> {
   const supabase = createClient()
 

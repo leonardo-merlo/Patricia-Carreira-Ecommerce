@@ -4,9 +4,10 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { MonthStats } from '@/lib/actions/partners'
+import type { Product } from '@/lib/types'
 
 type Tab = 'resumo' | 'vendas' | 'pagamentos' | 'divulgar'
-type ProductFilter = 'todos' | 'novidades' | 'favoritos'
+type ProductFilter = 'todos' | 'favoritos'
 
 interface AfiliadaContentProps {
   name: string
@@ -14,20 +15,10 @@ interface AfiliadaContentProps {
   paymentDay: number | null
   couponCode: string | null
   orderHistory: MonthStats[]
+  promoProducts: Product[]
 }
 
-// Products for "Divulgar" tab — populated from the real store catalog.
-// Kept static for now; will connect to products table in a future update.
-const CATALOG_PRODUCTS = [
-  { id: 'p1', name: 'Bolsa Bucket Couro Caramelo',   category: 'bolsas', slug: 'bolsa-bucket-couro-caramelo',   price: 445, isNew: true,  thumbBg: 'linear-gradient(135deg,#e8c99a,#c9a87a)' },
-  { id: 'p2', name: 'Vestido Linho Midi Off-White',   category: 'roupas', slug: 'vestido-linho-midi-off-white',   price: 310, isNew: true,  thumbBg: 'linear-gradient(135deg,#ede8e0,#d4cfc5)' },
-  { id: 'p3', name: 'Conjunto Saia + Cropped Linho',  category: 'roupas', slug: 'conjunto-saia-cropped-linho',    price: 385, isNew: true,  thumbBg: 'linear-gradient(135deg,#d6cfc4,#b8b0a4)' },
-  { id: 'p4', name: 'Bolsa Palha Trançada Natural',   category: 'bolsas', slug: 'bolsa-palha-trancada-natural',   price: 380, isNew: false, thumbBg: 'linear-gradient(135deg,#ddd0b8,#c4b090)' },
-  { id: 'p5', name: 'Bata Algodão Bordada Cru',       category: 'roupas', slug: 'bata-algodao-bordada-cru',       price: 248, isNew: false, thumbBg: 'linear-gradient(135deg,#f0ece4,#e0d8cc)' },
-  { id: 'p6', name: 'Bolsa Tiracolo Couro Preto',     category: 'bolsas', slug: 'bolsa-tiracolo-couro-preto',     price: 298, isNew: false, thumbBg: 'linear-gradient(135deg,#555,#333)' },
-]
-
-const catLabel: Record<string, string> = { bolsas: 'Bolsas', roupas: 'Roupas', acessorios: 'Acessórios' }
+const catLabel: Record<string, string> = { bolsas: 'Bolsas', roupas: 'Roupas', acessorios: 'Acessórios', bazar: 'Bazar' }
 
 const statusLabel: Record<string, string> = {
   pago: 'confirmado',
@@ -97,7 +88,7 @@ function IconLink() {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-export function AfiliadaContent({ name, commissionPct, paymentDay, couponCode, orderHistory }: AfiliadaContentProps) {
+export function AfiliadaContent({ name, commissionPct, paymentDay, couponCode, orderHistory, promoProducts }: AfiliadaContentProps) {
   const router = useRouter()
   const supabase = createClient()
 
@@ -141,11 +132,9 @@ export function AfiliadaContent({ name, commissionPct, paymentDay, couponCode, o
     dotYellow: i === 0,
   }))
 
-  const newCount = CATALOG_PRODUCTS.filter(pr => pr.isNew).length
   const favCount = favorites.size
 
-  const visibleProducts = CATALOG_PRODUCTS.filter(pr => {
-    if (productFilter === 'novidades') return pr.isNew
+  const visibleProducts = promoProducts.filter(pr => {
     if (productFilter === 'favoritos') return favorites.has(pr.id)
     return true
   })
@@ -586,79 +575,91 @@ export function AfiliadaContent({ name, commissionPct, paymentDay, couponCode, o
         {/* ══════════════════════════════ */}
         {tab === 'divulgar' && (
           <>
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 13, color: 'var(--ap-text-2)', marginBottom: 14 }}>
-                Escolha os produtos que quer divulgar e copie o link
-                {hasCoupon ? ' com o seu cupom já incluído.' : '.'}
-              </div>
-              <div className="products-filter">
-                <button
-                  className={`filter-pill ${productFilter === 'todos' ? 'active' : ''}`}
-                  onClick={() => setProductFilter('todos')}
-                >
-                  Todos ({CATALOG_PRODUCTS.length})
-                </button>
-                <button
-                  className={`filter-pill ${productFilter === 'novidades' ? 'active' : ''}`}
-                  onClick={() => setProductFilter('novidades')}
-                >
-                  Novidades ({newCount})
-                </button>
-                <button
-                  className={`filter-pill ${productFilter === 'favoritos' ? 'active' : ''}`}
-                  onClick={() => setProductFilter('favoritos')}
-                >
-                  Favoritos ({favCount})
-                </button>
-              </div>
-            </div>
-
-            {visibleProducts.length === 0 ? (
+            {promoProducts.length === 0 ? (
               <div style={{
                 textAlign: 'center', padding: '40px 20px',
                 color: 'var(--ap-text-3)', fontSize: 13,
                 background: 'var(--ap-bg)', borderRadius: 10,
                 border: '1px solid var(--ap-border)',
               }}>
-                Nenhum produto favoritado ainda.
+                Nenhum produto disponível pra divulgar ainda.
                 <div style={{ marginTop: 6, fontSize: 11 }}>
-                  Clique no coração de um produto para adicioná-lo aqui.
+                  O Henrique ainda não marcou nenhum produto pra aparecer aqui.
                 </div>
               </div>
             ) : (
-              <div className="products-grid">
-                {visibleProducts.map(pr => {
-                  const isFav = favorites.has(pr.id)
-                  const isCopied = copiedProductId === pr.id
-                  return (
-                    <div className="product-card" key={pr.id}>
-                      <div className="product-thumb" style={{ background: pr.thumbBg }}>
-                        {pr.isNew && <span className="product-new-badge">Novidade</span>}
-                      </div>
-                      <div className="product-body">
-                        <div className="product-cat">{catLabel[pr.category]}</div>
-                        <div className="product-name">{pr.name}</div>
-                        <div className="product-price">{fmt(pr.price)}</div>
-                      </div>
-                      <div className="product-actions">
-                        <button
-                          className={`fav-btn ${isFav ? 'active' : ''}`}
-                          onClick={() => toggleFav(pr.id)}
-                          title={isFav ? 'Remover dos favoritos' : 'Favoritar'}
-                        >
-                          <IconHeart filled={isFav} />
-                        </button>
-                        <button
-                          className={`copy-link-btn ${isCopied ? 'copied' : ''}`}
-                          onClick={() => copyProductLink(pr.slug, pr.id)}
-                        >
-                          {isCopied ? <><IconCheck /> Copiado!</> : <><IconLink /> Copiar link</>}
-                        </button>
-                      </div>
+              <>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, color: 'var(--ap-text-2)', marginBottom: 14 }}>
+                    Escolha os produtos que quer divulgar e copie o link
+                    {hasCoupon ? ' com o seu cupom já incluído.' : '.'}
+                  </div>
+                  <div className="products-filter">
+                    <button
+                      className={`filter-pill ${productFilter === 'todos' ? 'active' : ''}`}
+                      onClick={() => setProductFilter('todos')}
+                    >
+                      Todos ({promoProducts.length})
+                    </button>
+                    <button
+                      className={`filter-pill ${productFilter === 'favoritos' ? 'active' : ''}`}
+                      onClick={() => setProductFilter('favoritos')}
+                    >
+                      Favoritos ({favCount})
+                    </button>
+                  </div>
+                </div>
+
+                {visibleProducts.length === 0 ? (
+                  <div style={{
+                    textAlign: 'center', padding: '40px 20px',
+                    color: 'var(--ap-text-3)', fontSize: 13,
+                    background: 'var(--ap-bg)', borderRadius: 10,
+                    border: '1px solid var(--ap-border)',
+                  }}>
+                    Nenhum produto favoritado ainda.
+                    <div style={{ marginTop: 6, fontSize: 11 }}>
+                      Clique no coração de um produto para adicioná-lo aqui.
                     </div>
-                  )
-                })}
-              </div>
+                  </div>
+                ) : (
+                  <div className="products-grid">
+                    {visibleProducts.map(pr => {
+                      const isFav = favorites.has(pr.id)
+                      const isCopied = copiedProductId === pr.id
+                      const image = pr.variants?.[0]?.images?.[0] ?? null
+                      return (
+                        <div className="product-card" key={pr.id}>
+                          <div
+                            className="product-thumb"
+                            style={image ? { backgroundImage: `url(${image})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: 'linear-gradient(135deg,#ede8e0,#d4cfc5)' }}
+                          />
+                          <div className="product-body">
+                            <div className="product-cat">{catLabel[pr.category] ?? pr.category}</div>
+                            <div className="product-name">{pr.name}</div>
+                            <div className="product-price">{fmt(pr.base_price)}</div>
+                          </div>
+                          <div className="product-actions">
+                            <button
+                              className={`fav-btn ${isFav ? 'active' : ''}`}
+                              onClick={() => toggleFav(pr.id)}
+                              title={isFav ? 'Remover dos favoritos' : 'Favoritar'}
+                            >
+                              <IconHeart filled={isFav} />
+                            </button>
+                            <button
+                              className={`copy-link-btn ${isCopied ? 'copied' : ''}`}
+                              onClick={() => copyProductLink(pr.slug, pr.id)}
+                            >
+                              {isCopied ? <><IconCheck /> Copiado!</> : <><IconLink /> Copiar link</>}
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

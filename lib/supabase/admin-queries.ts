@@ -852,15 +852,15 @@ export async function getAllAffiliatesWithStats(): Promise<AffiliateRow[]> {
 
   const couponIds = (partners as PartnerRow[]).map((p) => p.coupon_id).filter((id): id is string => Boolean(id))
 
-  const { data: payments } = await supabase
-    .from('affiliate_payments')
-    .select('partner_id, month, paid')
+  const { data: payables } = await supabase
+    .from('accounts_payable')
+    .select('partner_id, reference_month, paid_at')
     .in('partner_id', (partners as PartnerRow[]).map((p) => p.id))
 
-  type PaymentRow = { partner_id: string; month: string; paid: boolean }
+  type PayableRow = { partner_id: string; reference_month: string; paid_at: string | null }
   const paidByPartnerMonth = new Map<string, boolean>()
-  for (const pay of (payments ?? []) as PaymentRow[]) {
-    paidByPartnerMonth.set(`${pay.partner_id}:${pay.month}`, pay.paid)
+  for (const pay of (payables ?? []) as PayableRow[]) {
+    paidByPartnerMonth.set(`${pay.partner_id}:${pay.reference_month}`, pay.paid_at !== null)
   }
 
   const { data: rawOrders } = couponIds.length

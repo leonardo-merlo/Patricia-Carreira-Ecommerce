@@ -165,6 +165,11 @@ export function FinanceiroClient({
     }
   }, [accounts, todayStr, in7daysStr, selectedPeriod, displayRevenue])
 
+  const pendingAffiliateAccounts = useMemo(
+    () => accounts.filter(a => a.partner_id && !a.paid_at).sort((a, b) => a.due_date.localeCompare(b.due_date)),
+    [accounts],
+  )
+
   const filtered = useMemo(() => {
     return accounts.filter(a => {
       const s = getAccountStatus(a)
@@ -401,6 +406,54 @@ export function FinanceiroClient({
           <div className="kpi-trend"><span className="subtle">contas próximas</span></div>
         </div>
       </div>
+
+      {/* Comissões de afiliadas pendentes */}
+      {pendingAffiliateAccounts.length > 0 && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="card-header">
+            <div>
+              <h3 className="ttl">Comissões de afiliadas a pagar</h3>
+              <div className="cust-meta" style={{ marginTop: 2, fontSize: 11.5 }}>
+                {pendingAffiliateAccounts.length} pendente{pendingAffiliateAccounts.length !== 1 ? 's' : ''} ·{' '}
+                {fmtCurrency(pendingAffiliateAccounts.reduce((s, a) => s + a.amount, 0))} no total
+              </div>
+            </div>
+          </div>
+          <div className="card-body flush">
+            <div className="table-wrap">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Afiliada</th>
+                    <th>Referência</th>
+                    <th style={{ width: 130 }}>Vencimento</th>
+                    <th style={{ width: 120 }}>Valor</th>
+                    <th style={{ width: 100 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingAffiliateAccounts.map(a => (
+                    <tr key={a.id}>
+                      <td style={{ fontWeight: 500 }}>{a.creditor ?? '—'}</td>
+                      <td className="cust-meta">{a.reference_month}</td>
+                      <td className="cust-meta">{fmtDate(a.due_date)}</td>
+                      <td className="num" style={{ fontWeight: 600 }}>{fmtCurrency(a.amount)}</td>
+                      <td>
+                        <button
+                          className="btn sm primary"
+                          onClick={() => setMarkPaid({ account: a, paidAt: todayStr, paymentMethod: '' })}
+                        >
+                          Dar baixa
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs + seletor de período */}
       <div style={{ display: 'flex', alignItems: 'flex-end', borderBottom: '1px solid var(--border)', marginTop: 24, marginBottom: 18 }}>

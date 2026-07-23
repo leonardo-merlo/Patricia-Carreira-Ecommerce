@@ -67,6 +67,7 @@ export type UpdateProductData = {
   subcategory: string | null
   is_active: boolean
   is_featured: boolean
+  is_affiliate_promo: boolean
   weight_grams: number | null
   length_cm: number | null
   width_cm: number | null
@@ -92,6 +93,7 @@ export async function updateProduct(productId: string, data: UpdateProductData):
       subcategory: data.subcategory,
       is_active: data.is_active,
       is_featured: data.is_featured,
+      is_affiliate_promo: data.is_affiliate_promo,
       weight_grams: data.weight_grams,
       length_cm: data.length_cm,
       width_cm: data.width_cm,
@@ -150,6 +152,7 @@ export type CreateProductInput = {
   subcategory: string | null
   is_active: boolean
   is_featured: boolean
+  is_affiliate_promo: boolean
   weight_grams: number | null
   length_cm: number | null
   width_cm: number | null
@@ -186,6 +189,7 @@ export async function createProduct(data: CreateProductInput): Promise<string> {
       subcategory: data.subcategory ?? null,
       is_active: data.is_active,
       is_featured: data.is_featured,
+      is_affiliate_promo: data.is_affiliate_promo,
       weight_grams: data.weight_grams,
       length_cm: data.length_cm,
       width_cm: data.width_cm,

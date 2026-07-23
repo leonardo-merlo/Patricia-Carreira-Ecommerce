@@ -85,6 +85,8 @@ export function EstoqueClient({ products, rawMaterials }: EstoqueClientProps) {
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [featuredFilter, setFeaturedFilter] = useState('all')
+  const [affFilter, setAffFilter] = useState('all')
 
   // Table state
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -106,6 +108,10 @@ export function EstoqueClient({ products, rawMaterials }: EstoqueClientProps) {
     const isActive = statusOverrides.has(p.id) ? statusOverrides.get(p.id)! : p.is_active
     if (statusFilter === 'active' && !isActive) return false
     if (statusFilter === 'inactive' && isActive) return false
+    if (featuredFilter === 'yes' && !p.is_featured) return false
+    if (featuredFilter === 'no' && p.is_featured) return false
+    if (affFilter === 'yes' && !p.is_affiliate_promo) return false
+    if (affFilter === 'no' && p.is_affiliate_promo) return false
     if (search.trim()) {
       const q = search.toLowerCase()
       const matchName = p.name.toLowerCase().includes(q)
@@ -185,6 +191,16 @@ export function EstoqueClient({ products, rawMaterials }: EstoqueClientProps) {
               <option value="all">Todos os status</option>
               <option value="active">Ativo</option>
               <option value="inactive">Inativo</option>
+            </select>
+            <select className="select" style={{ width: 'auto' }} value={featuredFilter} onChange={(e) => setFeaturedFilter(e.target.value)}>
+              <option value="all">Destaque: todos</option>
+              <option value="yes">Destaque na home</option>
+              <option value="no">Sem destaque</option>
+            </select>
+            <select className="select" style={{ width: 'auto' }} value={affFilter} onChange={(e) => setAffFilter(e.target.value)}>
+              <option value="all">Afiliadas: todos</option>
+              <option value="yes">Para afiliadas</option>
+              <option value="no">Fora do portal</option>
             </select>
           </div>
           <span className="chip">{filtered.length} produto{filtered.length !== 1 ? 's' : ''}</span>
