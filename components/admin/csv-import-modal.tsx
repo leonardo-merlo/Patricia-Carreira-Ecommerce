@@ -276,7 +276,7 @@ export function CsvImportModal({ products, onClose }: CsvImportModalProps) {
               >
                 <AdminIcon name="upload" size={18} style={{ display: 'block', margin: '0 auto 6px', color: 'var(--text-2)' }} />
                 <div style={{ fontSize: 12.5, color: 'var(--text-2)' }}>Arraste o CSV ou clique para selecionar</div>
-                <div className="cust-meta" style={{ marginTop: 2 }}>Só "sku" é obrigatório — as demais colunas são opcionais (vazio = não altera)</div>
+                <div className="cust-meta" style={{ marginTop: 2 }}>Só &quot;sku&quot; é obrigatório — as demais colunas são opcionais (vazio = não altera)</div>
               </div>
               <input
                 ref={fileRef}
