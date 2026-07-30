@@ -49,18 +49,12 @@ interface PendingAction {
   targetStatus?: string
 }
 
-type MaterialStatus = 'ok' | 'needs_laser' | 'needs_purchase'
+type MaterialStatus = 'ok' | 'not_registered' | 'needs_purchase'
 
-function materialStatus(m: OpMaterial, missing: MissingMaterialEntry[]): MaterialStatus {
+function materialStatus(m: OpMaterial): MaterialStatus {
   if (m.sufficient) return 'ok'
-  const entry = missing.find((x) => x.material_id === m.material_id)
-  if (
-    m.category === 'Couro' &&
-    entry?.couro_bruto_available != null &&
-    entry.couro_bruto_available > 0
-  ) {
-    return 'needs_laser'
-  }
+  // O corte existe na receita, mas não há linha de estoque na cor da variante.
+  if (!m.resolved) return 'not_registered'
   return 'needs_purchase'
 }
 
@@ -490,7 +484,7 @@ function OpCard({
                     />
                     <span className={`op-mat-name${checked ? ' op-mat-name--done' : ''}`}>
                       {m.material_name}
-                      {m.state && <span className="op-mat-state">{m.state}</span>}
+                      {m.required_color && <span className="op-mat-state">{m.required_color}</span>}
                     </span>
                     <span
                       className={`op-mat-avail ${m.sufficient ? 'ok' : 'low'}`}
@@ -582,9 +576,8 @@ function OpDetailModal({
               <div key={category} className="op-check-group">
                 <div className="op-check-group-title">{category}</div>
                 {mats.map((m) => {
-                  const status = materialStatus(m, op.missing_materials)
+                  const status = materialStatus(m)
                   const checked = op.material_checks[m.material_id] ?? false
-                  const entry = op.missing_materials.find((x) => x.material_id === m.material_id)
 
                   return (
                     <div
@@ -601,20 +594,21 @@ function OpDetailModal({
                         />
                         <span className="op-check-category">
                           {m.material_name}
-                          {m.state && <span className="op-mat-state">{m.state}</span>}
+                          {m.required_color && <span className="op-mat-state">{m.required_color}</span>}
                         </span>
                       </label>
 
                       <span className={`op-check-status op-check-status--${status}`}>
                         {status === 'ok' && '✅ Disponível'}
-                        {status === 'needs_laser' && '⚠️ Precisa de laser'}
+                        {status === 'not_registered' && '⚠️ Não cadastrado'}
                         {status === 'needs_purchase' && '❌ Comprar'}
                       </span>
 
                       <div className="op-check-detail">
-                        {status === 'needs_laser' && entry ? (
+                        {status === 'not_registered' ? (
                           <span>
-                            Necessário {fmtQty(m.needed)} {m.unit} · couro bruto disponível ({fmtQty(entry.couro_bruto_available ?? 0)} {m.unit}) — enviar para laser antes de usar
+                            Necessário {fmtQty(m.needed)} {m.unit} · o insumo <b>{m.material_name}</b>
+                            {m.required_color ? ` na cor ${m.required_color}` : ''} ainda não existe em matérias-primas — cadastre antes de produzir
                           </span>
                         ) : (
                           <span>

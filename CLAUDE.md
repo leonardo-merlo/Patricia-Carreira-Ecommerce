@@ -191,10 +191,18 @@ product_variants (
 
 ### 6.2 Matérias-Primas e BOM
 
+> ⚠️ REDESENHO (jul/2026 — migrations 028–031). O Henrique não controla metro de
+> lona/couro/forro: ele controla **peça cortada**. As categorias espelham as
+> seções da ficha técnica e a receita passou a ser **do produto**, não da variante.
+
 ```sql
 raw_materials (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name            text NOT NULL,
+  category        text NOT NULL,          -- 'Corte Lona' | 'Corte Forro' | 'Corte Couro'
+                                          -- | 'Aplicações' | 'Metais' | 'Aviamentos'
+  type_specific   text,                   -- a peça, nomeada como na ficha ('Frente', 'Casinha')
+  color           text,                   -- obrigatória nos cortes; NULL nos demais
   unit            text NOT NULL,          -- 'metro' | 'unidade' | 'kg' | 'cm'
   stock_quantity  numeric(10,3) NOT NULL DEFAULT 0,
   minimum_stock   numeric(10,3) DEFAULT 0,
@@ -202,18 +210,44 @@ raw_materials (
   supplier        text,
   updated_at      timestamptz DEFAULT now()
 )
+-- Um insumo é único por (category, type_specific, color).
 
 bill_of_materials (
-  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  product_variant_id uuid REFERENCES product_variants(id) ON DELETE CASCADE,
-  raw_material_id    uuid REFERENCES raw_materials(id) ON DELETE RESTRICT,
-  quantity_needed    numeric(10,3) NOT NULL,
-  UNIQUE(product_variant_id, raw_material_id)
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id        uuid NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  -- Insumo de cor fixa (Aplicações, Metais, Aviamentos):
+  raw_material_id   uuid REFERENCES raw_materials(id) ON DELETE RESTRICT,
+  -- Corte, cuja cor sai da variante:
+  material_category text,                 -- 'Corte Lona' | 'Corte Forro' | 'Corte Couro'
+  material_type     text,
+  quantity_needed   numeric(10,3) NOT NULL,
+  -- CHECK: exatamente uma das duas formas de endereçar o insumo
+)
+
+product_variants (
+  ...
+  color_lona   text,   -- resolve os itens 'Corte Lona' da receita
+  color_forro  text,   -- resolve os itens 'Corte Forro'
+  color_couro  text    -- resolve os itens 'Corte Couro'
 )
 ```
 
-> ⚠️ PRÉ-REQUISITO NÃO-TÉCNICO: BOM precisa ser mapeado pelo Henrique ANTES
-> do início da Fase 4. Preparar planilha de coleta no onboarding.
+**Como a receita vira lista de insumos.** A receita é cadastrada uma vez por
+produto e herdada por todas as variantes. Os itens de corte guardam só o tipo; a
+cor vem da variante. A função `resolve_variant_bom(variant_id)` faz a tradução e
+é o único caminho para ler a receita de uma variante (wrapper TS em
+`lib/supabase/bom.ts`). Ela devolve `resolved = false` quando o insumo naquela
+cor ainda não existe — pendência de cadastro, que bloqueia a conclusão da OP.
+
+```
+Bolsa Flora  ── receita única (34 itens)
+   └─ Mostarda  → color_lona Mostarda · color_forro Cru · color_couro Caramelo
+   └─ Marinho   → color_lona Marinho  · color_forro Cru · color_couro Preto
+```
+
+> ⚠️ O estoque de corte é por (peça, cor): "Corte Lona › Frente › Mostarda" é uma
+> linha distinta de "Corte Lona › Frente › Marinho". A cor digitada na variante
+> precisa bater exatamente com a do insumo.
 
 ### 6.3 Clientes
 

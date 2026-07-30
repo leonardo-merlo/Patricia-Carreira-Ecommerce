@@ -123,19 +123,40 @@ export type RawMaterial = {
 };
 
 /**
- * bill_of_materials — "Para produzir 1 unidade de [variant], precisa de [qty] de [material]"
- * ⚠️  Precisa ser mapeado com Henrique antes de usar a tela de OP.
+ * bill_of_materials — "Para produzir 1 unidade de [produto], precisa de [qty] de [material]"
+ *
+ * A receita é do PRODUTO e vale para todas as suas variantes. Um item aponta o
+ * insumo de uma destas duas formas, nunca as duas:
+ *
+ *  · raw_material_id — insumo de cor fixa (Aplicações, Metais, Aviamentos);
+ *  · material_category + material_type — corte cuja cor sai da variante
+ *    (Corte Lona → color_lona, Corte Forro → color_forro, Corte Couro → color_couro).
+ *
+ * Para obter a lista concreta de insumos de uma variante use
+ * `getResolvedBomForVariant` (lib/supabase/bom.ts).
  */
 export type BillOfMaterial = {
   id: string;
-  product_variant_id: string;
-  raw_material_id: string;
+  product_id: string;
+  raw_material_id: string | null;
+  material_category: CutCategory | null;
+  material_type: string | null;
   quantity_needed: number; // quantidade POR unidade produzida
 
   // Relações opcionais
   raw_material?: RawMaterial;
-  product_variant?: ProductVariant;
+  product?: Product;
 };
+
+/** Categorias de insumo cuja cor é definida pela variante. */
+export type CutCategory = "Corte Lona" | "Corte Forro" | "Corte Couro";
+
+/** Categorias de matéria-prima, espelhando as seções da ficha técnica. */
+export type MaterialCategory =
+  | CutCategory
+  | "Aplicações"
+  | "Metais"
+  | "Aviamentos";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CLIENTES

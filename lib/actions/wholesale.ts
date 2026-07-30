@@ -5,6 +5,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { requireAdmin } from '@/lib/server/auth'
 import { createManualProductionOrder } from '@/lib/actions/production'
 import { getStoreSettings } from '@/lib/server/store-settings'
+import { getResolvedBomForVariant } from '@/lib/supabase/bom'
 
 export type WholesaleOrderLineItem = {
   variant_id: string
@@ -24,6 +25,10 @@ export type BomItemCheck = {
   available: number
   is_sufficient: boolean
   missing: number
+  /** Cor exigida pela variante (só nos cortes). */
+  required_color: string | null
+  /** false = insumo dessa cor ainda não cadastrado — bloqueia a produção. */
+  resolved: boolean
   recipe_check?: BomItemCheck[]
 }
 
@@ -230,13 +235,10 @@ async function checkItemAvailability(
     }
   }
 
-  // Duas queries separadas para evitar dependência do cache de schema do PostgREST
-  const { data: bomRows } = await supabase
-    .from('bill_of_materials')
-    .select('quantity_needed, raw_material_id')
-    .eq('product_variant_id', variantId)
+  // Receita do produto resolvida com as cores desta variante
+  const bomRows = await getResolvedBomForVariant(variantId)
 
-  if (!bomRows || bomRows.length === 0) {
+  if (bomRows.length === 0) {
     return {
       variant_id: variantId,
       product_name: productName,
@@ -253,96 +255,27 @@ async function checkItemAvailability(
     }
   }
 
-  // Busca os raw_materials de todos os itens do BOM em uma query só
-  const bomMaterialIds = bomRows.map((r) => r.raw_material_id as string)
-  const { data: bomMaterials } = await supabase
-    .from('raw_materials')
-    .select('id, name, type, unit, stock_quantity')
-    .in('id', bomMaterialIds)
-
-  const bomMatMap = new Map(
-    (bomMaterials ?? []).map((m) => [m.id as string, m]),
-  )
-
-  let canProduceAll = true
-  const shortIntermediaries: Array<{ materialId: string; materialName: string; needed: number }> = []
-  const bomCheck: BomItemCheck[] = []
-
-  for (const b of bomRows) {
-    const mat = bomMatMap.get(b.raw_material_id as string)
-    if (!mat) continue
-
-    const needed = Number(b.quantity_needed) * deficit
-    const available = Number(mat.stock_quantity)
-    const isSufficient = available >= needed
-    const missing = Math.max(0, needed - available)
-
-    const check: BomItemCheck = {
-      material_id: mat.id as string,
-      material_name: mat.name as string,
-      material_type: mat.type as 'bruta' | 'intermediaria',
-      unit: mat.unit as string,
-      needed_per_unit: Number(b.quantity_needed),
+  const bomCheck: BomItemCheck[] = bomRows.map((line) => {
+    const needed = line.quantity_needed * deficit
+    const available = line.resolved ? line.stock_quantity : 0
+    return {
+      material_id: line.raw_material_id ?? '',
+      material_name: line.material_name,
+      material_type: 'bruta' as const,
+      unit: line.unit,
+      needed_per_unit: line.quantity_needed,
       needed_total: needed,
       available,
-      is_sufficient: isSufficient,
-      missing,
+      is_sufficient: line.resolved && available >= needed,
+      missing: Math.max(0, needed - available),
+      required_color: line.required_color,
+      resolved: line.resolved,
       recipe_check: [],
     }
+  })
 
-    if (!isSufficient) {
-      if (mat.type === 'intermediaria') {
-        // Duas queries separadas para evitar join ambíguo (dois FKs para raw_materials)
-        const { data: recipeRows } = await supabase
-          .from('raw_material_recipes')
-          .select('quantity_needed, input_material_id')
-          .eq('output_material_id', mat.id)
-
-        if (!recipeRows || recipeRows.length === 0) {
-          canProduceAll = false
-        } else {
-          const inputIds = recipeRows.map((r) => r.input_material_id as string)
-          const { data: inputMats } = await supabase
-            .from('raw_materials')
-            .select('id, name, unit, stock_quantity')
-            .in('id', inputIds)
-
-          const matMap = new Map(
-            (inputMats ?? []).map((m) => [m.id as string, m]),
-          )
-
-          const recipeCheck: BomItemCheck[] = recipeRows.map((r) => {
-            const im = matMap.get(r.input_material_id as string)
-            const neededForCorte = Number(r.quantity_needed) * missing
-            const bruteAvailable = im ? Number(im.stock_quantity) : 0
-            const bruteSuff = im != null && bruteAvailable >= neededForCorte
-            if (!bruteSuff) canProduceAll = false
-            return {
-              material_id: r.input_material_id as string,
-              material_name: (im?.name as string) ?? 'Desconhecido',
-              material_type: 'bruta' as const,
-              unit: (im?.unit as string) ?? '',
-              needed_per_unit: Number(r.quantity_needed),
-              needed_total: neededForCorte,
-              available: bruteAvailable,
-              is_sufficient: bruteSuff,
-              missing: Math.max(0, neededForCorte - bruteAvailable),
-            }
-          })
-
-          check.recipe_check = recipeCheck
-          shortIntermediaries.push({ materialId: mat.id, materialName: mat.name, needed: missing })
-        }
-      } else {
-        canProduceAll = false
-      }
-    }
-
-    bomCheck.push(check)
-  }
-
+  const unresolved = bomCheck.filter((b) => !b.resolved)
   const allBomSufficient = bomCheck.every((b) => b.is_sufficient)
-  const hasShortBruta = bomCheck.some((b) => b.material_type === 'bruta' && !b.is_sufficient)
 
   let scenario: 'A' | 'B' | 'C' | 'D'
   let scenarioLabel: string
@@ -351,32 +284,23 @@ async function checkItemAvailability(
   if (allBomSufficient) {
     scenario = 'B'
     scenarioLabel = 'Materiais disponíveis — produção possível'
-  } else if (shortIntermediaries.length > 0 && canProduceAll && !hasShortBruta) {
+  } else if (unresolved.length > 0) {
+    // Cadastro incompleto, não falta de material: o corte existe na receita mas
+    // não há linha de estoque na cor desta variante.
     scenario = 'C'
-    scenarioLabel = 'MP intermediária em falta — produção possível com corte'
+    scenarioLabel = `Insumo não cadastrado na cor desta variante (${unresolved
+      .map((b) => [b.material_name, b.required_color].filter(Boolean).join(' · '))
+      .join(', ')})`
   } else {
     scenario = 'D'
     scenarioLabel = 'Materiais insuficientes — compra necessária'
-    const shortBrutas = bomCheck.filter((b) => b.material_type === 'bruta' && !b.is_sufficient)
-    for (const b of shortBrutas) {
+    for (const b of bomCheck.filter((x) => !x.is_sufficient)) {
       itemsToPurchase.push({
         material_id: b.material_id,
-        material_name: b.material_name,
+        material_name: [b.material_name, b.required_color].filter(Boolean).join(' · '),
         quantity_to_buy: b.missing,
         unit: b.unit,
       })
-    }
-    for (const b of bomCheck) {
-      if (b.material_type === 'intermediaria' && !b.is_sufficient && b.recipe_check) {
-        for (const r of b.recipe_check.filter((rc) => !rc.is_sufficient)) {
-          itemsToPurchase.push({
-            material_id: r.material_id,
-            material_name: r.material_name,
-            quantity_to_buy: r.missing,
-            unit: r.unit,
-          })
-        }
-      }
     }
   }
 

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { AdminIcon } from '@/components/admin/admin-icon'
-import type { RawMaterialRow, VariantWithBOM, PurchaseRequestRow } from '@/lib/supabase/admin-queries'
+import type { RawMaterialRow, ProductWithBOM, PurchaseRequestRow } from '@/lib/supabase/admin-queries'
 import type { Supplier } from '@/lib/actions/suppliers'
 import {
   registerMaterialEntry,
@@ -15,33 +15,56 @@ import {
   cancelPurchaseRequest,
 } from '@/lib/actions/raw-materials'
 
-const CATEGORIES = ['Bordado', 'Couro', 'Metais', 'Forro', 'Tecido', 'Aviamentos'] as const
+// Categorias espelham as seções da ficha técnica do Henrique.
+const CATEGORIES = ['Corte Lona', 'Corte Forro', 'Corte Couro', 'Aplicações', 'Metais', 'Aviamentos'] as const
 type Category = typeof CATEGORIES[number]
 
-// tipo: item específico dentro da categoria
-const TIPOS: Record<Category, string[]> = {
-  Bordado: ['Bordado', 'Acabamento'],
-  Couro: ['Legítimo carneiro', 'Legítimo vaqueta', 'Sintético montana', 'Sintético raspa', 'Sintético uruguai', 'Raspa de porco'],
-  Metais: ['Argola', 'Mosquetão', 'Cursor', 'Meia argola', 'Fiel', 'Rebite', 'Imã', 'Fivela'],
-  Forro: ['Frente', 'Costas', 'Bolso lateral'],
-  Tecido: ['Lona', 'Viscose sarjada', 'Viscolinho', 'Tricoline'],
-  Aviamentos: ['Etiqueta', 'Zíper', 'Linha'],
+// Cortes têm cor; a receita do produto guarda só o tipo e a variante define a cor.
+const CUT_CATEGORIES: readonly Category[] = ['Corte Lona', 'Corte Forro', 'Corte Couro']
+
+function isCutCategory(category: string): boolean {
+  return (CUT_CATEGORIES as readonly string[]).includes(category)
 }
 
-// estado: processamento/tamanho do material (comum a todas as categorias)
-const ESTADOS = ['Bruto', 'Com laser', 'P', 'M', 'G', 'GG', 'Cortado'] as const
-
-function deriveType(category: Category, state: string): 'bruta' | 'intermediaria' {
-  if (category === 'Couro' && state === 'Com laser') return 'intermediaria'
-  if (category === 'Tecido' && state === 'Cortado') return 'intermediaria'
-  return 'bruta'
+// tipo: a peça específica dentro da categoria, nomeada como na ficha
+const TIPOS: Record<Category, string[]> = {
+  'Corte Lona': [
+    'Frente', 'Costas', 'Lateral', 'Lateral 1', 'Lateral 2',
+    'Faixa da boca', 'Tira da boca', 'Viés da boca', 'Alça', 'Meio',
+  ],
+  'Corte Forro': [
+    'Frente', 'Costas', 'Frente e costas (peça única)', 'Lateral', 'Lateral 1', 'Lateral 2',
+    'Bolso de trás', 'Bolso de dentro', 'Bolso canguru',
+  ],
+  'Corte Couro': [
+    'Casinha', 'Boca de palhaço', 'Alça', 'Alça de couro', 'Acabamento de alça',
+    'Couro boca zíper', 'Corte H', 'Corte alça Flora A', 'Corte alça Flora B',
+    'Tira 20 cm', 'Tira 43 cm', 'Tira 48 cm', 'Tira barra alça 15 cm',
+    'Tirinha/alça 7 cm', 'Tirinha barra alça 7 cm', 'Tirinha do fecho de dentro 5 cm',
+  ],
+  'Aplicações': [
+    'Nirvana A', 'Nirvana B', 'Nirvana C', 'Nirvana D', 'Nirvana E', 'Nirvana F',
+    'Lyra A', 'Lyra B',
+    'Liberty A', 'Liberty B', 'Liberty C', 'Liberty D', 'Liberty E', 'Liberty F',
+    'Flora A', 'Flora B', 'Flora C', 'Flora D', 'Flora E',
+    'Mandala A', 'Mandala B', 'Mandala C', 'Mandala D', 'Mandala E', 'Mandala F', 'Mandala G', 'Mandala H',
+  ],
+  Metais: [
+    'Rebite', 'Argola G', 'Meia argola 1,5 cm',
+    'Mosquetão G', 'Mosquetão médio', 'Mosquetão P', 'Cursor diamante', 'Ímã',
+  ],
+  Aviamentos: [
+    'Fecho metro 20 cm', 'Fecho metro 30 cm', 'Fecho metro 40 cm', 'Fecho metro 45 cm',
+    'Fecho padrão 18 cm', 'Viés 1 metro', 'Viés 2,5 cm', 'Viés 3 cm', 'Gorgurão',
+    'Etiqueta bordada', 'Etiqueta de composição',
+  ],
 }
 
 const UNITS = ['metro', 'unidade', 'kg', 'cm'] as const
 
 interface MateriasClientProps {
   materials: RawMaterialRow[]
-  variants: VariantWithBOM[]
+  products: ProductWithBOM[]
   purchaseRequests: PurchaseRequestRow[]
   suppliers: Supplier[]
 }
@@ -56,7 +79,7 @@ function formatQty(qty: number, unit: string) {
   return `${qty.toLocaleString('pt-BR', { maximumFractionDigits: 3 })} ${unit}`
 }
 
-export function MateriasClient({ materials, variants, purchaseRequests, suppliers }: MateriasClientProps) {
+export function MateriasClient({ materials, products, purchaseRequests, suppliers }: MateriasClientProps) {
   // ── Abas ──
   const [tab, setTab] = useState<'insumos' | 'receitas' | 'compras'>('insumos')
 
@@ -78,8 +101,8 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
   const [entryNotes, setEntryNotes] = useState('')
   const [entryError, setEntryError] = useState('')
 
-  // ── BOM viewer/editor ──
-  const [selectedVariantId, setSelectedVariantId] = useState(variants[0]?.id ?? '')
+  // ── BOM viewer/editor (receita é do produto, herdada por todas as variantes) ──
+  const [selectedProductId, setSelectedProductId] = useState(products[0]?.id ?? '')
   const [bomEditMode, setBomEditMode] = useState(false)
   const [editingQty, setEditingQty] = useState<Record<string, string>>({})
   const [addMaterialId, setAddMaterialId] = useState(materials[0]?.id ?? '')
@@ -96,7 +119,7 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
   const [newName, setNewName] = useState('')
   const [newCategory, setNewCategory] = useState<string>(CATEGORIES[0])
   const [newTipo, setNewTipo] = useState<string>(() => TIPOS[CATEGORIES[0]]?.[0] ?? '')
-  const [newEstado, setNewEstado] = useState<string>('')
+  const [newColor, setNewColor] = useState<string>('')
   const [newUnit, setNewUnit] = useState<'metro' | 'unidade' | 'kg' | 'cm'>('unidade')
   const [newStock, setNewStock] = useState('0')
   const [newMinStock, setNewMinStock] = useState('0')
@@ -113,19 +136,32 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
     if (search.trim() && !m.name.toLowerCase().includes(search.trim().toLowerCase())) return false
     return true
   })
-  const variantsWithBOM = variants.filter((v) => v.bom.length > 0)
-  const selectedVariant = variants.find((v) => v.id === selectedVariantId) ?? null
+  const productsWithBOM = products.filter((p) => p.bom.length > 0)
+  const selectedProduct = products.find((p) => p.id === selectedProductId) ?? null
 
-  const estimatedCost = selectedVariant
-    ? selectedVariant.bom.reduce((sum, b) => {
+  const estimatedCost = selectedProduct
+    ? selectedProduct.bom.reduce((sum, b) => {
         if (b.material.cost_per_unit == null) return sum
         return sum + b.material.cost_per_unit * b.quantity_needed
       }, 0)
     : 0
 
-  // Already-used material IDs in this BOM (to exclude from "add" dropdown)
-  const usedMaterialIds = new Set(selectedVariant?.bom.map((b) => b.material.id) ?? [])
-  const availableMaterials = materials.filter((m) => !usedMaterialIds.has(m.id))
+  // Cores já cadastradas, para sugerir no formulário de novo insumo
+  const knownColors = Array.from(
+    new Set(materials.map((m) => m.color).filter((c): c is string => Boolean(c))),
+  ).sort()
+
+  // Insumos já na receita. Cortes entram por categoria+tipo (sem cor), então a
+  // chave precisa ser a mesma dos dois lados.
+  const bomKey = (category: string, type: string | null, id: string) =>
+    isCutCategory(category) ? `${category}||${type ?? ''}` : id
+
+  const usedKeys = new Set(
+    (selectedProduct?.bom ?? []).map((b) => bomKey(b.material_category, b.material_type, b.material.id ?? '')),
+  )
+  const availableMaterials = materials.filter(
+    (m) => !usedKeys.has(bomKey(m.category, m.type_specific, m.id)),
+  )
 
   function handleEntry() {
     if (!entryFor) return
@@ -150,13 +186,13 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
   }
 
   function handleAddBOM() {
-    if (!selectedVariantId || !addMaterialId) return
+    if (!selectedProductId || !addMaterialId) return
     const qty = parseFloat(addQty.replace(',', '.'))
     if (isNaN(qty) || qty <= 0) { setBomError('Quantidade inválida'); return }
     setBomError('')
     startTransition(async () => {
       const res = await addBOMEntry({
-        product_variant_id: selectedVariantId,
+        product_id: selectedProductId,
         raw_material_id: addMaterialId,
         quantity_needed: qty,
       })
@@ -213,7 +249,7 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
     setNewCategory(cat)
     const tipos = TIPOS[cat as Category] ?? []
     setNewTipo(tipos[0] ?? '')
-    setNewEstado('')
+    setNewColor('')
   }
 
   function handleExit() {
@@ -242,7 +278,7 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
     setShowNewMaterial(true)
     setNewName(''); setNewCategory(CATEGORIES[0])
     setNewTipo(TIPOS[CATEGORIES[0]]?.[0] ?? '')
-    setNewEstado('')
+    setNewColor('')
     setNewUnit('unidade'); setNewStock('0'); setNewMinStock('0')
     setNewCost(''); setNewSupplierId(''); setNewNotes(''); setNewError('')
   }
@@ -254,18 +290,14 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
     if (isNaN(stockQty) || stockQty < 0) { setNewError('Estoque inválido'); return }
     setNewError('')
     startTransition(async () => {
-      const estadoValue = newEstado || null
-      const typeValue = estadoValue
-        ? deriveType(newCategory as Category, estadoValue)
-        : 'bruta'
-
       const res = await createRawMaterial({
         name: newName.trim(),
-        type: typeValue,
+        type: 'bruta',
         category: newCategory,
         subcategory: null,
         type_specific: newTipo || null,
-        state: estadoValue,
+        state: null,
+        color: isCutCategory(newCategory) ? newColor.trim() || null : null,
         unit: newUnit,
         stock_quantity: stockQty,
         minimum_stock: isNaN(minQty) ? 0 : minQty,
@@ -277,7 +309,7 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
       if (res.success) {
         setShowNewMaterial(false)
         setNewTipo(TIPOS[CATEGORIES[0]]?.[0] ?? '')
-        setNewEstado('')
+        setNewColor('')
       } else {
         setNewError(res.error)
       }
@@ -439,7 +471,7 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
                 Consumo de matéria-prima por unidade fabricada.
               </div>
             </div>
-            {selectedVariant && (
+            {selectedProduct && (
               <button
                 className={`btn sm ${bomEditMode ? '' : 'ghost'}`}
                 style={bomEditMode ? { background: 'var(--accent)', color: '#fff', border: 'none' } : {}}
@@ -462,22 +494,24 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
               <label>Variante de produto</label>
               <select
                 className="select"
-                value={selectedVariantId}
+                value={selectedProductId}
                 onChange={(e) => {
-                  setSelectedVariantId(e.target.value)
+                  setSelectedProductId(e.target.value)
                   setBomEditMode(false)
                   setBomError('')
                   setEditingQty({})
                 }}
               >
-                <option value="">— Selecionar variante —</option>
-                {variantsWithBOM.map((v) => (
-                  <option key={v.id} value={v.id}>{v.label}</option>
+                <option value="">— Selecionar produto —</option>
+                {productsWithBOM.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.variant_count} {p.variant_count === 1 ? 'variante' : 'variantes'})
+                  </option>
                 ))}
-                {variants
-                  .filter((v) => v.bom.length === 0)
-                  .map((v) => (
-                    <option key={v.id} value={v.id}>{v.label} (sem receita)</option>
+                {products
+                  .filter((p) => p.bom.length === 0)
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} (sem receita)</option>
                   ))}
               </select>
             </div>
@@ -485,9 +519,9 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
 
           {/* Tabela de ingredientes */}
           <div className="card-body flush">
-            {!selectedVariant || (selectedVariant.bom.length === 0 && !bomEditMode) ? (
+            {!selectedProduct || (selectedProduct.bom.length === 0 && !bomEditMode) ? (
               <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-3)', fontSize: 12.5 }}>
-                {selectedVariant
+                {selectedProduct
                   ? <><span>Nenhuma receita cadastrada.</span><br /><button className="linkish" style={{ marginTop: 6, fontSize: 12 }} onClick={() => setBomEditMode(true)}>+ Adicionar ingredientes</button></>
                   : 'Selecione uma variante acima.'}
               </div>
@@ -504,7 +538,7 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedVariant.bom.map((b) => {
+                    {selectedProduct.bom.map((b) => {
                       const s = stockState(b.material.stock_quantity, 0)
                       const isEditing = bomEditMode && editingQty[b.id] !== undefined
                       return (
@@ -517,7 +551,8 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
                               <div>
                                 <div style={{ fontSize: 12.5 }}>{b.material.name}</div>
                                 <div className="cust-meta" style={{ fontSize: 11 }}>
-                                  {b.material.type === 'intermediaria' ? 'Intermediária' : 'Bruta'}
+                                  {b.material_category}
+                                  {b.is_cut && ' · cor definida na variante'}
                                 </div>
                               </div>
                             </div>
@@ -599,7 +634,7 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
                       </tr>
                     )}
 
-                    {bomEditMode && availableMaterials.length === 0 && selectedVariant.bom.length > 0 && (
+                    {bomEditMode && availableMaterials.length === 0 && selectedProduct.bom.length > 0 && (
                       <tr>
                         <td colSpan={5} style={{ padding: '8px 12px', textAlign: 'center' }}>
                           <span className="cust-meta" style={{ fontSize: 11 }}>Todos os insumos já foram adicionados.</span>
@@ -612,7 +647,7 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
             )}
           </div>
 
-          {selectedVariant && selectedVariant.bom.length > 0 && (
+          {selectedProduct && selectedProduct.bom.length > 0 && (
             <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', background: 'var(--surface-2)', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
               <div className="cust-meta tiny">
                 Custo estimado / un.:{' '}
@@ -851,21 +886,28 @@ export function MateriasClient({ materials, variants, purchaseRequests, supplier
                   </select>
                 </div>
 
-                {/* Estado — dropdown com valores comuns, opcional */}
-                <div className="field">
-                  <label>Estado (opcional)</label>
-                  <select
-                    id="new-material-estado"
-                    className="select"
-                    value={newEstado}
-                    onChange={(e) => setNewEstado(e.target.value)}
-                  >
-                    <option value="">— Sem estado —</option>
-                    {ESTADOS.map((e) => (
-                      <option key={e} value={e}>{e}</option>
-                    ))}
-                  </select>
-                </div>
+                {/* Cor — só nos cortes: é ela que casa o insumo com a variante */}
+                {isCutCategory(newCategory) && (
+                  <div className="field">
+                    <label>Cor</label>
+                    <input
+                      id="new-material-cor"
+                      className="input"
+                      value={newColor}
+                      onChange={(e) => setNewColor(e.target.value)}
+                      placeholder="Ex: Mostarda"
+                      list="cores-cadastradas"
+                    />
+                    <datalist id="cores-cadastradas">
+                      {knownColors.map((c) => (
+                        <option key={c} value={c} />
+                      ))}
+                    </datalist>
+                    <span className="cust-meta tiny">
+                      Precisa bater com a cor de {newCategory.replace('Corte ', '').toLowerCase()} definida na variante do produto.
+                    </span>
+                  </div>
+                )}
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                   <div className="field">

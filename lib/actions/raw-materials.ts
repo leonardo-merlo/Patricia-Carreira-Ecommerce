@@ -3,10 +3,14 @@
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAdmin } from '@/lib/server/auth'
+import type { CutCategory } from '@/lib/types'
 
 export type StockEntryResult =
   | { success: true }
   | { success: false; error: string }
+
+/** Categorias cuja cor é definida pela variante, não pela receita. */
+const CUT_CATEGORIES: readonly CutCategory[] = ['Corte Lona', 'Corte Forro', 'Corte Couro']
 
 export async function registerMaterialEntry(input: {
   material_id: string
@@ -70,6 +74,8 @@ export async function createRawMaterial(input: {
   subcategory: string | null
   type_specific: string | null
   state: string | null
+  /** Obrigatória nos cortes — é ela que liga o insumo à variante. */
+  color: string | null
   unit: 'metro' | 'unidade' | 'kg' | 'cm'
   stock_quantity: number
   minimum_stock: number
@@ -88,6 +94,7 @@ export async function createRawMaterial(input: {
     subcategory: input.subcategory,
     type_specific: input.type_specific,
     state: input.state,
+    color: input.color,
     unit: input.unit,
     stock_quantity: input.stock_quantity,
     minimum_stock: input.minimum_stock,
@@ -105,17 +112,34 @@ export async function createRawMaterial(input: {
 
 // ─── Bill of Materials ───────────────────────────────────────────────────────
 
+/**
+ * Adiciona um item à receita do produto. Cortes (Corte Lona/Forro/Couro) entram
+ * como categoria + tipo — a cor é resolvida pela variante na hora da produção.
+ * Os demais insumos entram pelo id.
+ */
 export async function addBOMEntry(input: {
-  product_variant_id: string
+  product_id: string
   raw_material_id: string
   quantity_needed: number
 }): Promise<StockEntryResult> {
   await requireAdmin()
   const supabase = createServiceClient()
 
+  const { data: material, error: matError } = await supabase
+    .from('raw_materials')
+    .select('category, type_specific')
+    .eq('id', input.raw_material_id)
+    .single()
+
+  if (matError) return { success: false, error: matError.message }
+
+  const isCut = CUT_CATEGORIES.includes(material.category as CutCategory)
+
   const { error } = await supabase.from('bill_of_materials').insert({
-    product_variant_id: input.product_variant_id,
-    raw_material_id: input.raw_material_id,
+    product_id: input.product_id,
+    raw_material_id: isCut ? null : input.raw_material_id,
+    material_category: isCut ? material.category : null,
+    material_type: isCut ? material.type_specific : null,
     quantity_needed: input.quantity_needed,
   })
 
@@ -124,6 +148,7 @@ export async function addBOMEntry(input: {
   }
 
   revalidatePath('/admin/materias')
+  revalidatePath('/admin/estoque')
   return { success: true }
 }
 

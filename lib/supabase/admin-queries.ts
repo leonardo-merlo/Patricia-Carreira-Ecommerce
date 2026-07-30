@@ -1,12 +1,25 @@
 import { createServiceClient } from '@/lib/supabase/service'
-import type { ProductWithVariants, ProductVariant } from '@/lib/types'
+import { getResolvedBomForVariants } from '@/lib/supabase/bom'
+import type { ProductWithVariants, ProductVariant, CutCategory } from '@/lib/types'
 
-export type ProductVariantWithBom = ProductVariant & {
-  bom: { id: string; raw_material_id: string; quantity_needed: number }[]
+/** Cores de produção da variante — resolvem os cortes da receita do produto. */
+export type ProductVariantWithColors = ProductVariant & {
+  color_lona: string | null
+  color_forro: string | null
+  color_couro: string | null
+}
+
+export type ProductBomEntry = {
+  id: string
+  raw_material_id: string | null
+  material_category: CutCategory | null
+  material_type: string | null
+  quantity_needed: number
 }
 
 export type ProductWithVariantsAndBom = Omit<ProductWithVariants, 'variants'> & {
-  variants: ProductVariantWithBom[]
+  variants: ProductVariantWithColors[]
+  bom: ProductBomEntry[]
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
@@ -146,7 +159,9 @@ export async function getAllProductsWithVariants(): Promise<ProductWithVariantsA
 
   const { data, error } = await supabase
     .from('products')
-    .select('*, variants:product_variants(*, bom:bill_of_materials(id, raw_material_id, quantity_needed))')
+    .select(
+      '*, variants:product_variants(*), bom:bill_of_materials(id, raw_material_id, material_category, material_type, quantity_needed)',
+    )
     .order('name', { ascending: true })
 
   if (error) {
@@ -318,80 +333,131 @@ export async function getRawMaterials(): Promise<RawMaterialRow[]> {
   })) as RawMaterialRow[]
 }
 
+/**
+ * Item da receita do produto, já enriquecido com os dados do insumo.
+ *
+ * Nos cortes, `material.id` é null e `material.stock_quantity` é a soma do
+ * estoque em todas as cores — a receita do produto não fixa cor. O saldo da cor
+ * concreta aparece na variante, via `resolve_variant_bom`.
+ */
 export type BOMEntry = {
   id: string
   quantity_needed: number
+  material_category: string
+  material_type: string | null
+  is_cut: boolean
   material: {
-    id: string
+    id: string | null
     name: string
     unit: string
     stock_quantity: number
-    type: string
     cost_per_unit: number | null
   }
 }
 
-export type VariantWithBOM = {
+export type ProductWithBOM = {
   id: string
-  sku: string
-  label: string
-  product_name: string
+  name: string
+  category: string
+  variant_count: number
   bom: BOMEntry[]
 }
 
-export async function getAllVariantsWithBOM(): Promise<VariantWithBOM[]> {
+export async function getAllProductsWithBOM(): Promise<ProductWithBOM[]> {
   const supabase = createServiceClient()
 
   const { data, error } = await supabase
-    .from('product_variants')
+    .from('products')
     .select(`
-      id, sku, size, color,
-      product:products(name),
+      id, name, category,
+      variants:product_variants(id),
       bom:bill_of_materials(
-        id, quantity_needed,
-        material:raw_materials(id, name, unit, stock_quantity, type, cost_per_unit)
+        id, quantity_needed, material_category, material_type,
+        material:raw_materials(id, name, unit, stock_quantity, cost_per_unit)
       )
     `)
-    .order('sku')
+    .order('name')
 
   if (error) {
-    console.error('[getAllVariantsWithBOM]', error)
+    console.error('[getAllProductsWithBOM]', error)
     return []
   }
 
+  // Cortes não apontam um insumo: o estoque exibido é a soma das cores.
+  const { data: cutRows } = await supabase
+    .from('raw_materials')
+    .select('category, type_specific, unit, stock_quantity, cost_per_unit')
+    .in('category', ['Corte Lona', 'Corte Forro', 'Corte Couro'])
+
+  type CutRow = {
+    category: string; type_specific: string | null; unit: string
+    stock_quantity: string; cost_per_unit: string | null
+  }
+
+  const cutTotals = new Map<string, { unit: string; stock: number; cost: number | null }>()
+  for (const c of (cutRows ?? []) as unknown as CutRow[]) {
+    const key = `${c.category}||${c.type_specific ?? ''}`
+    const prev = cutTotals.get(key)
+    cutTotals.set(key, {
+      unit: c.unit,
+      stock: (prev?.stock ?? 0) + Number(c.stock_quantity),
+      cost: c.cost_per_unit != null ? Number(c.cost_per_unit) : prev?.cost ?? null,
+    })
+  }
+
   type Raw = {
-    id: string; sku: string; size: string | null; color: string | null
-    product: { name: string } | null
+    id: string; name: string; category: string
+    variants: Array<{ id: string }>
     bom: Array<{
       id: string; quantity_needed: string
-      material: { id: string; name: string; unit: string; stock_quantity: string; type: string; cost_per_unit: string | null } | null
+      material_category: string | null; material_type: string | null
+      material: {
+        id: string; name: string; unit: string
+        stock_quantity: string; cost_per_unit: string | null
+      } | null
     }>
   }
 
-  return ((data ?? []) as unknown as Raw[]).map((v) => {
-    const parts = [v.color, v.size].filter(Boolean).join(' — ')
-    const productName = v.product?.name ?? ''
-    return {
-      id: v.id,
-      sku: v.sku,
-      label: parts ? `${productName} — ${parts}` : productName,
-      product_name: productName,
-      bom: (v.bom ?? [])
-        .filter((b) => b.material != null)
-        .map((b) => ({
+  return ((data ?? []) as unknown as Raw[]).map((p) => ({
+    id: p.id,
+    name: p.name,
+    category: p.category,
+    variant_count: (p.variants ?? []).length,
+    bom: (p.bom ?? []).map((b) => {
+      if (b.material) {
+        return {
           id: b.id,
           quantity_needed: Number(b.quantity_needed),
+          material_category: b.material_category ?? '',
+          material_type: b.material_type,
+          is_cut: false,
           material: {
-            id: b.material!.id,
-            name: b.material!.name,
-            unit: b.material!.unit,
-            stock_quantity: Number(b.material!.stock_quantity),
-            type: b.material!.type,
-            cost_per_unit: b.material!.cost_per_unit != null ? Number(b.material!.cost_per_unit) : null,
+            id: b.material.id,
+            name: b.material.name,
+            unit: b.material.unit,
+            stock_quantity: Number(b.material.stock_quantity),
+            cost_per_unit: b.material.cost_per_unit != null ? Number(b.material.cost_per_unit) : null,
           },
-        })),
-    }
-  })
+        }
+      }
+
+      const totals = cutTotals.get(`${b.material_category ?? ''}||${b.material_type ?? ''}`)
+      return {
+        id: b.id,
+        quantity_needed: Number(b.quantity_needed),
+        material_category: b.material_category ?? '',
+        material_type: b.material_type,
+        is_cut: true,
+        material: {
+          id: null,
+          name: b.material_type ?? '',
+          unit: totals?.unit ?? 'unidade',
+          stock_quantity: totals?.stock ?? 0,
+          cost_per_unit: totals?.cost ?? null,
+        },
+      }
+    }),
+  }))
 }
 
 // ─── Ordens de produção ───────────────────────────────────────────────────────
@@ -404,7 +470,10 @@ export type MissingMaterialEntry = {
   available: number
   missing: number
   unit: string
-  couro_bruto_available: number | null
+  /** Cor exigida pela variante (só para cortes); null nos insumos de cor fixa. */
+  required_color: string | null
+  /** false = o insumo nessa cor ainda não existe em raw_materials. */
+  resolved: boolean
 }
 
 export type OpMaterial = {
@@ -412,7 +481,8 @@ export type OpMaterial = {
   material_name: string
   category: string
   type_specific: string | null
-  state: string | null
+  required_color: string | null
+  resolved: boolean
   unit: string
   needed: number
   available: number
@@ -482,30 +552,8 @@ export async function getProductionOrders(limit = 50): Promise<ProductionOrderRo
     new Set(rows.map((o) => o.product_variant_id).filter((id): id is string => Boolean(id))),
   )
 
-  type BomRaw = {
-    product_variant_id: string
-    quantity_needed: number
-    material: {
-      id: string; name: string; category: string
-      type_specific: string | null; state: string | null; unit: string; stock_quantity: number
-    } | null
-  }
-
-  const bomByVariant: Record<string, BomRaw[]> = {}
-  if (variantIds.length > 0) {
-    const { data: bomData } = await supabase
-      .from('bill_of_materials')
-      .select(`
-        product_variant_id,
-        quantity_needed,
-        material:raw_materials(id, name, category, type_specific, state, unit, stock_quantity)
-      `)
-      .in('product_variant_id', variantIds)
-
-    for (const b of (bomData ?? []) as unknown as BomRaw[]) {
-      ;(bomByVariant[b.product_variant_id] ??= []).push(b)
-    }
-  }
+  // A receita é do produto; resolve por variante para aplicar as cores dela.
+  const bomByVariant = await getResolvedBomForVariants(variantIds)
 
   return rows.map((o) => {
     const v = o.variant
@@ -514,24 +562,21 @@ export async function getProductionOrders(limit = 50): Promise<ProductionOrderRo
     const variantLabel = parts ? `${productName} — ${parts}` : productName
 
     const bom = o.product_variant_id ? bomByVariant[o.product_variant_id] ?? [] : []
-    const materials: OpMaterial[] = bom
-      .filter((b) => b.material)
-      .map((b) => {
-        const mat = b.material!
-        const needed = Number(b.quantity_needed) * o.quantity_requested
-        const available = Number(mat.stock_quantity)
-        return {
-          material_id: mat.id,
-          material_name: mat.name,
-          category: mat.category,
-          type_specific: mat.type_specific,
-          state: mat.state,
-          unit: mat.unit,
-          needed,
-          available,
-          sufficient: available >= needed,
-        }
-      })
+    const materials: OpMaterial[] = bom.map((line) => {
+      const needed = line.quantity_needed * o.quantity_requested
+      return {
+        material_id: line.raw_material_id ?? '',
+        material_name: line.material_name,
+        category: line.material_category,
+        type_specific: line.material_type,
+        required_color: line.required_color,
+        resolved: line.resolved,
+        unit: line.unit,
+        needed,
+        available: line.stock_quantity,
+        sufficient: line.resolved && line.stock_quantity >= needed,
+      }
+    })
 
     return {
       id: o.id,

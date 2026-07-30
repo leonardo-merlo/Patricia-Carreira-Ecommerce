@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAdmin } from '@/lib/server/auth'
 import type { MissingMaterialEntry } from '@/lib/supabase/admin-queries'
+import { getResolvedBomForVariant } from '@/lib/supabase/bom'
 
 export type CreateOPResult =
   | { success: true; op_ids: string[] }
@@ -63,17 +64,9 @@ export async function checkAndSetMaterials(opId: string): Promise<CheckMaterials
     return { success: false, error: 'OP ou variante não encontrada' }
   }
 
-  const { data: bom, error: bomErr } = await supabase
-    .from('bill_of_materials')
-    .select(`
-      quantity_needed,
-      material:raw_materials(id, name, category, subcategory, type_specific, unit, stock_quantity)
-    `)
-    .eq('product_variant_id', op.product_variant_id)
+  const bom = await getResolvedBomForVariant(op.product_variant_id)
 
-  if (bomErr) return { success: false, error: bomErr.message }
-
-  if (!bom || bom.length === 0) {
+  if (bom.length === 0) {
     await supabase
       .from('production_orders')
       .update({ materials_sufficient: true, missing_materials: [] })
@@ -81,56 +74,40 @@ export async function checkAndSetMaterials(opId: string): Promise<CheckMaterials
     return { success: true }
   }
 
-  type BomRow = {
-    quantity_needed: number
-    material: {
-      id: string; name: string; category: string
-      subcategory: string | null; type_specific: string | null; unit: string; stock_quantity: number
-    } | null
-  }
-
   const missing: MissingMaterialEntry[] = []
 
-  for (const row of bom as unknown as BomRow[]) {
-    const mat = row.material
-    if (!mat) continue
+  for (const line of bom) {
+    const needed = line.quantity_needed * op.quantity_requested
 
-    const needed = row.quantity_needed * op.quantity_requested
-    const available = Number(mat.stock_quantity)
-    const category = mat.category
-
-    if (available >= needed) continue
-
-    let couroBrutoAvailable: number | null = null
-    if (category === 'Couro' && mat.subcategory === 'com laser') {
-      const brutoQuery = supabase
-        .from('raw_materials')
-        .select('stock_quantity')
-        .eq('category', 'Couro')
-        .eq('subcategory', 'bruto')
-
-      if (mat.type_specific) {
-        brutoQuery.eq('type_specific', mat.type_specific)
-      }
-
-      // Pode haver mais de um registro de couro bruto (lotes/fornecedores):
-      // soma tudo em vez de maybeSingle, que erra com múltiplas linhas.
-      const { data: brutoRows } = await brutoQuery
-      couroBrutoAvailable = (brutoRows ?? []).reduce(
-        (sum, row) => sum + Number(row.stock_quantity),
-        0,
-      )
+    // Insumo ainda não cadastrado na cor desta variante: conta como faltante
+    // integral, para o Henrique cadastrar antes de produzir.
+    if (!line.resolved) {
+      missing.push({
+        material_id: '',
+        material_name: line.material_name,
+        category: line.material_category,
+        needed,
+        available: 0,
+        missing: needed,
+        unit: line.unit,
+        required_color: line.required_color,
+        resolved: false,
+      })
+      continue
     }
 
+    if (line.stock_quantity >= needed) continue
+
     missing.push({
-      material_id: mat.id,
-      material_name: mat.name,
-      category,
+      material_id: line.raw_material_id ?? '',
+      material_name: line.material_name,
+      category: line.material_category,
       needed,
-      available,
-      missing: needed - available,
-      unit: mat.unit,
-      couro_bruto_available: couroBrutoAvailable,
+      available: line.stock_quantity,
+      missing: needed - line.stock_quantity,
+      unit: line.unit,
+      required_color: line.required_color,
+      resolved: true,
     })
   }
 

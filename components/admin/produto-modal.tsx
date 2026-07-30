@@ -11,7 +11,7 @@ import {
   type CreateProductInput,
   type UpdateProductData,
   type VariantInput,
-  type VariantBomInput,
+  type ProductBomInput,
 } from '@/lib/actions/products'
 import { MANUAL_TAGS } from '@/lib/types'
 import type { ProductWithVariantsAndBom, RawMaterialRow } from '@/lib/supabase/admin-queries'
@@ -38,7 +38,28 @@ function buildSku(name: string, color: string, size: string): string {
   return `${base}-${c}-${s}`
 }
 
-type BomRow = { tempBomId: string; raw_material_id: string; quantity_needed: string }
+const CUT_CATEGORIES = ['Corte Lona', 'Corte Forro', 'Corte Couro'] as const
+
+function isCutCategory(category: string): boolean {
+  return (CUT_CATEGORIES as readonly string[]).includes(category)
+}
+
+/**
+ * Item da receita do produto. Cortes são identificados por categoria + tipo (a
+ * cor sai da variante); os demais insumos, pelo id.
+ */
+type BomRow = {
+  tempBomId: string
+  raw_material_id: string | null
+  material_category: string
+  material_type: string
+  quantity_needed: string
+}
+
+/** Chave de deduplicação: cortes ignoram a cor, os demais são o próprio id. */
+function bomKey(category: string, type: string | null, id: string | null): string {
+  return isCutCategory(category) ? `${category}||${type ?? ''}` : (id ?? '')
+}
 
 type VariantRow = {
   tempId: string
@@ -50,7 +71,9 @@ type VariantRow = {
   imageFiles: File[]
   imagePreviews: string[] // existing URLs + object URLs, in display order
   existingImageCount: number // how many of imagePreviews are pre-existing URLs (not new files)
-  bom: BomRow[]
+  colorLona: string
+  colorForro: string
+  colorCouro: string
   expanded: boolean
 }
 
@@ -64,7 +87,9 @@ function emptyVariant(expanded = true): VariantRow {
     imageFiles: [],
     imagePreviews: [],
     existingImageCount: 0,
-    bom: [],
+    colorLona: '',
+    colorForro: '',
+    colorCouro: '',
     expanded,
   }
 }
@@ -124,14 +149,28 @@ export function ProdutoModal({ mode, product, rawMaterials, onClose }: ProdutoMo
           imageFiles: [],
           imagePreviews: v.images ?? [],
           existingImageCount: (v.images ?? []).length,
-          bom: (v.bom ?? []).map((b) => ({
-            tempBomId: b.id,
-            raw_material_id: b.raw_material_id,
-            quantity_needed: String(b.quantity_needed),
-          })),
+          colorLona: v.color_lona ?? '',
+          colorForro: v.color_forro ?? '',
+          colorCouro: v.color_couro ?? '',
           expanded: product.variants.length === 1,
         }))
       : [emptyVariant()],
+  )
+
+  // Receita do produto — uma só, herdada por todas as variantes
+  const [bom, setBom] = useState<BomRow[]>(
+    mode === 'edit' && product
+      ? (product.bom ?? []).map((b) => {
+          const mat = rawMaterials.find((m) => m.id === b.raw_material_id)
+          return {
+            tempBomId: b.id,
+            raw_material_id: b.raw_material_id,
+            material_category: b.material_category ?? mat?.category ?? '',
+            material_type: b.material_type ?? mat?.type_specific ?? '',
+            quantity_needed: String(b.quantity_needed),
+          }
+        })
+      : [],
   )
 
   const [saving, setSaving] = useState(false)
@@ -194,35 +233,40 @@ export function ProdutoModal({ mode, product, rawMaterials, onClose }: ProdutoMo
     )
   }
 
-  function usedMaterialIds(v: VariantRow): Set<string> {
-    return new Set(v.bom.map((b) => b.raw_material_id))
+  const usedBomKeys = new Set(bom.map((b) => bomKey(b.material_category, b.material_type, b.raw_material_id)))
+  // Cortes aparecem uma vez por tipo no seletor — a cor vem da variante.
+  const availableMaterials = rawMaterials.filter((m, i, all) => {
+    if (usedBomKeys.has(bomKey(m.category, m.type_specific, m.id))) return false
+    if (!isCutCategory(m.category)) return true
+    return all.findIndex((o) => o.category === m.category && o.type_specific === m.type_specific) === i
+  })
+
+  const knownColors = Array.from(
+    new Set(rawMaterials.map((m) => m.color).filter((c): c is string => Boolean(c))),
+  ).sort()
+
+  function addBomRow(materialId: string) {
+    const mat = rawMaterials.find((m) => m.id === materialId)
+    if (!mat) return
+    const isCut = isCutCategory(mat.category)
+    setBom((prev) => [
+      ...prev,
+      {
+        tempBomId: `${Date.now()}-${Math.random()}`,
+        raw_material_id: isCut ? null : mat.id,
+        material_category: mat.category,
+        material_type: mat.type_specific ?? mat.name,
+        quantity_needed: '1',
+      },
+    ])
   }
 
-  function addBomRow(tempId: string, materialId: string) {
-    if (!materialId) return
-    setVariants((prev) =>
-      prev.map((v) =>
-        v.tempId === tempId
-          ? { ...v, bom: [...v.bom, { tempBomId: `${Date.now()}-${Math.random()}`, raw_material_id: materialId, quantity_needed: '1' }] }
-          : v,
-      ),
-    )
+  function updateBomQty(tempBomId: string, qty: string) {
+    setBom((prev) => prev.map((b) => (b.tempBomId === tempBomId ? { ...b, quantity_needed: qty } : b)))
   }
 
-  function updateBomQty(tempId: string, tempBomId: string, qty: string) {
-    setVariants((prev) =>
-      prev.map((v) =>
-        v.tempId === tempId
-          ? { ...v, bom: v.bom.map((b) => (b.tempBomId === tempBomId ? { ...b, quantity_needed: qty } : b)) }
-          : v,
-      ),
-    )
-  }
-
-  function removeBomRow(tempId: string, tempBomId: string) {
-    setVariants((prev) =>
-      prev.map((v) => (v.tempId === tempId ? { ...v, bom: v.bom.filter((b) => b.tempBomId !== tempBomId) } : v)),
-    )
+  function removeBomRow(tempBomId: string) {
+    setBom((prev) => prev.filter((b) => b.tempBomId !== tempBomId))
   }
 
   async function handleSubmit() {
@@ -230,8 +274,8 @@ export function ProdutoModal({ mode, product, rawMaterials, onClose }: ProdutoMo
     const price = parseFloat(basePrice.replace(',', '.'))
     if (isNaN(price) || price <= 0) { setError('Preço varejo inválido.'); return }
     if (variants.some((v) => !v.sku.trim())) { setError('Todas as variantes precisam ter SKU.'); return }
-    const invalidBom = variants.some((v) => v.bom.some((b) => !b.raw_material_id || isNaN(parseFloat(b.quantity_needed)) || parseFloat(b.quantity_needed) <= 0))
-    if (invalidBom) { setError('Verifique as quantidades da receita (BOM).'); return }
+    const invalidBom = bom.some((b) => isNaN(parseFloat(b.quantity_needed)) || parseFloat(b.quantity_needed) <= 0)
+    if (invalidBom) { setError('Verifique as quantidades da receita.'); return }
 
     setSaving(true)
     setError(null)
@@ -249,10 +293,6 @@ export function ProdutoModal({ mode, product, rawMaterials, onClose }: ProdutoMo
         }
         const existingUrls = v.imagePreviews.slice(0, v.existingImageCount)
         const finalImages = [...existingUrls, ...uploadedUrls]
-        const bom: VariantBomInput[] = v.bom.map((b) => ({
-          raw_material_id: b.raw_material_id,
-          quantity_needed: parseFloat(b.quantity_needed),
-        }))
         variantInputs.push({
           tempId: v.tempId,
           id: v.id,
@@ -261,9 +301,21 @@ export function ProdutoModal({ mode, product, rawMaterials, onClose }: ProdutoMo
           sku: v.sku.trim(),
           stock_quantity: Math.max(0, parseInt(v.stock) || 0),
           images: finalImages,
-          bom,
+          color_lona: v.colorLona.trim() || null,
+          color_forro: v.colorForro.trim() || null,
+          color_couro: v.colorCouro.trim() || null,
         })
       }
+
+      const bomInputs: ProductBomInput[] = bom.map((b) => {
+        const isCut = isCutCategory(b.material_category)
+        return {
+          raw_material_id: isCut ? null : b.raw_material_id,
+          material_category: isCut ? (b.material_category as ProductBomInput['material_category']) : null,
+          material_type: isCut ? b.material_type : null,
+          quantity_needed: parseFloat(b.quantity_needed),
+        }
+      })
 
       const shared = {
         name: name.trim(),
@@ -285,10 +337,10 @@ export function ProdutoModal({ mode, product, rawMaterials, onClose }: ProdutoMo
       }
 
       if (mode === 'create') {
-        const input: CreateProductInput = { ...shared, variants: variantInputs }
+        const input: CreateProductInput = { ...shared, variants: variantInputs, bom: bomInputs }
         await createProduct(input)
       } else if (product) {
-        const data: UpdateProductData = { ...shared, variants: variantInputs }
+        const data: UpdateProductData = { ...shared, variants: variantInputs, bom: bomInputs }
         await updateProduct(product.id, data)
       }
 
@@ -475,7 +527,6 @@ export function ProdutoModal({ mode, product, rawMaterials, onClose }: ProdutoMo
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {variants.map((v) => {
-                const available = rawMaterials.filter((m) => !usedMaterialIds(v).has(m.id))
                 return (
                   <div key={v.tempId} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
                     {/* Header do card */}
@@ -545,71 +596,40 @@ export function ProdutoModal({ mode, product, rawMaterials, onClose }: ProdutoMo
                           )}
                         </div>
 
-                        {/* BOM da variante */}
+                        {/* Cores de produção — resolvem os cortes da receita do produto */}
                         <div>
-                          <label style={{ fontSize: 12, fontWeight: 500, display: 'block', marginBottom: 6 }}>Receita (BOM)</label>
-                          {v.bom.length > 0 && (
-                            <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', marginBottom: 8 }}>
-                              <table className="tbl" style={{ fontSize: 12 }}>
-                                <thead>
-                                  <tr>
-                                    <th>Matéria-prima</th>
-                                    <th style={{ width: 90 }}>Qtd. / unid.</th>
-                                    <th style={{ width: 32 }}></th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {v.bom.map((b) => {
-                                    const mat = rawMaterials.find((m) => m.id === b.raw_material_id)
-                                    return (
-                                      <tr key={b.tempBomId}>
-                                        <td style={{ padding: '4px 10px' }}>{mat?.name ?? '—'} <span className="cust-meta">({mat?.unit})</span></td>
-                                        <td style={{ padding: '4px 10px' }}>
-                                          <input
-                                            className="input"
-                                            style={{ height: 24, padding: '2px 6px' }}
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            value={b.quantity_needed}
-                                            onChange={(e) => updateBomQty(v.tempId, b.tempBomId, e.target.value)}
-                                          />
-                                        </td>
-                                        <td style={{ padding: '4px 6px', textAlign: 'center' }}>
-                                          <button className="icon-btn" type="button" onClick={() => removeBomRow(v.tempId, b.tempBomId)}>
-                                            <AdminIcon name="x" size={11} />
-                                          </button>
-                                        </td>
-                                      </tr>
-                                    )
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-                          {available.length > 0 ? (
-                            <div style={{ display: 'flex', gap: 8 }}>
-                              <select
-                                className="select"
-                                data-testid={`select-bom-material-${v.tempId}`}
-                                style={{ flex: 1 }}
-                                defaultValue=""
-                                onChange={(e) => {
-                                  if (e.target.value) {
-                                    addBomRow(v.tempId, e.target.value)
-                                    e.target.value = ''
-                                  }
-                                }}
-                              >
-                                <option value="">+ Adicionar matéria-prima…</option>
-                                {available.map((m) => (
-                                  <option key={m.id} value={m.id}>{m.name} ({m.unit})</option>
-                                ))}
-                              </select>
-                            </div>
-                          ) : (
-                            <div className="cust-meta">Nenhuma matéria-prima disponível para adicionar.</div>
-                          )}
+                          <label style={{ fontSize: 12, fontWeight: 500, display: 'block', marginBottom: 6 }}>
+                            Cores de produção
+                          </label>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                            <input
+                              className="input"
+                              placeholder="Cor da lona"
+                              data-testid={`input-cor-lona-${v.tempId}`}
+                              value={v.colorLona}
+                              onChange={(e) => updateVariant(v.tempId, { colorLona: e.target.value })}
+                              list="cores-insumos"
+                            />
+                            <input
+                              className="input"
+                              placeholder="Cor do forro"
+                              data-testid={`input-cor-forro-${v.tempId}`}
+                              value={v.colorForro}
+                              onChange={(e) => updateVariant(v.tempId, { colorForro: e.target.value })}
+                              list="cores-insumos"
+                            />
+                            <input
+                              className="input"
+                              placeholder="Cor do couro"
+                              data-testid={`input-cor-couro-${v.tempId}`}
+                              value={v.colorCouro}
+                              onChange={(e) => updateVariant(v.tempId, { colorCouro: e.target.value })}
+                              list="cores-insumos"
+                            />
+                          </div>
+                          <div className="cust-meta" style={{ marginTop: 4 }}>
+                            Precisam bater com a cor cadastrada no insumo de corte, senão a produção acusa pendência.
+                          </div>
                         </div>
                       </div>
                     )}
@@ -619,6 +639,86 @@ export function ProdutoModal({ mode, product, rawMaterials, onClose }: ProdutoMo
             </div>
             <div className="cust-meta" style={{ marginTop: 6 }}>SKU gerado automaticamente ao digitar cor e tamanho — edite se necessário.</div>
           </div>
+
+          {/* Receita do produto — uma só, herdada por todas as variantes */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 500, display: 'block', marginBottom: 6 }}>
+              Receita — vale para todas as {variants.length} {variants.length === 1 ? 'variante' : 'variantes'}
+            </label>
+
+            {bom.length > 0 && (
+              <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', marginBottom: 8 }}>
+                <table className="tbl" style={{ fontSize: 12 }}>
+                  <thead>
+                    <tr>
+                      <th>Insumo</th>
+                      <th style={{ width: 110 }}>Categoria</th>
+                      <th style={{ width: 90 }}>Qtd. / unid.</th>
+                      <th style={{ width: 32 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bom.map((b) => (
+                      <tr key={b.tempBomId}>
+                        <td style={{ padding: '4px 10px' }}>
+                          {b.material_type}
+                          {isCutCategory(b.material_category) && (
+                            <span className="cust-meta"> · cor da variante</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '4px 10px' }} className="cust-meta">
+                          {b.material_category}
+                        </td>
+                        <td style={{ padding: '4px 10px' }}>
+                          <input
+                            className="input"
+                            style={{ height: 24, padding: '2px 6px' }}
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={b.quantity_needed}
+                            onChange={(e) => updateBomQty(b.tempBomId, e.target.value)}
+                          />
+                        </td>
+                        <td style={{ padding: '4px 6px', textAlign: 'center' }}>
+                          <button className="icon-btn" type="button" onClick={() => removeBomRow(b.tempBomId)}>
+                            <AdminIcon name="x" size={11} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {availableMaterials.length > 0 ? (
+              <select
+                className="select"
+                data-testid="select-bom-material"
+                style={{ width: '100%' }}
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) addBomRow(e.target.value)
+                }}
+              >
+                <option value="">+ Adicionar insumo…</option>
+                {availableMaterials.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.category} › {m.type_specific ?? m.name} ({m.unit})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="cust-meta">Todos os insumos já estão na receita.</div>
+            )}
+          </div>
+
+          <datalist id="cores-insumos">
+            {knownColors.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
 
           {error && (
             <div style={{ background: 'var(--red-soft)', color: 'var(--red)', padding: '10px 14px', borderRadius: 8, fontSize: 12.5 }}>

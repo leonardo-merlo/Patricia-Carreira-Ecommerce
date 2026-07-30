@@ -3,6 +3,7 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAdmin } from '@/lib/server/auth'
 import { revalidatePath } from 'next/cache'
+import type { CutCategory } from '@/lib/types'
 
 export async function toggleProductStatus(productId: string, isActive: boolean): Promise<void> {
   await requireAdmin()
@@ -17,8 +18,15 @@ export async function toggleProductStatus(productId: string, isActive: boolean):
 
 // ─── Variantes (compartilhado entre criar/editar) ─────────────────────────────
 
-export type VariantBomInput = {
-  raw_material_id: string
+/**
+ * Item da receita do produto. Ou aponta um insumo de cor fixa
+ * (`raw_material_id`), ou um corte cuja cor vem da variante
+ * (`material_category` + `material_type`) — nunca os dois.
+ */
+export type ProductBomInput = {
+  raw_material_id: string | null
+  material_category: CutCategory | null
+  material_type: string | null
   quantity_needed: number
 }
 
@@ -30,26 +38,31 @@ export type VariantInput = {
   sku: string
   stock_quantity: number
   images: string[]
-  bom: VariantBomInput[] // lista completa desejada — servidor substitui a existente
+  // Cores de produção — resolvem os cortes da receita para esta variante
+  color_lona: string | null
+  color_forro: string | null
+  color_couro: string | null
 }
 
-async function saveVariantBom(
+async function saveProductBom(
   supabase: ReturnType<typeof createServiceClient>,
-  variantId: string,
-  bom: VariantBomInput[],
+  productId: string,
+  bom: ProductBomInput[],
 ): Promise<void> {
   const { error: delError } = await supabase
     .from('bill_of_materials')
     .delete()
-    .eq('product_variant_id', variantId)
+    .eq('product_id', productId)
   if (delError) throw new Error(delError.message)
 
   if (bom.length === 0) return
 
   const { error: insError } = await supabase.from('bill_of_materials').insert(
     bom.map((b) => ({
-      product_variant_id: variantId,
+      product_id: productId,
       raw_material_id: b.raw_material_id,
+      material_category: b.material_category,
+      material_type: b.material_type,
       quantity_needed: b.quantity_needed,
     })),
   )
@@ -76,6 +89,7 @@ export type UpdateProductData = {
   ncm: string | null
   cfop: string | null
   variants: VariantInput[]
+  bom: ProductBomInput[] // lista completa desejada — servidor substitui a existente
 }
 
 export async function updateProduct(productId: string, data: UpdateProductData): Promise<void> {
@@ -106,39 +120,36 @@ export async function updateProduct(productId: string, data: UpdateProductData):
 
   if (error) throw new Error(error.message)
 
+  await saveProductBom(supabase, productId, data.bom)
+
   for (const v of data.variants) {
+    const fields = {
+      color: v.color,
+      size: v.size,
+      sku: v.sku,
+      stock_quantity: v.stock_quantity,
+      images: v.images,
+      color_lona: v.color_lona,
+      color_forro: v.color_forro,
+      color_couro: v.color_couro,
+    }
+
     if (v.id) {
       const { error: varError } = await supabase
         .from('product_variants')
-        .update({
-          color: v.color,
-          size: v.size,
-          sku: v.sku,
-          stock_quantity: v.stock_quantity,
-          images: v.images,
-        })
+        .update(fields)
         .eq('id', v.id)
       if (varError) throw new Error(varError.message)
-      await saveVariantBom(supabase, v.id, v.bom)
     } else {
-      const { data: newVariant, error: insError } = await supabase
+      const { error: insError } = await supabase
         .from('product_variants')
-        .insert({
-          product_id: productId,
-          color: v.color,
-          size: v.size,
-          sku: v.sku,
-          stock_quantity: v.stock_quantity,
-          images: v.images,
-        })
-        .select('id')
-        .single()
+        .insert({ product_id: productId, ...fields })
       if (insError) throw new Error(insError.message)
-      await saveVariantBom(supabase, newVariant.id as string, v.bom)
     }
   }
 
   revalidatePath('/admin/estoque')
+  revalidatePath('/admin/materias')
 }
 
 // ─── Criar produto ──────────────────────────────────────────────────────────
@@ -161,6 +172,7 @@ export type CreateProductInput = {
   ncm: string | null
   cfop: string | null
   variants: VariantInput[]
+  bom: ProductBomInput[]
 }
 
 export async function createProduct(data: CreateProductInput): Promise<string> {
@@ -203,8 +215,10 @@ export async function createProduct(data: CreateProductInput): Promise<string> {
 
   if (prodError) throw new Error(prodError.message)
 
+  await saveProductBom(supabase, product.id as string, data.bom)
+
   for (const v of data.variants) {
-    const { data: newVariant, error: varError } = await supabase
+    const { error: varError } = await supabase
       .from('product_variants')
       .insert({
         product_id: product.id,
@@ -213,14 +227,15 @@ export async function createProduct(data: CreateProductInput): Promise<string> {
         size: v.size,
         stock_quantity: v.stock_quantity,
         images: v.images,
+        color_lona: v.color_lona,
+        color_forro: v.color_forro,
+        color_couro: v.color_couro,
       })
-      .select('id')
-      .single()
     if (varError) throw new Error(varError.message)
-    await saveVariantBom(supabase, newVariant.id as string, v.bom)
   }
 
   revalidatePath('/admin/estoque')
+  revalidatePath('/admin/materias')
   return product.id as string
 }
 
