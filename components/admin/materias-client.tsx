@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { AdminIcon } from '@/components/admin/admin-icon'
-import type { RawMaterialRow, ProductWithBOM, PurchaseRequestRow } from '@/lib/supabase/admin-queries'
+import type { RawMaterialRow, ProductWithBOM, PendingCutMaterial, PurchaseRequestRow } from '@/lib/supabase/admin-queries'
 import type { Supplier } from '@/lib/actions/suppliers'
 import {
   registerMaterialEntry,
@@ -13,6 +13,7 @@ import {
   deleteBOMEntry,
   receivePurchaseRequest,
   cancelPurchaseRequest,
+  createPendingCutMaterials,
 } from '@/lib/actions/raw-materials'
 
 // Categorias espelham as seções da ficha técnica do Henrique.
@@ -65,6 +66,7 @@ const UNITS = ['metro', 'unidade', 'kg', 'cm'] as const
 interface MateriasClientProps {
   materials: RawMaterialRow[]
   products: ProductWithBOM[]
+  pendingCuts: PendingCutMaterial[]
   purchaseRequests: PurchaseRequestRow[]
   suppliers: Supplier[]
 }
@@ -79,7 +81,7 @@ function formatQty(qty: number, unit: string) {
   return `${qty.toLocaleString('pt-BR', { maximumFractionDigits: 3 })} ${unit}`
 }
 
-export function MateriasClient({ materials, products, purchaseRequests, suppliers }: MateriasClientProps) {
+export function MateriasClient({ materials, products, pendingCuts, purchaseRequests, suppliers }: MateriasClientProps) {
   // ── Abas ──
   const [tab, setTab] = useState<'insumos' | 'receitas' | 'compras'>('insumos')
 
@@ -182,6 +184,14 @@ export function MateriasClient({ materials, products, purchaseRequests, supplier
       } else {
         setEntryError(res.error)
       }
+    })
+  }
+
+  function handleCreatePendingCuts() {
+    setBomError('')
+    startTransition(async () => {
+      const res = await createPendingCutMaterials()
+      if (!res.success) setBomError(res.error)
     })
   }
 
@@ -463,12 +473,59 @@ export function MateriasClient({ materials, products, purchaseRequests, supplier
       )}
 
       {tab === 'receitas' && (
+        <>
+        {pendingCuts.length > 0 && (
+          <div className="card" id="cortes-pendentes" style={{ marginBottom: 12 }}>
+            <div className="card-header">
+              <div>
+                <h3 className="ttl">Cortes a cadastrar</h3>
+                <div className="cust-meta" style={{ marginTop: 2, fontSize: 11.5 }}>
+                  {pendingCuts.length} {pendingCuts.length === 1 ? 'combinação de peça e cor' : 'combinações de peça e cor'} que
+                  as receitas exigem e ainda não existem no estoque de insumos.
+                </div>
+              </div>
+              <button
+                id="btn-cadastrar-cortes-pendentes"
+                className="btn sm primary"
+                onClick={handleCreatePendingCuts}
+                disabled={isPending}
+              >
+                <AdminIcon name="plus" size={11} /> Cadastrar {pendingCuts.length} com estoque 0
+              </button>
+            </div>
+            <div className="card-body flush">
+              <div className="table-wrap">
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th>Peça</th>
+                      <th style={{ width: 110 }}>Categoria</th>
+                      <th style={{ width: 110 }}>Cor</th>
+                      <th>Usada em</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingCuts.map((c) => (
+                      <tr key={`${c.category}-${c.type_specific}-${c.color}`}>
+                        <td style={{ fontSize: 12.5 }}>{c.type_specific}</td>
+                        <td className="cust-meta">{c.category}</td>
+                        <td style={{ fontSize: 12.5 }}>{c.color}</td>
+                        <td className="cust-meta">{c.products}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="card">
           <div className="card-header">
             <div>
               <h3 className="ttl">Receita de Produto (BOM)</h3>
               <div className="cust-meta" style={{ marginTop: 2, fontSize: 11.5 }}>
-                Consumo de matéria-prima por unidade fabricada.
+                Consumo por unidade fabricada. A receita é do produto — vale para todas as variantes.
               </div>
             </div>
             {selectedProduct && (
@@ -660,6 +717,7 @@ export function MateriasClient({ materials, products, purchaseRequests, supplier
             </div>
           )}
         </div>
+        </>
       )}
 
       {/* ── Compras Pendentes ── */}

@@ -9,6 +9,15 @@
 -- item a produzir a partir de outro insumo.
 --
 -- Estoque inicial 0 — o Henrique faz o inventário pelo painel.
+--
+-- Divergência conhecida: a ficha da Flora declara "CORTE COURO (13 peças)", mas
+-- os itens somam 15 (4+4+2+2+1+2). O Henrique confirmou que 15 está certo e o
+-- cabeçalho é que estava errado.
+--
+-- Os insumos de corte NÃO entram aqui: cada um existe por cor, e as cores de
+-- cada variante ainda serão definidas pelo Henrique no painel. A receita já
+-- referencia os cortes por categoria+tipo, então basta cadastrar os insumos nas
+-- cores certas depois (botão "cadastrar cortes pendentes" em matérias-primas).
 
 -- ─── Aplicações (cor fixa) ───────────────────────────────────────────────────
 INSERT INTO public.raw_materials (name, type, category, type_specific, color, unit, stock_quantity, minimum_stock) VALUES

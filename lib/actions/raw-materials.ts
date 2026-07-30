@@ -110,6 +110,46 @@ export async function createRawMaterial(input: {
   return { success: true }
 }
 
+export type CreatePendingResult =
+  | { success: true; created: number }
+  | { success: false; error: string }
+
+/**
+ * Cria de uma vez os insumos de corte que a receita exige nas cores declaradas
+ * nas variantes, com estoque zerado. Evita cadastrar ~35 tipos × cada cor no
+ * formulário um a um; o Henrique depois dá entrada do estoque real.
+ */
+export async function createPendingCutMaterials(): Promise<CreatePendingResult> {
+  await requireAdmin()
+  const supabase = createServiceClient()
+
+  const { data: pending, error: pendingError } = await supabase.rpc('pending_cut_materials')
+  if (pendingError) return { success: false, error: pendingError.message }
+
+  type PendingRow = { category: string; type_specific: string; color: string }
+  const rows = (pending ?? []) as PendingRow[]
+  if (rows.length === 0) return { success: true, created: 0 }
+
+  const { error } = await supabase.from('raw_materials').insert(
+    rows.map((r) => ({
+      name: r.type_specific,
+      type: 'bruta',
+      category: r.category,
+      type_specific: r.type_specific,
+      color: r.color,
+      unit: 'unidade',
+      stock_quantity: 0,
+      minimum_stock: 0,
+    })),
+  )
+
+  if (error) return { success: false, error: error.message }
+
+  revalidatePath('/admin/materias')
+  revalidatePath('/admin/producao')
+  return { success: true, created: rows.length }
+}
+
 // ─── Bill of Materials ───────────────────────────────────────────────────────
 
 /**

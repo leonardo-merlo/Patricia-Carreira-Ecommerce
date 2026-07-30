@@ -363,6 +363,31 @@ export type ProductWithBOM = {
   bom: BOMEntry[]
 }
 
+/** Corte que a receita exige numa cor que ainda não existe em raw_materials. */
+export type PendingCutMaterial = {
+  category: string
+  type_specific: string
+  color: string
+  variant_count: number
+  products: string
+}
+
+export async function getPendingCutMaterials(): Promise<PendingCutMaterial[]> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('pending_cut_materials')
+
+  if (error) {
+    console.error('[getPendingCutMaterials]', error)
+    return []
+  }
+
+  type Row = Omit<PendingCutMaterial, 'variant_count'> & { variant_count: string | number }
+  return ((data ?? []) as Row[]).map((r) => ({
+    ...r,
+    variant_count: Number(r.variant_count),
+  }))
+}
+
 export async function getAllProductsWithBOM(): Promise<ProductWithBOM[]> {
   const supabase = createServiceClient()
 

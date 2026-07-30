@@ -8,6 +8,19 @@
 -- em raw_materials, a conclusão da OP é bloqueada — antes esse item simplesmente
 -- não existiria e a OP concluiria com baixa incompleta.
 
+-- to_char(2, 'FM999999990.999') devolve "2." — o ponto solto vazava para a
+-- mensagem de erro ("falta 2. unidade").
+create or replace function public.format_qty(p_qty numeric)
+returns text
+language sql
+immutable
+as $$
+  select rtrim(rtrim(to_char(p_qty, 'FM999999990.999'), '0'), '.');
+$$;
+
+grant execute on function public.format_qty(numeric) to service_role;
+grant execute on function public.format_qty(numeric) to authenticated;
+
 create or replace function public.complete_production_order(p_op_id uuid)
 returns void
 language plpgsql
@@ -61,7 +74,7 @@ begin
     if r.stock_quantity < r.needed then
       v_missing := v_missing || r.material_name
         || coalesce(' (' || r.required_color || ')', '') || ' — falta '
-        || to_char(r.needed - r.stock_quantity, 'FM999999990.999') || ' ' || r.unit || '; ';
+        || public.format_qty(r.needed - r.stock_quantity) || ' ' || r.unit || '; ';
     end if;
   end loop;
 
