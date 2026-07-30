@@ -4,7 +4,7 @@ import { Fragment, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AdminIcon } from '@/components/admin/admin-icon'
 import { formatPrice } from '@/lib/utils'
-import { toggleProductStatus } from '@/lib/actions/products'
+import { toggleProductStatus, deleteProduct } from '@/lib/actions/products'
 import { ProdutoModal, AdjustStockModal, type AdjustStockTarget } from '@/components/admin/produto-modal'
 import { CsvImportModal } from '@/components/admin/csv-import-modal'
 import { toCsv, downloadCsv } from '@/lib/csv'
@@ -99,6 +99,9 @@ export function EstoqueClient({ products, rawMaterials }: EstoqueClientProps) {
   const [editProduct, setEditProduct] = useState<ProductWithVariantsAndBom | null>(null)
   const [adjustTarget, setAdjustTarget] = useState<AdjustStockTarget | null>(null)
   const [showCsvImport, setShowCsvImport] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<ProductWithVariantsAndBom | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
 
   // ─── Filtering ──────────────────────────────────────────────────────────────
@@ -125,6 +128,20 @@ export function EstoqueClient({ products, rawMaterials }: EstoqueClientProps) {
 
   // ─── Handlers ───────────────────────────────────────────────────────────────
 
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    setDeleteError(null)
+    const res = await deleteProduct(deleteTarget.id)
+    setDeleting(false)
+    if (res.success) {
+      setDeleteTarget(null)
+      router.refresh()
+    } else {
+      setDeleteError(res.error)
+    }
+  }
+
   async function handleToggle(productId: string, current: boolean) {
     const next = !current
     setStatusOverrides((m) => new Map(m).set(productId, next))
@@ -149,6 +166,54 @@ export function EstoqueClient({ products, rawMaterials }: EstoqueClientProps) {
       {editProduct && <ProdutoModal mode="edit" product={editProduct} rawMaterials={rawMaterials} onClose={() => setEditProduct(null)} />}
       {adjustTarget && <AdjustStockModal target={adjustTarget} onClose={() => setAdjustTarget(null)} />}
       {showCsvImport && <CsvImportModal products={products} onClose={() => setShowCsvImport(false)} />}
+
+      {deleteTarget && (
+        <div className="modal-backdrop" onClick={() => !deleting && setDeleteTarget(null)}>
+          <div
+            className="modal confirm-modal"
+            id="confirm-apagar-produto"
+            data-testid="confirm-apagar-produto"
+            role="alertdialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="confirm-modal-icon">
+              <AdminIcon name="alert" size={22} />
+            </div>
+            <h3 className="confirm-modal-title">Apagar {deleteTarget.name}?</h3>
+            <p className="confirm-modal-text">
+              Remove {deleteTarget.variants.length}{' '}
+              {deleteTarget.variants.length === 1 ? 'variante' : 'variantes'}, a receita e os
+              favoritos dos clientes. <b>Não dá para desfazer.</b>
+            </p>
+            <p className="cust-meta" style={{ marginTop: 4 }}>
+              Se a bolsa já teve pedidos ou ordens de produção, a exclusão é recusada — nesse
+              caso use o botão de ativar/desativar para tirá-la da loja sem perder o histórico.
+            </p>
+
+            {deleteError && (
+              <div className="alert alert-error" style={{ marginTop: 10, textAlign: 'left' }}>
+                {deleteError}
+              </div>
+            )}
+
+            <div className="confirm-modal-actions">
+              <button className="btn ghost" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+                Cancelar
+              </button>
+              <button
+                className="btn danger-outline"
+                id="btn-confirmar-apagar-produto"
+                data-testid="btn-confirmar-apagar-produto"
+                onClick={handleDelete}
+                disabled={deleting}
+              >
+                {deleting ? 'Apagando…' : 'Apagar definitivamente'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="page-header">
         <div>
@@ -276,6 +341,15 @@ export function EstoqueClient({ products, rawMaterials }: EstoqueClientProps) {
                           <div className="row" style={{ justifyContent: 'flex-end', gap: 4 }}>
                             <button className="icon-btn" title="Editar" onClick={() => setEditProduct(p)}>
                               <AdminIcon name="edit" size={13} />
+                            </button>
+                            <button
+                              className="icon-btn"
+                              id={`btn-apagar-produto-${p.id}`}
+                              data-testid={`btn-apagar-produto-${p.id}`}
+                              title="Apagar produto"
+                              onClick={() => { setDeleteTarget(p); setDeleteError(null) }}
+                            >
+                              <AdminIcon name="x" size={13} />
                             </button>
                           </div>
                         </td>

@@ -16,6 +16,86 @@ export async function toggleProductStatus(productId: string, isActive: boolean):
   revalidatePath('/admin/estoque')
 }
 
+// ─── Excluir produto ──────────────────────────────────────────────────────────
+
+export type DeleteProductResult =
+  | { success: true }
+  | { success: false; error: string }
+
+/**
+ * Apaga o produto e, em cascata, suas variantes, a receita e os favoritos.
+ *
+ * Não apaga produto com histórico: pedido ou ordem de produção que aponte para
+ * uma variante bloqueia a exclusão (o próprio banco recusa). Nesse caso o
+ * caminho é desativar, que tira da loja sem perder o histórico.
+ *
+ * As imagens no Storage não são removidas — a URL pode ter sido reaproveitada
+ * em outro produto, e apagar por engano quebraria a vitrine dele.
+ */
+export async function deleteProduct(productId: string): Promise<DeleteProductResult> {
+  await requireAdmin()
+  const supabase = createServiceClient()
+
+  const { data: product, error: prodError } = await supabase
+    .from('products')
+    .select('name, variants:product_variants(id)')
+    .eq('id', productId)
+    .single()
+
+  if (prodError || !product) {
+    return { success: false, error: 'Produto não encontrado.' }
+  }
+
+  const variantIds = ((product.variants ?? []) as Array<{ id: string }>).map((v) => v.id)
+
+  if (variantIds.length > 0) {
+    const [{ count: orderCount }, { count: opCount }] = await Promise.all([
+      supabase
+        .from('order_items')
+        .select('id', { count: 'exact', head: true })
+        .in('product_variant_id', variantIds),
+      supabase
+        .from('production_orders')
+        .select('id', { count: 'exact', head: true })
+        .in('product_variant_id', variantIds),
+    ])
+
+    const blockers: string[] = []
+    if (orderCount) blockers.push(`${orderCount} ${orderCount === 1 ? 'pedido' : 'pedidos'}`)
+    if (opCount) blockers.push(`${opCount} ${opCount === 1 ? 'ordem de produção' : 'ordens de produção'}`)
+
+    if (blockers.length > 0) {
+      return {
+        success: false,
+        error:
+          `"${product.name}" não pode ser apagada: ${blockers.join(' e ')} usam esta bolsa. ` +
+          'Apagar quebraria esse histórico. Desative o produto para tirá-lo da loja mantendo os registros.',
+      }
+    }
+  }
+
+  const { error } = await supabase.from('products').delete().eq('id', productId)
+
+  if (error) {
+    // Corrida: pedido ou OP criado entre a checagem acima e o delete. A mensagem
+    // do Postgres é ilegível para o Henrique — traduz.
+    if (error.code === '23503') {
+      return {
+        success: false,
+        error:
+          `"${product.name}" passou a ter histórico enquanto você confirmava (um pedido ou ` +
+          'ordem de produção acabou de usá-la). Recarregue a página; se ainda quiser tirá-la ' +
+          'da loja, desative o produto.',
+      }
+    }
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/admin/estoque')
+  revalidatePath('/admin/materias')
+  return { success: true }
+}
+
 // ─── Variantes (compartilhado entre criar/editar) ─────────────────────────────
 
 /**
