@@ -107,7 +107,7 @@ export default async function HomePage() {
             <Link href="/bolsas">Ver tudo</Link>
           </Button>
         </div>
-        <div className="grid grid-cols-3 gap-2 md:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
           {FEATURED.map((product) => (
             <ProductCard key={product.id} product={product} compact showLowStockWarning={showLowStockWarning} />
           ))}

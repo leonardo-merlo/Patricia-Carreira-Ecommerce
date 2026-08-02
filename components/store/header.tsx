@@ -32,7 +32,7 @@ export function Header() {
           aria-label="Patrícia Carreira — página inicial"
         >
           <Image
-            src="/images/logo/logo oficial.png"
+            src="/images/logo/logo-v2.png"
             alt="Patrícia Carreira"
             width={80}
             height={64}

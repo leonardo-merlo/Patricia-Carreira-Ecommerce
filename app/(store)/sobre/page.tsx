@@ -125,7 +125,7 @@ export default function SobrePage() {
       {/* Entre Arraial e O Mundo — full bleed */}
       <section>
         {/* Foto da loja */}
-        <div className="relative h-[55vh] w-full overflow-hidden">
+        <div className="relative h-[55vh] w-full overflow-hidden md:h-[72vh]">
           <Image
             src="/images/refs2/loja-loja.png"
             alt="Loja Patrícia Carreira em Arraial d'Ajuda"
@@ -166,7 +166,7 @@ export default function SobrePage() {
 
         {/* Três fotos lado a lado — sem padding, de borda a borda */}
         <div className="grid grid-cols-3 gap-[3px] bg-white">
-          <div className="relative aspect-[5/3]">
+          <div className="relative aspect-[9/16] md:aspect-[4/3]">
             <Image
               src="/images/refs2/loja-mulher1.jpeg"
               alt="Loja Patrícia Carreira"
@@ -174,7 +174,7 @@ export default function SobrePage() {
               className="object-cover object-[50%_10%]"
             />
           </div>
-          <div className="relative aspect-[5/3]">
+          <div className="relative aspect-[9/16] md:aspect-[4/3]">
             <Image
               src="/images/refs2/loja-criança.jpeg"
               alt="Criança na loja Patrícia Carreira"
@@ -182,7 +182,7 @@ export default function SobrePage() {
               className="object-cover object-[50%_35%]"
             />
           </div>
-          <div className="relative aspect-[5/3]">
+          <div className="relative aspect-[9/16] md:aspect-[4/3]">
             <Image
               src="/images/refs2/loja-mulher2.jpeg"
               alt="Loja Patrícia Carreira"

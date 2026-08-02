@@ -87,9 +87,9 @@ export default function AfiliadasPage() {
           priority
         />
         {/* Mobile: overlay uniforme */}
-        <div className="absolute inset-0 bg-black/70 md:hidden" />
+        <div className="absolute inset-0 bg-black/50 md:hidden" />
         {/* Desktop: gradiente — opaco à esquerda (texto), quase transparente à direita (imagem) */}
-        <div className="absolute inset-0 hidden bg-gradient-to-r from-stone-900/90 via-stone-900/10 to-transparent md:block" />
+        <div className="absolute inset-0 hidden bg-gradient-to-r from-stone-900/70 via-stone-900/5 to-transparent md:block" />
 
         {/* Conteúdo */}
         <div className="relative flex flex-1 flex-col justify-between px-margin-mobile py-24 md:px-margin-desktop">
@@ -191,9 +191,9 @@ export default function AfiliadasPage() {
           className="object-cover object-[center_65%]"
         />
         {/* Gradient desktop: opaco à esquerda (texto), transparente à direita (imagem) */}
-        <div className="absolute inset-0 hidden bg-gradient-to-r from-black/95 via-black/50 to-transparent md:block" />
+        <div className="absolute inset-0 hidden bg-gradient-to-r from-black/75 via-black/30 to-transparent md:block" />
         {/* Overlay sólido mobile */}
-        <div className="absolute inset-0 bg-black/65 md:hidden" />
+        <div className="absolute inset-0 bg-black/50 md:hidden" />
 
         {/* Conteúdo */}
         <div className="relative mx-auto max-w-container px-margin-mobile py-24 md:px-margin-desktop">
