@@ -8,8 +8,12 @@ import { toggleProductStatus, deleteProduct } from '@/lib/actions/products'
 import { ProdutoModal, AdjustStockModal, type AdjustStockTarget } from '@/components/admin/produto-modal'
 import { CsvImportModal } from '@/components/admin/csv-import-modal'
 import { toCsv, downloadCsv } from '@/lib/csv'
-import type { ProductVariant } from '@/lib/types'
-import type { ProductWithVariantsAndBom, RawMaterialRow } from '@/lib/supabase/admin-queries'
+import type { ProductVariant, CutCategoryRow, MaterialColor } from '@/lib/types'
+import type {
+  ProductWithVariantsAndBom,
+  RawMaterialRow,
+  RecipeMaterialOption,
+} from '@/lib/supabase/admin-queries'
 
 const EXPORT_HEADERS = [
   'sku', 'nome_produto', 'descricao', 'categoria', 'subcategoria', 'cor', 'tamanho',
@@ -50,6 +54,9 @@ function exportEstoqueCsv(products: ProductWithVariantsAndBom[]): void {
 interface EstoqueClientProps {
   products: ProductWithVariantsAndBom[]
   rawMaterials: RawMaterialRow[]
+  cutCategories: CutCategoryRow[]
+  materialColors: MaterialColor[]
+  recipeMaterials: RecipeMaterialOption[]
 }
 
 function getCategoryLabel(cat: string): string {
@@ -78,7 +85,13 @@ function variantLabel(v: ProductVariant): string {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function EstoqueClient({ products, rawMaterials }: EstoqueClientProps) {
+export function EstoqueClient({
+  products,
+  rawMaterials,
+  cutCategories,
+  materialColors,
+  recipeMaterials,
+}: EstoqueClientProps) {
   const router = useRouter()
 
   // Filters
@@ -162,8 +175,27 @@ export function EstoqueClient({ products, rawMaterials }: EstoqueClientProps) {
   return (
     <div className="page">
       {/* Modais */}
-      {showCreateModal && <ProdutoModal mode="create" rawMaterials={rawMaterials} onClose={() => setShowCreateModal(false)} />}
-      {editProduct && <ProdutoModal mode="edit" product={editProduct} rawMaterials={rawMaterials} onClose={() => setEditProduct(null)} />}
+      {showCreateModal && (
+        <ProdutoModal
+          mode="create"
+          rawMaterials={rawMaterials}
+          cutCategories={cutCategories}
+          materialColors={materialColors}
+          recipeMaterials={recipeMaterials}
+          onClose={() => setShowCreateModal(false)}
+        />
+      )}
+      {editProduct && (
+        <ProdutoModal
+          mode="edit"
+          product={editProduct}
+          rawMaterials={rawMaterials}
+          cutCategories={cutCategories}
+          materialColors={materialColors}
+          recipeMaterials={recipeMaterials}
+          onClose={() => setEditProduct(null)}
+        />
+      )}
       {adjustTarget && <AdjustStockModal target={adjustTarget} onClose={() => setAdjustTarget(null)} />}
       {showCsvImport && <CsvImportModal products={products} onClose={() => setShowCsvImport(false)} />}
 
