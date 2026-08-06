@@ -2,7 +2,9 @@
 
 import { useState, useTransition } from 'react'
 import { AdminIcon } from '@/components/admin/admin-icon'
+import { ColorSelect } from '@/components/admin/color-select'
 import type { RawMaterialRow, ProductWithBOM, PendingCutMaterial, PurchaseRequestRow } from '@/lib/supabase/admin-queries'
+import type { CutCategoryRow, MaterialColor } from '@/lib/types'
 import type { Supplier } from '@/lib/actions/suppliers'
 import {
   registerMaterialEntry,
@@ -16,19 +18,13 @@ import {
   createPendingCutMaterials,
 } from '@/lib/actions/raw-materials'
 
-// Categorias espelham as seções da ficha técnica do Henrique.
-const CATEGORIES = ['Corte Lona', 'Corte Forro', 'Corte Couro', 'Aplicações', 'Metais', 'Aviamentos'] as const
-type Category = typeof CATEGORIES[number]
+// Categorias de cor fixa. As de corte vêm do banco (`cut_categories`), via prop —
+// categoria nova entra por INSERT, sem deploy.
+const FIXED_CATEGORIES = ['Aplicações', 'Metais', 'Aviamentos'] as const
 
-// Cortes têm cor; a receita do produto guarda só o tipo e a variante define a cor.
-const CUT_CATEGORIES: readonly Category[] = ['Corte Lona', 'Corte Forro', 'Corte Couro']
-
-function isCutCategory(category: string): boolean {
-  return (CUT_CATEGORIES as readonly string[]).includes(category)
-}
-
-// tipo: a peça específica dentro da categoria, nomeada como na ficha
-const TIPOS: Record<Category, string[]> = {
+// tipo: a peça específica dentro da categoria, nomeada como na ficha. É catálogo
+// de sugestão, não lista fechada — categoria sem entrada aqui aceita texto livre.
+const TIPOS: Record<string, string[]> = {
   'Corte Lona': [
     'Frente', 'Costas', 'Lateral', 'Lateral 1', 'Lateral 2',
     'Faixa da boca', 'Tira da boca', 'Viés da boca', 'Alça', 'Meio',
@@ -69,6 +65,8 @@ interface MateriasClientProps {
   pendingCuts: PendingCutMaterial[]
   purchaseRequests: PurchaseRequestRow[]
   suppliers: Supplier[]
+  cutCategories: CutCategoryRow[]
+  materialColors: MaterialColor[]
 }
 
 function stockState(cur: number, min: number) {
@@ -81,9 +79,17 @@ function formatQty(qty: number, unit: string) {
   return `${qty.toLocaleString('pt-BR', { maximumFractionDigits: 3 })} ${unit}`
 }
 
-export function MateriasClient({ materials, products, pendingCuts, purchaseRequests, suppliers }: MateriasClientProps) {
+export function MateriasClient({
+  materials, products, pendingCuts, purchaseRequests, suppliers,
+  cutCategories, materialColors,
+}: MateriasClientProps) {
   // ── Abas ──
   const [tab, setTab] = useState<'insumos' | 'receitas' | 'compras'>('insumos')
+
+  // Categorias de corte vêm do banco; as de cor fixa são constantes do domínio.
+  const cutCategoryNames = cutCategories.map((c) => c.category)
+  const CATEGORIES = [...cutCategoryNames, ...FIXED_CATEGORIES]
+  const isCutCategory = (category: string) => cutCategoryNames.includes(category)
 
   // ── Busca e filtro de insumos ──
   const [search, setSearch] = useState('')
@@ -105,6 +111,8 @@ export function MateriasClient({ materials, products, pendingCuts, purchaseReque
 
   // ── BOM viewer/editor (receita é do produto, herdada por todas as variantes) ──
   const [selectedProductId, setSelectedProductId] = useState(products[0]?.id ?? '')
+  /** Variante que "colore" a receita exibida. Vazio = receita padrão, sem cor. */
+  const [recipeVariantId, setRecipeVariantId] = useState('')
   const [bomEditMode, setBomEditMode] = useState(false)
   const [editingQty, setEditingQty] = useState<Record<string, string>>({})
   const [addMaterialId, setAddMaterialId] = useState(materials[0]?.id ?? '')
@@ -141,6 +149,20 @@ export function MateriasClient({ materials, products, pendingCuts, purchaseReque
   const productsWithBOM = products.filter((p) => p.bom.length > 0)
   const selectedProduct = products.find((p) => p.id === selectedProductId) ?? null
 
+  // Cores da variante escolhida no "ver como", por categoria de corte.
+  const recipeVariantColors: Record<string, string> = Object.fromEntries(
+    ((selectedProduct?.variants ?? []).find((v) => v.id === recipeVariantId)?.cut_colors ?? [])
+      .map((c) => [c.category, c.color]),
+  )
+
+  // Variantes que ainda não declaram alguma categoria de corte da receita.
+  const categoriasExigidas = Array.from(
+    new Set((selectedProduct?.bom ?? []).filter((b) => b.is_cut).map((b) => b.material_category)),
+  )
+  const variantesSemCor = (selectedProduct?.variants ?? []).filter((v) =>
+    categoriasExigidas.some((c) => !v.cut_colors.some((cc) => cc.category === c)),
+  )
+
   const estimatedCost = selectedProduct
     ? selectedProduct.bom.reduce((sum, b) => {
         if (b.material.cost_per_unit == null) return sum
@@ -148,10 +170,8 @@ export function MateriasClient({ materials, products, pendingCuts, purchaseReque
       }, 0)
     : 0
 
-  // Cores já cadastradas, para sugerir no formulário de novo insumo
-  const knownColors = Array.from(
-    new Set(materials.map((m) => m.color).filter((c): c is string => Boolean(c))),
-  ).sort()
+  // A paleta cresce sem fechar o modal quando o Henrique cria uma cor.
+  const [colorList, setColorList] = useState<MaterialColor[]>(materialColors)
 
   // Insumos já na receita. Cortes entram por categoria+tipo (sem cor), então a
   // chave precisa ser a mesma dos dois lados.
@@ -257,7 +277,7 @@ export function MateriasClient({ materials, products, pendingCuts, purchaseReque
 
   function handleCategoryChange(cat: string) {
     setNewCategory(cat)
-    const tipos = TIPOS[cat as Category] ?? []
+    const tipos = TIPOS[cat] ?? []
     setNewTipo(tipos[0] ?? '')
     setNewColor('')
   }
@@ -298,6 +318,11 @@ export function MateriasClient({ materials, products, pendingCuts, purchaseReque
     const stockQty = parseFloat(newStock.replace(',', '.'))
     const minQty = parseFloat(newMinStock.replace(',', '.'))
     if (isNaN(stockQty) || stockQty < 0) { setNewError('Estoque inválido'); return }
+    // Corte sem cor não casa com variante nenhuma — vira estoque órfão.
+    if (isCutCategory(newCategory) && !newColor.trim()) {
+      setNewError('Insumo de corte precisa de cor.')
+      return
+    }
     setNewError('')
     startTransition(async () => {
       const res = await createRawMaterial({
@@ -548,7 +573,7 @@ export function MateriasClient({ materials, products, pendingCuts, purchaseReque
           {/* Seletor de variante */}
           <div className="card-body" style={{ borderBottom: '1px solid var(--border)' }}>
             <div className="field">
-              <label>Variante de produto</label>
+              <label>Produto</label>
               <select
                 className="select"
                 value={selectedProductId}
@@ -580,14 +605,40 @@ export function MateriasClient({ materials, products, pendingCuts, purchaseReque
               <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-3)', fontSize: 12.5 }}>
                 {selectedProduct
                   ? <><span>Nenhuma receita cadastrada.</span><br /><button className="linkish" style={{ marginTop: 6, fontSize: 12 }} onClick={() => setBomEditMode(true)}>+ Adicionar ingredientes</button></>
-                  : 'Selecione uma variante acima.'}
+                  : 'Selecione um produto acima.'}
               </div>
             ) : (
               <div className="table-wrap">
+                {/* A receita é do produto e não tem cor. Escolher a variante é o
+                    que torna a coluna Cor concreta. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px' }}>
+                  <span className="cust-meta">ver como:</span>
+                  <select
+                    className="select"
+                    style={{ width: 240, height: 26 }}
+                    data-testid="select-variante-receita"
+                    value={recipeVariantId}
+                    onChange={(e) => setRecipeVariantId(e.target.value)}
+                  >
+                    <option value="">Receita padrão (sem cor)</option>
+                    {(selectedProduct.variants ?? []).map((v) => (
+                      <option key={v.id} value={v.id}>{v.label}</option>
+                    ))}
+                  </select>
+                  {variantesSemCor.length > 0 && (
+                    <span style={{ fontSize: 11.5, color: 'var(--yellow)' }}>
+                      {variantesSemCor.length}{' '}
+                      {variantesSemCor.length === 1 ? 'variante sem cor' : 'variantes sem cor'} — defina em
+                      Estoque › {selectedProduct.name}
+                    </span>
+                  )}
+                </div>
+
                 <table className="tbl">
                   <thead>
                     <tr>
                       <th>Material</th>
+                      <th style={{ width: 110 }}>Cor</th>
                       <th style={{ width: 90 }}>Qtd. / un.</th>
                       <th style={{ width: 60 }}>Un.</th>
                       <th style={{ width: 70 }}>Estoque</th>
@@ -613,6 +664,9 @@ export function MateriasClient({ materials, products, pendingCuts, purchaseReque
                                 </div>
                               </div>
                             </div>
+                          </td>
+                          <td className="cust-meta">
+                            {b.is_cut ? (recipeVariantColors[b.material_category] ?? 'cor da variante') : '—'}
                           </td>
                           <td className="num" style={{ fontWeight: 500 }}>
                             {bomEditMode ? (
@@ -929,38 +983,38 @@ export function MateriasClient({ materials, products, pendingCuts, purchaseReque
                   </select>
                 </div>
 
-                {/* Tipo — dropdown com opções específicas por categoria */}
+                {/* Tipo — sugestões por categoria; categoria sem catálogo aceita texto livre */}
                 <div className="field">
                   <label>Tipo</label>
-                  <select
+                  <input
                     id="new-material-tipo"
-                    className="select"
+                    className="input"
                     value={newTipo}
                     onChange={(e) => setNewTipo(e.target.value)}
-                  >
-                    {TIPOS[newCategory as Category].map((t) => (
-                      <option key={t} value={t}>{t}</option>
+                    placeholder="Ex: Frente"
+                    list={`tipos-${newCategory.replace(/\s+/g, '-')}`}
+                  />
+                  <datalist id={`tipos-${newCategory.replace(/\s+/g, '-')}`}>
+                    {(TIPOS[newCategory] ?? []).map((t) => (
+                      <option key={t} value={t} />
                     ))}
-                  </select>
+                  </datalist>
                 </div>
 
-                {/* Cor — só nos cortes: é ela que casa o insumo com a variante */}
+                {/* Cor — só nos cortes: é ela que casa o insumo com a variante.
+                    Sai da paleta, não de texto livre: um acento de diferença
+                    separaria o insumo da variante para sempre. */}
                 {isCutCategory(newCategory) && (
                   <div className="field">
-                    <label>Cor</label>
-                    <input
-                      id="new-material-cor"
-                      className="input"
+                    <label>Cor *</label>
+                    <ColorSelect
+                      category={newCategory}
+                      colors={colorList.filter((c) => c.category === newCategory)}
                       value={newColor}
-                      onChange={(e) => setNewColor(e.target.value)}
-                      placeholder="Ex: Mostarda"
-                      list="cores-cadastradas"
+                      onChange={setNewColor}
+                      onColorCreated={(c) => setColorList((prev) => [...prev, c])}
+                      testId="select-cor-nova-materia"
                     />
-                    <datalist id="cores-cadastradas">
-                      {knownColors.map((c) => (
-                        <option key={c} value={c} />
-                      ))}
-                    </datalist>
                     <span className="cust-meta tiny">
                       Precisa bater com a cor de {newCategory.replace('Corte ', '').toLowerCase()} definida na variante do produto.
                     </span>

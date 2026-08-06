@@ -461,6 +461,8 @@ export type ProductWithBOM = {
   name: string
   category: string
   variant_count: number
+  /** Para o seletor "ver como" da aba Receitas: colore a receita do produto. */
+  variants: Array<{ id: string; label: string; cut_colors: VariantCutColor[] }>
   bom: BOMEntry[]
 }
 
@@ -496,7 +498,7 @@ export async function getAllProductsWithBOM(): Promise<ProductWithBOM[]> {
     .from('products')
     .select(`
       id, name, category,
-      variants:product_variants(id),
+      variants:product_variants(id, sku, size, color, cut_colors:variant_cut_colors(category, color)),
       bom:bill_of_materials(
         id, quantity_needed, material_category, material_type,
         material:raw_materials(id, name, unit, stock_quantity, cost_per_unit)
@@ -533,7 +535,10 @@ export async function getAllProductsWithBOM(): Promise<ProductWithBOM[]> {
 
   type Raw = {
     id: string; name: string; category: string
-    variants: Array<{ id: string }>
+    variants: Array<{
+      id: string; sku: string; size: string | null; color: string | null
+      cut_colors: Array<{ category: string; color: string }> | null
+    }>
     bom: Array<{
       id: string; quantity_needed: string
       material_category: string | null; material_type: string | null
@@ -549,6 +554,11 @@ export async function getAllProductsWithBOM(): Promise<ProductWithBOM[]> {
     name: p.name,
     category: p.category,
     variant_count: (p.variants ?? []).length,
+    variants: (p.variants ?? []).map((v) => ({
+      id: v.id,
+      label: [v.color, v.size !== 'Único' ? v.size : null].filter(Boolean).join(' — ') || v.sku,
+      cut_colors: v.cut_colors ?? [],
+    })),
     bom: (p.bom ?? []).map((b) => {
       if (b.material) {
         return {
