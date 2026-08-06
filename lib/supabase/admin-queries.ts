@@ -352,6 +352,68 @@ export async function getCutCategories(): Promise<CutCategoryRow[]> {
   return (data ?? []) as CutCategoryRow[]
 }
 
+/** Uma opção do seletor de insumo da receita. */
+export type RecipeMaterialOption = {
+  /** id de raw_materials nos de cor fixa; null nos cortes. */
+  raw_material_id: string | null
+  category: string
+  type: string
+  unit: string
+  is_cut: boolean
+}
+
+/**
+ * Opções do seletor "+ Adicionar insumo" da receita.
+ *
+ * Cortes NÃO saem de raw_materials: lá o insumo é por (peça, cor), e a receita
+ * quer a peça sem cor. Saem dos tipos já usados em qualquer receita — é o que
+ * torna as peças já cadastradas reusáveis num produto novo.
+ */
+export async function getRecipeMaterialOptions(): Promise<RecipeMaterialOption[]> {
+  const supabase = createServiceClient()
+
+  const { data: cutCategoryRows } = await supabase.from('cut_categories').select('category')
+  const cutCategories = (cutCategoryRows ?? []).map((c) => c.category as string)
+
+  const [fixedRes, cutRes] = await Promise.all([
+    supabase
+      .from('raw_materials')
+      .select('id, category, type_specific, name, unit')
+      .not('category', 'in', `("${cutCategories.join('","')}")`)
+      .order('category')
+      .order('name'),
+    supabase
+      .from('bill_of_materials')
+      .select('material_category, material_type')
+      .not('material_category', 'is', null),
+  ])
+
+  if (fixedRes.error) console.error('[getRecipeMaterialOptions:fixed]', fixedRes.error)
+  if (cutRes.error) console.error('[getRecipeMaterialOptions:cut]', cutRes.error)
+
+  const fixed: RecipeMaterialOption[] = (fixedRes.data ?? []).map((m) => ({
+    raw_material_id: m.id as string,
+    category: m.category as string,
+    type: (m.type_specific as string | null) ?? (m.name as string),
+    unit: m.unit as string,
+    is_cut: false,
+  }))
+
+  const seen = new Set<string>()
+  const cuts: RecipeMaterialOption[] = []
+  for (const row of cutRes.data ?? []) {
+    const category = row.material_category as string
+    const type = row.material_type as string
+    const key = `${category}||${type}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    cuts.push({ raw_material_id: null, category, type, unit: 'unidade', is_cut: true })
+  }
+  cuts.sort((a, b) => a.category.localeCompare(b.category) || a.type.localeCompare(b.type))
+
+  return [...cuts, ...fixed]
+}
+
 /** Paleta completa. O cliente filtra por categoria na hora de montar o dropdown. */
 export async function getMaterialColors(): Promise<MaterialColor[]> {
   const supabase = createServiceClient()
