@@ -1898,18 +1898,394 @@ git commit -m "test(e2e): variante nao salva sem a cor exigida pela receita"
 
 ---
 
-## Achado anterior a esta mudança (não corrigir aqui)
+## Task 13: Dropdown da receita lista cortes e cria insumo inline
 
-O seletor "+ Adicionar insumo…" da receita monta as opções a partir de `rawMaterials`.
-Como **não existe nenhum insumo de categoria `Corte *` cadastrado**, hoje não há como
-acrescentar um corte à receita pelo modal — os 70 itens de corte dos 5 produtos vieram
-do seed da migration 031, não da UI.
+**Files:**
+- Modify: `lib/supabase/admin-queries.ts` (novo `getRecipeMaterialOptions`)
+- Create: `lib/actions/recipe-materials.ts`
+- Create: `components/admin/material-select.tsx`
+- Modify: `components/admin/produto-modal.tsx`
 
-Isso é anterior a este trabalho e está fora do escopo do plano. Depois de rodar tudo, o
-caminho para o Henrique sair do zero é: cadastrar um insumo de corte pela aba Insumos
-(que agora exige cor da paleta), e aí ele passa a aparecer no seletor da receita. Vale
-decidir em separado se o seletor da receita deveria listar tipos de corte independente
-de existir estoque — é uma conversa de produto, não um bug a consertar de passagem.
+**Por que entrou no plano.** O seletor "+ Adicionar insumo…" monta as opções a partir de
+`raw_materials`, onde não existe **nenhum** corte — os 70 itens de corte dos 5 produtos
+vieram do seed da migration 031. Sem isso, a receita de um produto novo não consegue
+receber corte nenhum, e a feature inteira nasce travada.
+
+A correção tem duas partes, ambas pedidas pelo Leonardo: puxar os cortes de
+`bill_of_materials` (onde os 35 tipos já estão) e permitir criar um insumo de dentro do
+dropdown, no mesmo gesto do `+ Nova cor`.
+
+- [ ] **Step 1: Query das opções**
+
+Em `lib/supabase/admin-queries.ts`, acrescente:
+
+```typescript
+/** Uma opção do seletor de insumo da receita. */
+export type RecipeMaterialOption = {
+  /** id de raw_materials nos de cor fixa; null nos cortes. */
+  raw_material_id: string | null
+  category: string
+  type: string
+  unit: string
+  is_cut: boolean
+}
+
+/**
+ * Opções do seletor "+ Adicionar insumo" da receita.
+ *
+ * Cortes NÃO saem de raw_materials: lá o insumo é por (peça, cor), e a receita
+ * quer a peça sem cor. Saem dos tipos já usados em qualquer receita — é o que
+ * torna as 35 peças do seed reusáveis num produto novo.
+ */
+export async function getRecipeMaterialOptions(): Promise<RecipeMaterialOption[]> {
+  const supabase = createServiceClient()
+
+  const [fixedRes, cutRes] = await Promise.all([
+    supabase
+      .from('raw_materials')
+      .select('id, category, type_specific, name, unit')
+      .not('category', 'in', '("Corte Lona","Corte Forro","Corte Couro","Corte Tecido")')
+      .order('category')
+      .order('name'),
+    supabase
+      .from('bill_of_materials')
+      .select('material_category, material_type')
+      .not('material_category', 'is', null),
+  ])
+
+  if (fixedRes.error) console.error('[getRecipeMaterialOptions:fixed]', fixedRes.error)
+  if (cutRes.error) console.error('[getRecipeMaterialOptions:cut]', cutRes.error)
+
+  const fixed: RecipeMaterialOption[] = (fixedRes.data ?? []).map((m) => ({
+    raw_material_id: m.id as string,
+    category: m.category as string,
+    type: (m.type_specific as string | null) ?? (m.name as string),
+    unit: m.unit as string,
+    is_cut: false,
+  }))
+
+  const seen = new Set<string>()
+  const cuts: RecipeMaterialOption[] = []
+  for (const row of cutRes.data ?? []) {
+    const category = row.material_category as string
+    const type = row.material_type as string
+    const key = `${category}||${type}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    cuts.push({ raw_material_id: null, category, type, unit: 'unidade', is_cut: true })
+  }
+  cuts.sort((a, b) => a.category.localeCompare(b.category) || a.type.localeCompare(b.type))
+
+  return [...cuts, ...fixed]
+}
+```
+
+- [ ] **Step 2: Server action de criação**
+
+Crie `lib/actions/recipe-materials.ts`:
+
+```typescript
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { createServiceClient } from '@/lib/supabase/service'
+import { requireAdmin } from '@/lib/server/auth'
+import type { RecipeMaterialOption } from '@/lib/supabase/admin-queries'
+
+export type CreateRecipeMaterialResult =
+  | { success: true; option: RecipeMaterialOption }
+  | { success: false; error: string }
+
+/**
+ * Cria um insumo a partir do seletor da receita.
+ *
+ * Categoria de corte: nada é gravado em raw_materials — no momento da receita
+ * ainda não se sabe a cor, e o estoque de corte é por (peça, cor). A opção volta
+ * só para o cliente montar a linha da receita; as linhas de estoque nascem
+ * depois, pelo botão de cortes pendentes, quando a variante já escolheu a cor.
+ *
+ * Categoria de cor fixa: cria a linha em raw_materials com estoque 0.
+ */
+export async function createRecipeMaterial(input: {
+  category: string
+  type: string
+  unit: string
+}): Promise<CreateRecipeMaterialResult> {
+  await requireAdmin()
+
+  const type = input.type.trim()
+  if (!type) return { success: false, error: 'Informe o nome do insumo.' }
+
+  const supabase = createServiceClient()
+
+  const { data: cut } = await supabase
+    .from('cut_categories')
+    .select('category')
+    .eq('category', input.category)
+    .maybeSingle()
+
+  if (cut) {
+    return {
+      success: true,
+      option: {
+        raw_material_id: null,
+        category: input.category,
+        type,
+        unit: 'unidade',
+        is_cut: true,
+      },
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('raw_materials')
+    .insert({
+      name: type,
+      type: 'bruta',
+      category: input.category,
+      type_specific: type,
+      unit: input.unit,
+      stock_quantity: 0,
+      minimum_stock: 0,
+    })
+    .select('id, category, type_specific, name, unit')
+    .single()
+
+  if (error) return { success: false, error: error.message }
+
+  revalidatePath('/admin/estoque')
+  revalidatePath('/admin/materias')
+
+  return {
+    success: true,
+    option: {
+      raw_material_id: data.id as string,
+      category: data.category as string,
+      type: (data.type_specific as string | null) ?? (data.name as string),
+      unit: data.unit as string,
+      is_cut: false,
+    },
+  }
+}
+```
+
+- [ ] **Step 3: Componente `MaterialSelect`**
+
+Crie `components/admin/material-select.tsx`, no mesmo molde do `ColorSelect`: um
+`<select>` com `<optgroup>` para Cortes e outro para os de cor fixa, `+ Criar novo
+insumo…` no fim, e um formulário inline que troca os campos conforme a categoria
+escolhida (corte pede só o nome; cor fixa pede nome e unidade).
+
+```tsx
+"use client"
+
+// Client component: guarda o estado do formulário inline de criação sem
+// recarregar o modal do produto, que perderia tudo que já foi preenchido.
+
+import { useState } from 'react'
+import { AdminIcon } from '@/components/admin/admin-icon'
+import { createRecipeMaterial } from '@/lib/actions/recipe-materials'
+import type { CutCategoryRow } from '@/lib/types'
+import type { RecipeMaterialOption } from '@/lib/supabase/admin-queries'
+
+const CREATE_VALUE = '__novo__'
+const FIXED_CATEGORIES = ['Aplicações', 'Metais', 'Aviamentos'] as const
+const UNITS = ['unidade', 'metro', 'cm', 'kg'] as const
+
+interface MaterialSelectProps {
+  options: RecipeMaterialOption[]
+  cutCategories: CutCategoryRow[]
+  /** Chaves já na receita, para não oferecer duplicata. */
+  usedKeys: Set<string>
+  onPick: (option: RecipeMaterialOption) => void
+  onCreated: (option: RecipeMaterialOption) => void
+}
+
+export function optionKey(o: Pick<RecipeMaterialOption, 'category' | 'type' | 'raw_material_id'>): string {
+  return o.raw_material_id ?? `${o.category}||${o.type}`
+}
+
+export function MaterialSelect({
+  options, cutCategories, usedKeys, onPick, onCreated,
+}: MaterialSelectProps) {
+  const [creating, setCreating] = useState(false)
+  const [category, setCategory] = useState('')
+  const [name, setName] = useState('')
+  const [unit, setUnit] = useState<string>('unidade')
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const available = options.filter((o) => !usedKeys.has(optionKey(o)))
+  const cuts = available.filter((o) => o.is_cut)
+  const fixed = available.filter((o) => !o.is_cut)
+  const isCutCategory = cutCategories.some((c) => c.category === category)
+
+  async function handleCreate() {
+    if (!category) { setError('Escolha a categoria.'); return }
+    if (!name.trim()) { setError('Informe o nome do insumo.'); return }
+
+    setSaving(true)
+    setError(null)
+    const result = await createRecipeMaterial({ category, type: name, unit })
+    setSaving(false)
+
+    if (!result.success) { setError(result.error); return }
+
+    onCreated(result.option)
+    onPick(result.option)
+    setCreating(false)
+    setCategory('')
+    setName('')
+    setUnit('unidade')
+  }
+
+  if (creating) {
+    return (
+      <div style={{ border: '1px solid var(--border)', borderRadius: 6, padding: 10, display: 'grid', gap: 8 }}>
+        <div style={{ fontSize: 12, fontWeight: 500 }}>Novo insumo</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div className="field">
+            <label>Categoria *</label>
+            <select
+              className="select"
+              data-testid="select-nova-categoria-insumo"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              <option value="">Escolha…</option>
+              <optgroup label="Cortes (cor vem da variante)">
+                {cutCategories.map((c) => (
+                  <option key={c.category} value={c.category}>{c.category}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Cor fixa">
+                {FIXED_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </optgroup>
+            </select>
+          </div>
+          <div className="field">
+            <label>{isCutCategory ? 'Nome da peça *' : 'Nome do insumo *'}</label>
+            <input
+              className="input"
+              data-testid="input-novo-insumo-nome"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={isCutCategory ? 'Frente' : 'Zíper nº5 Dourado'}
+            />
+          </div>
+        </div>
+
+        {!isCutCategory && category && (
+          <div className="field" style={{ maxWidth: 160 }}>
+            <label>Unidade</label>
+            <select className="select" value={unit} onChange={(e) => setUnit(e.target.value)}>
+              {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
+          </div>
+        )}
+
+        {isCutCategory && (
+          <div className="cust-meta">
+            A cor não entra aqui: ela vem da variante. O estoque desta peça por cor é
+            criado depois, pelo botão de cortes pendentes.
+          </div>
+        )}
+
+        {error && <div style={{ fontSize: 11.5, color: 'var(--red)' }}>{error}</div>}
+
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button className="btn sm primary" type="button" onClick={handleCreate} disabled={saving}>
+            {saving ? 'Salvando…' : 'Criar e adicionar'}
+          </button>
+          <button
+            className="btn sm ghost"
+            type="button"
+            onClick={() => { setCreating(false); setError(null) }}
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <select
+      className="select"
+      data-testid="select-bom-material"
+      style={{ width: '100%' }}
+      value=""
+      onChange={(e) => {
+        const v = e.target.value
+        if (!v) return
+        if (v === CREATE_VALUE) { setCreating(true); return }
+        const picked = available.find((o) => optionKey(o) === v)
+        if (picked) onPick(picked)
+      }}
+    >
+      <option value="">+ Adicionar insumo…</option>
+      {cuts.length > 0 && (
+        <optgroup label="Cortes (cor vem da variante)">
+          {cuts.map((o) => (
+            <option key={optionKey(o)} value={optionKey(o)}>{o.category} › {o.type}</option>
+          ))}
+        </optgroup>
+      )}
+      {fixed.length > 0 && (
+        <optgroup label="Aplicações · Metais · Aviamentos">
+          {fixed.map((o) => (
+            <option key={optionKey(o)} value={optionKey(o)}>{o.category} › {o.type} ({o.unit})</option>
+          ))}
+        </optgroup>
+      )}
+      <option value={CREATE_VALUE}>+ Criar novo insumo…</option>
+    </select>
+  )
+}
+```
+
+- [ ] **Step 4: Ligar no modal**
+
+Em `components/admin/produto-modal.tsx`, troque o `<select data-testid="select-bom-material">`
+(e o `availableMaterials` que o alimentava) pelo `<MaterialSelect>`. `addBomRow` passa a
+receber a `RecipeMaterialOption` em vez do id:
+
+```typescript
+  const [materialOptions, setMaterialOptions] = useState<RecipeMaterialOption[]>(recipeMaterials)
+
+  function addBomRow(option: RecipeMaterialOption) {
+    setBom((prev) => [
+      ...prev,
+      {
+        tempBomId: `${Date.now()}-${Math.random()}`,
+        raw_material_id: option.is_cut ? null : option.raw_material_id,
+        material_category: option.category,
+        material_type: option.type,
+        quantity_needed: '1',
+      },
+    ])
+  }
+```
+
+`recipeMaterials: RecipeMaterialOption[]` entra como prop nova do modal, vinda de
+`getRecipeMaterialOptions()` em `app/admin/estoque/page.tsx` e repassada pelo
+`EstoqueClient`.
+
+- [ ] **Step 5: Compilar**
+
+Run: `npx tsc --noEmit`
+Expected: sem saída.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add lib/supabase/admin-queries.ts lib/actions/recipe-materials.ts components/admin/material-select.tsx components/admin/produto-modal.tsx app/admin/estoque/page.tsx components/admin/estoque-client.tsx
+git commit -m "feat(receita): seletor lista cortes existentes e cria insumo inline"
+```
+
+---
 
 ## Pendências de aceite (para o Leonardo, não para o executor)
 
