@@ -153,7 +153,7 @@ na receita dele. Um produto só de couro não pede cor de lona.
 | Variante já em "Indefinida" | **Conta como preenchida** para efeito de salvar — senão as 69 linhas do backfill travariam qualquer edição de produto legado. O que ela bloqueia é a produção. |
 | Escolher "Indefinida" | Não é oferecida no dropdown. Só aparece se a variante já estiver nela (dado legado). Variante nova não nasce indefinida. |
 | Adicionar corte à receita pela aba Receitas | **Não bloqueia.** As variantes daquele produto que ainda não declaram a categoria nova ficam pendentes, e a aba mostra o aviso com link. Bloquear ali impediria montar a receita antes de existir cor cadastrada. |
-| Importar produtos por CSV | Cria as linhas em "Indefinida" — o CSV não tem como saber as cores. Mesmo tratamento do legado. |
+| Importar produtos por CSV | **Não é caminho de criação.** `importProductsCsv` só atualiza SKUs que já existem e nunca cria produto ou variante (`lib/actions/products.ts:390`). Não toca em cor de produção e fica fora desta mudança. |
 | Concluir OP | Bloqueia se alguma cor for placeholder, com mensagem própria — não o genérico de "insumo não cadastrado". |
 | `pending_cut_materials` | Ignora placeholder. Não faz sentido criar "Corte Lona › Frente › Indefinida" no estoque. |
 | Publicar na loja | Não bloqueia. Decisão explícita. |
@@ -225,13 +225,22 @@ trabalho — é o que a aba Receitas comunica.
 
 ## Testes
 
-Não existe `cypress/` no repositório. A validação possível neste ambiente é
-`typecheck` + `build`, e o sandbox não tem env do Supabase — rotas com DB não sobem aqui.
+O projeto usa **Playwright** (`e2e/`, `npm run test:e2e`), com `e2e/produto-modal.spec.ts`
+já cobrindo a criação de produto pelo modal. O teste novo entra nessa suíte.
 
-As migrations são aplicadas e verificadas direto no Supabase via MCP, com query de
-conferência pós-migration. O fluxo de UI (salvar variante sem cor, criar cor nova,
-concluir OP com cor indefinida) precisa de uma passada manual no painel — fica anotado
-como pendência de aceite, não como algo que eu consiga afirmar daqui.
+O que dá para verificar de dentro deste ambiente:
 
-Cobertura ausente a sinalizar: nenhum teste automatizado cobre `resolve_variant_bom`
-nem `complete_production_order` hoje, e ambos mudam de forma neste trabalho.
+- **SQL**: as migrations são aplicadas via MCP e conferidas com `execute_sql` contra o
+  banco real — é verificação de verdade, não simulação.
+- **TypeScript**: `npx tsc --noEmit` e `npm run build`.
+
+O que **não** dá: rodar a suíte Playwright. Ela precisa do app de pé com env do Supabase,
+que este sandbox não tem. O teste e2e é escrito e commitado, mas quem roda é o Leonardo:
+
+```bash
+npm run test:e2e -- produto-modal
+```
+
+Cobertura ausente a sinalizar: nenhum teste automatizado cobre `resolve_variant_bom` nem
+`complete_production_order` hoje, e ambos mudam de forma neste trabalho. A rede de
+proteção deles passa a ser a verificação SQL pós-migration.
