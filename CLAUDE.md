@@ -224,13 +224,45 @@ bill_of_materials (
   -- CHECK: exatamente uma das duas formas de endereçar o insumo
 )
 
-product_variants (
-  ...
-  color_lona   text,   -- resolve os itens 'Corte Lona' da receita
-  color_forro  text,   -- resolve os itens 'Corte Forro'
-  color_couro  text    -- resolve os itens 'Corte Couro'
+-- Categorias que exigem cor. É dado, não literal em código: uma categoria nova
+-- entra por INSERT, sem migration nem deploy (migration 035).
+cut_categories (
+  category   text PRIMARY KEY,   -- 'Corte Lona' | 'Corte Forro' | 'Corte Couro' | 'Corte Tecido'
+  label      text NOT NULL,
+  sort_order integer NOT NULL,
+  is_active  boolean DEFAULT true
+)
+
+-- A paleta, escopada por categoria: couro tem a paleta dele, lona a dela.
+material_colors (
+  id             uuid PRIMARY KEY,
+  category       text REFERENCES cut_categories(category),
+  name           text NOT NULL,
+  hex            text,
+  is_placeholder boolean DEFAULT false,  -- só a "Indefinida"
+  is_active      boolean DEFAULT true,
+  UNIQUE (category, name)
+)
+
+-- A cor que a variante usa em cada categoria de corte.
+variant_cut_colors (
+  variant_id uuid REFERENCES product_variants(id) ON DELETE CASCADE,
+  category   text,
+  color      text,
+  PRIMARY KEY (variant_id, category),
+  FOREIGN KEY (category, color) REFERENCES material_colors(category, name)
 )
 ```
+
+> ⚠️ A FK composta é o que impede cor de variante fora da paleta. Antes as cores
+> eram três colunas de texto livre na variante (`color_lona/forro/couro`), e um
+> espaço a mais quebrava a receita em silêncio. Removidas na migration 035.
+
+**Obrigatoriedade.** A variante precisa declarar cor em toda categoria de corte que
+a receita do produto usa — o modal bloqueia e `saveVariantCutColors` revalida no
+servidor. A cor `"Indefinida"` (`is_placeholder`) existe só para o backfill dos
+dados legados: não é oferecida no dropdown para variante nova, e
+`complete_production_order` recusa OP que ainda esteja nela.
 
 **Como a receita vira lista de insumos.** A receita é cadastrada uma vez por
 produto e herdada por todas as variantes. Os itens de corte guardam só o tipo; a
@@ -241,9 +273,14 @@ cor ainda não existe — pendência de cadastro, que bloqueia a conclusão da O
 
 ```
 Bolsa Flora  ── receita única (34 itens)
-   └─ Mostarda  → color_lona Mostarda · color_forro Cru · color_couro Caramelo
-   └─ Marinho   → color_lona Marinho  · color_forro Cru · color_couro Preto
+   └─ Mostarda  → Lona Mostarda · Forro Cru · Couro Caramelo
+   └─ Marinho   → Lona Marinho  · Forro Cru · Couro Preto
 ```
+
+> `product_variants.color` ("Mostarda") é a **cor comercial**, a que o cliente vê
+> na loja — texto livre, aceita qualquer rótulo. As cores de produção são outra
+> coisa e vivem em `variant_cut_colors`. Uma variante comercial "Mostarda" pode
+> ter lona Mostarda, forro Cru e couro Caramelo.
 
 > ⚠️ O estoque de corte é por (peça, cor): "Corte Lona › Frente › Mostarda" é uma
 > linha distinta de "Corte Lona › Frente › Marinho". A cor digitada na variante

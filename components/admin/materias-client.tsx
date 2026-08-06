@@ -409,6 +409,7 @@ export function MateriasClient({
                 <thead>
                   <tr>
                     <th>Nome</th>
+                    <th style={{ width: 90 }}>Cor</th>
                     <th style={{ width: 50 }}>Tipo</th>
                     <th style={{ width: 60 }}>Un.</th>
                     <th style={{ width: 90 }}>Atual</th>
@@ -420,7 +421,7 @@ export function MateriasClient({
                 <tbody>
                   {filteredMaterials.length === 0 && (
                     <tr>
-                      <td colSpan={7} style={{ padding: '16px', textAlign: 'center', color: 'var(--text-3)', fontSize: 12.5 }}>
+                      <td colSpan={8} style={{ padding: '16px', textAlign: 'center', color: 'var(--text-3)', fontSize: 12.5 }}>
                         Nenhum insumo encontrado.
                       </td>
                     </tr>
@@ -445,6 +446,7 @@ export function MateriasClient({
                             </div>
                           </div>
                         </td>
+                        <td className="cust-meta">{m.color ?? '—'}</td>
                         <td className="cust-meta" style={{ fontSize: 11 }}>
                           {m.type === 'intermediaria' ? 'Inter.' : 'Bruta'}
                         </td>
@@ -796,6 +798,7 @@ export function MateriasClient({
                 <thead>
                   <tr>
                     <th>Material</th>
+                    <th style={{ width: 90 }}>Cor</th>
                     <th style={{ width: 120 }}>Qtd. necessária</th>
                     <th style={{ width: 60 }}>Un.</th>
                     <th style={{ width: 100 }}>Pedido Atac.</th>
@@ -809,6 +812,7 @@ export function MateriasClient({
                       <td>
                         <div style={{ fontWeight: 500, fontSize: 12.5 }}>{pr.material_name}</div>
                       </td>
+                      <td className="cust-meta">{pr.material_color ?? '—'}</td>
                       <td className="num" style={{ fontWeight: 600, color: 'var(--red)' }}>
                         {pr.quantity_needed.toLocaleString('pt-BR', { maximumFractionDigits: 3 })}
                       </td>

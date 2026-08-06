@@ -25,7 +25,7 @@ test('cria produto novo com variante, fotos e BOM pelo modal', async ({ page }) 
   await skuInput.fill(`SKU-E2E-${Date.now()}`)
 
   // BOM — só tenta se houver matéria-prima cadastrada
-  const bomSelect = page.locator('[data-testid^="select-bom-material-"]').first()
+  const bomSelect = page.locator('[data-testid="select-bom-material"]').first()
   if (await bomSelect.count() > 0) {
     const optionCount = await bomSelect.locator('option').count()
     if (optionCount > 1) {
@@ -36,4 +36,33 @@ test('cria produto novo com variante, fotos e BOM pelo modal', async ({ page }) 
   await page.locator('#btn-salvar-produto').click()
 
   await expect(page.getByText(productName)).toBeVisible({ timeout: 15000 })
+})
+
+test('não salva variante sem a cor exigida pela receita', async ({ page }) => {
+  await loginAsAdmin(page)
+
+  await page.goto('/admin/estoque')
+  await page.locator('#btn-novo-produto').click()
+
+  await page.locator('[data-testid="input-nome-produto"]').fill(`Cor Obrigatoria ${Date.now()}`)
+  await page.locator('.modal .field:has-text("Preço varejo") input').fill('50,00')
+
+  // Um corte na receita é o que passa a exigir cor na variante. Cria um do zero
+  // pelo próprio seletor, para o teste não depender do que já existe no banco.
+  await page.locator('[data-testid="select-bom-material"]').selectOption('__novo__')
+  await page.locator('[data-testid="select-nova-categoria-insumo"]').selectOption('Corte Lona')
+  await page.locator('[data-testid="input-novo-insumo-nome"]').fill(`Peça E2E ${Date.now()}`)
+  await page.locator('[data-testid="btn-criar-insumo"]').click()
+
+  const variantCard = page.locator('.modal').locator('div', { hasText: 'Nova variante' }).first()
+  await variantCard.click()
+  await page
+    .locator('.modal input[placeholder="BOL-TIRA-MAR-UNI"]')
+    .first()
+    .fill(`SKU-COR-${Date.now()}`)
+
+  // Salva sem escolher cor de lona
+  await page.locator('#btn-salvar-produto').click()
+
+  await expect(page.locator('.modal')).toContainText('defina a cor', { ignoreCase: true })
 })
