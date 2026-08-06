@@ -3,14 +3,10 @@
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAdmin } from '@/lib/server/auth'
-import type { CutCategory } from '@/lib/types'
 
 export type StockEntryResult =
   | { success: true }
   | { success: false; error: string }
-
-/** Categorias cuja cor é definida pela variante, não pela receita. */
-const CUT_CATEGORIES: readonly CutCategory[] = ['Corte Lona', 'Corte Forro', 'Corte Couro']
 
 export async function registerMaterialEntry(input: {
   material_id: string
@@ -173,7 +169,16 @@ export async function addBOMEntry(input: {
 
   if (matError) return { success: false, error: matError.message }
 
-  const isCut = CUT_CATEGORIES.includes(material.category as CutCategory)
+  // Se a categoria está em cut_categories, a cor vem da variante e a receita
+  // guarda só (categoria, tipo). Consultar em vez de comparar com literal deixa
+  // categoria nova (ex: Corte Tecido) funcionar sem deploy.
+  const { data: cutCategory } = await supabase
+    .from('cut_categories')
+    .select('category')
+    .eq('category', material.category)
+    .maybeSingle()
+
+  const isCut = Boolean(cutCategory)
 
   const { error } = await supabase.from('bill_of_materials').insert({
     product_id: input.product_id,

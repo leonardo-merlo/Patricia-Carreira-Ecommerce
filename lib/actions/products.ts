@@ -118,10 +118,12 @@ export type VariantInput = {
   sku: string
   stock_quantity: number
   images: string[]
-  // Cores de produção — resolvem os cortes da receita para esta variante
-  color_lona: string | null
-  color_forro: string | null
-  color_couro: string | null
+  /**
+   * Cor de produção por categoria de corte: { 'Corte Lona': 'Mostarda', ... }.
+   * Precisa cobrir toda categoria que a receita do produto usa — o servidor
+   * recusa se faltar, mesmo que o cliente tenha deixado passar.
+   */
+  cut_colors: Record<string, string>
 }
 
 async function saveProductBom(
@@ -147,6 +149,58 @@ async function saveProductBom(
     })),
   )
   if (insError) throw new Error(insError.message)
+}
+
+/** Categorias de corte que a receita exige — ou seja, que a variante deve colorir. */
+function requiredCategories(bom: ProductBomInput[]): string[] {
+  return Array.from(
+    new Set(bom.map((b) => b.material_category).filter((c): c is string => Boolean(c))),
+  )
+}
+
+/**
+ * Grava as cores de produção da variante.
+ *
+ * Recusa se faltar cor de alguma categoria exigida pela receita. A checagem é
+ * repetida aqui (o modal já valida) porque server action é superfície pública:
+ * qualquer cliente pode chamar direto.
+ */
+async function saveVariantCutColors(
+  supabase: ReturnType<typeof createServiceClient>,
+  variantId: string,
+  cutColors: Record<string, string>,
+  required: string[],
+  sku: string,
+): Promise<void> {
+  const missing = required.filter((c) => !cutColors[c]?.trim())
+  if (missing.length > 0) {
+    throw new Error(`Variante ${sku}: defina a cor de ${missing.join(', ')} antes de salvar.`)
+  }
+
+  const { error: delError } = await supabase
+    .from('variant_cut_colors')
+    .delete()
+    .eq('variant_id', variantId)
+  if (delError) throw new Error(delError.message)
+
+  if (required.length === 0) return
+
+  const rows = required.map((category) => ({
+    variant_id: variantId,
+    category,
+    color: cutColors[category].trim(),
+  }))
+
+  const { error: insError } = await supabase.from('variant_cut_colors').insert(rows)
+  if (insError) {
+    // 23503 = a FK composta para material_colors: cor que não está na paleta.
+    if (insError.code === '23503') {
+      throw new Error(
+        `Variante ${sku}: uma das cores não existe na paleta. Recarregue a página e escolha de novo.`,
+      )
+    }
+    throw new Error(insError.message)
+  }
 }
 
 // ─── Atualizar produto ─────────────────────────────────────────────────────────
@@ -202,6 +256,8 @@ export async function updateProduct(productId: string, data: UpdateProductData):
 
   await saveProductBom(supabase, productId, data.bom)
 
+  const required = requiredCategories(data.bom)
+
   for (const v of data.variants) {
     const fields = {
       color: v.color,
@@ -209,23 +265,27 @@ export async function updateProduct(productId: string, data: UpdateProductData):
       sku: v.sku,
       stock_quantity: v.stock_quantity,
       images: v.images,
-      color_lona: v.color_lona,
-      color_forro: v.color_forro,
-      color_couro: v.color_couro,
     }
 
-    if (v.id) {
+    let variantId = v.id
+
+    if (variantId) {
       const { error: varError } = await supabase
         .from('product_variants')
         .update(fields)
-        .eq('id', v.id)
+        .eq('id', variantId)
       if (varError) throw new Error(varError.message)
     } else {
-      const { error: insError } = await supabase
+      const { data: created, error: insError } = await supabase
         .from('product_variants')
         .insert({ product_id: productId, ...fields })
+        .select('id')
+        .single()
       if (insError) throw new Error(insError.message)
+      variantId = created.id as string
     }
+
+    await saveVariantCutColors(supabase, variantId, v.cut_colors, required, v.sku)
   }
 
   revalidatePath('/admin/estoque')
@@ -297,8 +357,10 @@ export async function createProduct(data: CreateProductInput): Promise<string> {
 
   await saveProductBom(supabase, product.id as string, data.bom)
 
+  const required = requiredCategories(data.bom)
+
   for (const v of data.variants) {
-    const { error: varError } = await supabase
+    const { data: created, error: varError } = await supabase
       .from('product_variants')
       .insert({
         product_id: product.id,
@@ -307,11 +369,12 @@ export async function createProduct(data: CreateProductInput): Promise<string> {
         size: v.size,
         stock_quantity: v.stock_quantity,
         images: v.images,
-        color_lona: v.color_lona,
-        color_forro: v.color_forro,
-        color_couro: v.color_couro,
       })
+      .select('id')
+      .single()
     if (varError) throw new Error(varError.message)
+
+    await saveVariantCutColors(supabase, created.id as string, v.cut_colors, required, v.sku)
   }
 
   revalidatePath('/admin/estoque')
