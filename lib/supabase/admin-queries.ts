@@ -1,12 +1,13 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { getResolvedBomForVariants } from '@/lib/supabase/bom'
-import type { ProductWithVariants, ProductVariant, CutCategory } from '@/lib/types'
+import type {
+  ProductWithVariants, ProductVariant, CutCategory,
+  CutCategoryRow, MaterialColor, VariantCutColor,
+} from '@/lib/types'
 
 /** Cores de produção da variante — resolvem os cortes da receita do produto. */
 export type ProductVariantWithColors = ProductVariant & {
-  color_lona: string | null
-  color_forro: string | null
-  color_couro: string | null
+  cut_colors: VariantCutColor[]
 }
 
 export type ProductBomEntry = {
@@ -160,7 +161,7 @@ export async function getAllProductsWithVariants(): Promise<ProductWithVariantsA
   const { data, error } = await supabase
     .from('products')
     .select(
-      '*, variants:product_variants(*), bom:bill_of_materials(id, raw_material_id, material_category, material_type, quantity_needed)',
+      '*, variants:product_variants(*, cut_colors:variant_cut_colors(category, color)), bom:bill_of_materials(id, raw_material_id, material_category, material_type, quantity_needed)',
     )
     .order('name', { ascending: true })
 
@@ -331,6 +332,44 @@ export async function getRawMaterials(): Promise<RawMaterialRow[]> {
     minimum_stock: Number(r.minimum_stock),
     cost_per_unit: r.cost_per_unit != null ? Number(r.cost_per_unit) : null,
   })) as RawMaterialRow[]
+}
+
+/** Categorias de corte ativas, na ordem de exibição. */
+export async function getCutCategories(): Promise<CutCategoryRow[]> {
+  const supabase = createServiceClient()
+
+  const { data, error } = await supabase
+    .from('cut_categories')
+    .select('category, label, sort_order, is_active')
+    .eq('is_active', true)
+    .order('sort_order')
+
+  if (error) {
+    console.error('[getCutCategories]', error)
+    return []
+  }
+
+  return (data ?? []) as CutCategoryRow[]
+}
+
+/** Paleta completa. O cliente filtra por categoria na hora de montar o dropdown. */
+export async function getMaterialColors(): Promise<MaterialColor[]> {
+  const supabase = createServiceClient()
+
+  const { data, error } = await supabase
+    .from('material_colors')
+    .select('id, category, name, hex, is_placeholder, is_active, sort_order')
+    .eq('is_active', true)
+    .order('category')
+    .order('sort_order')
+    .order('name')
+
+  if (error) {
+    console.error('[getMaterialColors]', error)
+    return []
+  }
+
+  return (data ?? []) as MaterialColor[]
 }
 
 /**
@@ -508,6 +547,8 @@ export type OpMaterial = {
   type_specific: string | null
   required_color: string | null
   resolved: boolean
+  /** true quando a variante ainda está na cor "Indefinida". */
+  is_placeholder: boolean
   unit: string
   needed: number
   available: number
@@ -596,6 +637,7 @@ export async function getProductionOrders(limit = 50): Promise<ProductionOrderRo
         type_specific: line.material_type,
         required_color: line.required_color,
         resolved: line.resolved,
+        is_placeholder: line.is_placeholder,
         unit: line.unit,
         needed,
         available: line.stock_quantity,
@@ -804,6 +846,8 @@ export type PurchaseRequestRow = {
   material_name: string
   quantity_needed: number
   unit: string
+  /** Cor do insumo referenciado — null nos insumos sem cor. */
+  material_color: string | null
   status: 'pending' | 'ordered' | 'received' | 'cancelled'
   notes: string | null
   created_at: string
@@ -815,7 +859,7 @@ export async function getPurchaseRequests(): Promise<PurchaseRequestRow[]> {
 
   const { data, error } = await supabase
     .from('purchase_requests')
-    .select('id, order_id, raw_material_id, material_name, quantity_needed, unit, status, notes, created_at')
+    .select('id, order_id, raw_material_id, material_name, quantity_needed, unit, status, notes, created_at, material:raw_materials(color)')
     .not('status', 'in', '("received","cancelled")')
     .order('created_at', { ascending: false })
 
@@ -836,6 +880,7 @@ export async function getPurchaseRequests(): Promise<PurchaseRequestRow[]> {
       material_name: r.material_name as string,
       quantity_needed: Number(r.quantity_needed),
       unit: r.unit as string,
+      material_color: (r.material as { color: string | null } | null)?.color ?? null,
       status: r.status as 'pending' | 'ordered' | 'received' | 'cancelled',
       notes: (r.notes as string | null) ?? null,
       created_at: dateStr,

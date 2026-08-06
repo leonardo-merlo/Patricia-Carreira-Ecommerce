@@ -19,6 +19,8 @@ export type ResolvedBomLine = {
   stock_quantity: number
   quantity_needed: number
   resolved: boolean
+  /** true quando a cor escolhida é a "Indefinida" — pendência, não cor de verdade. */
+  is_placeholder: boolean
 }
 
 type ResolvedBomRow = Omit<ResolvedBomLine, 'stock_quantity' | 'quantity_needed'> & {

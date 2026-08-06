@@ -148,15 +148,44 @@ export type BillOfMaterial = {
   product?: Product;
 };
 
-/** Categorias de insumo cuja cor é definida pela variante. */
-export type CutCategory = "Corte Lona" | "Corte Forro" | "Corte Couro";
+/**
+ * Categoria de insumo cuja cor é definida pela variante.
+ *
+ * Deixou de ser união literal na migration 035: as categorias vivem em
+ * `cut_categories` e uma nova entra por INSERT, sem migration nem deploy.
+ * Para saber se uma categoria é de corte, consulte a lista carregada do banco
+ * (`getCutCategories`) — não compare com literal em código.
+ */
+export type CutCategory = string;
 
-/** Categorias de matéria-prima, espelhando as seções da ficha técnica. */
-export type MaterialCategory =
-  | CutCategory
-  | "Aplicações"
-  | "Metais"
-  | "Aviamentos";
+/** Uma linha de `cut_categories`. */
+export type CutCategoryRow = {
+  category: string;
+  label: string; // rótulo curto na UI: 'Lona', 'Forro', 'Couro', 'Tecido'
+  sort_order: number;
+  is_active: boolean;
+};
+
+/** Uma cor da paleta, escopada por categoria de corte. */
+export type MaterialColor = {
+  id: string;
+  category: string;
+  name: string;
+  hex: string | null;
+  /** true só na "Indefinida" — marcador de pendência, não uma cor de verdade. */
+  is_placeholder: boolean;
+  is_active: boolean;
+  sort_order: number;
+};
+
+/** A cor que uma variante usa numa categoria de corte. */
+export type VariantCutColor = {
+  category: string;
+  color: string;
+};
+
+/** Categorias de matéria-prima que não dependem da variante. */
+export type FixedMaterialCategory = "Aplicações" | "Metais" | "Aviamentos";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CLIENTES
