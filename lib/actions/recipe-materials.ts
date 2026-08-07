@@ -5,6 +5,83 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { requireAdmin } from '@/lib/server/auth'
 import type { RecipeMaterialOption } from '@/lib/supabase/admin-queries'
 
+export type CreatePurchaseResult =
+  | { success: true }
+  | { success: false; error: string }
+
+/**
+ * Cria o pedido de compra de uma peça direto da receita da variante.
+ *
+ * Se o insumo naquela cor ainda não existe em raw_materials, cria a linha com
+ * estoque 0 antes — senão o pedido não teria a que se referir e o botão
+ * "Receber" da aba Compras ficaria morto.
+ */
+export async function createPurchaseForCut(input: {
+  category: string
+  material_type: string
+  color: string | null
+  quantity: number
+  unit: string
+}): Promise<CreatePurchaseResult> {
+  await requireAdmin()
+
+  if (input.quantity <= 0) return { success: false, error: 'Quantidade inválida.' }
+
+  const supabase = createServiceClient()
+
+  let query = supabase
+    .from('raw_materials')
+    .select('id, unit')
+    .eq('category', input.category)
+    .eq('type_specific', input.material_type)
+
+  query = input.color ? query.eq('color', input.color) : query.is('color', null)
+
+  const { data: existing, error: findError } = await query.maybeSingle()
+  if (findError) return { success: false, error: findError.message }
+
+  let materialId = existing?.id as string | undefined
+  let unit = (existing?.unit as string | undefined) ?? input.unit
+
+  if (!materialId) {
+    const { data: created, error: createError } = await supabase
+      .from('raw_materials')
+      .insert({
+        name: input.material_type,
+        type: 'bruta',
+        category: input.category,
+        type_specific: input.material_type,
+        color: input.color,
+        unit: input.unit,
+        stock_quantity: 0,
+        minimum_stock: 0,
+      })
+      .select('id, unit')
+      .single()
+
+    if (createError) return { success: false, error: createError.message }
+    materialId = created.id as string
+    unit = created.unit as string
+  }
+
+  const label = input.color
+    ? `${input.material_type} (${input.color})`
+    : input.material_type
+
+  const { error } = await supabase.from('purchase_requests').insert({
+    order_id: null,
+    raw_material_id: materialId,
+    material_name: label,
+    quantity_needed: input.quantity,
+    unit,
+  })
+
+  if (error) return { success: false, error: error.message }
+
+  revalidatePath('/admin/materias')
+  return { success: true }
+}
+
 export type CreateRecipeMaterialResult =
   | { success: true; option: RecipeMaterialOption }
   | { success: false; error: string }

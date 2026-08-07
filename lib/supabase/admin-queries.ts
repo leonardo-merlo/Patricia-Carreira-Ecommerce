@@ -161,7 +161,7 @@ export async function getAllProductsWithVariants(): Promise<ProductWithVariantsA
   const { data, error } = await supabase
     .from('products')
     .select(
-      '*, variants:product_variants(*, cut_colors:variant_cut_colors(category, color)), bom:bill_of_materials(id, raw_material_id, material_category, material_type, quantity_needed)',
+      '*, variants:product_variants(*, cut_colors:variant_cut_colors(category, material_type, color)), bom:bill_of_materials(id, raw_material_id, material_category, material_type, quantity_needed)',
     )
     .order('name', { ascending: true })
 
@@ -498,7 +498,7 @@ export async function getAllProductsWithBOM(): Promise<ProductWithBOM[]> {
     .from('products')
     .select(`
       id, name, category,
-      variants:product_variants(id, sku, size, color, cut_colors:variant_cut_colors(category, color)),
+      variants:product_variants(id, sku, size, color, cut_colors:variant_cut_colors(category, material_type, color)),
       bom:bill_of_materials(
         id, quantity_needed, material_category, material_type,
         material:raw_materials(id, name, unit, stock_quantity, cost_per_unit)
@@ -537,7 +537,7 @@ export async function getAllProductsWithBOM(): Promise<ProductWithBOM[]> {
     id: string; name: string; category: string
     variants: Array<{
       id: string; sku: string; size: string | null; color: string | null
-      cut_colors: Array<{ category: string; color: string }> | null
+      cut_colors: Array<{ category: string; material_type: string; color: string }> | null
     }>
     bom: Array<{
       id: string; quantity_needed: string

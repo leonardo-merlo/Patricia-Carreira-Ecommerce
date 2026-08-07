@@ -13,7 +13,7 @@ import {
   type VariantInput,
   type ProductBomInput,
 } from '@/lib/actions/products'
-import { MANUAL_TAGS } from '@/lib/types'
+import { MANUAL_TAGS, cutLineKey } from '@/lib/types'
 import { VariantRecipe, type RecipeLine } from '@/components/admin/variant-recipe'
 import { MaterialSelect, optionKey } from '@/components/admin/material-select'
 import type { CutCategoryRow, MaterialColor } from '@/lib/types'
@@ -67,7 +67,7 @@ type VariantRow = {
   imageFiles: File[]
   imagePreviews: string[] // existing URLs + object URLs, in display order
   existingImageCount: number // how many of imagePreviews are pre-existing URLs (not new files)
-  /** Cor de produção por categoria de corte: { 'Corte Lona': 'Mostarda', ... }. */
+  /** Cor por peça de corte: { 'Corte Lona||Frente': 'Azul', ... }. */
   cutColors: Record<string, string>
   expanded: boolean
 }
@@ -153,7 +153,9 @@ export function ProdutoModal({
           imageFiles: [],
           imagePreviews: v.images ?? [],
           existingImageCount: (v.images ?? []).length,
-          cutColors: Object.fromEntries((v.cut_colors ?? []).map((c) => [c.category, c.color])),
+          cutColors: Object.fromEntries(
+            (v.cut_colors ?? []).map((c) => [cutLineKey(c.category, c.material_type), c.color]),
+          ),
           expanded: product.variants.length === 1,
         }))
       : [emptyVariant()],
@@ -185,9 +187,13 @@ export function ProdutoModal({
 
   const cutCategorySet = new Set(cutCategories.map((c) => c.category))
 
-  /** Categorias de corte que a receita exige — é o que cada variante deve colorir. */
-  const requiredCategories = Array.from(
-    new Set(bom.map((b) => b.material_category).filter((c) => cutCategorySet.has(c))),
+  /** Peças de corte que a receita exige — é o que cada variante deve colorir. */
+  const requiredCutKeys = Array.from(
+    new Set(
+      bom
+        .filter((b) => cutCategorySet.has(b.material_category))
+        .map((b) => cutLineKey(b.material_category, b.material_type)),
+    ),
   )
 
   const recipeLines: RecipeLine[] = bom.map((b) => ({
@@ -201,10 +207,25 @@ export function ProdutoModal({
     setColors((prev) => [...prev, color])
   }
 
-  function setCutColor(tempId: string, category: string, color: string) {
+  function setCutColor(tempId: string, key: string, color: string) {
     setVariants((prev) =>
       prev.map((v) =>
-        v.tempId === tempId ? { ...v, cutColors: { ...v.cutColors, [category]: color } } : v,
+        v.tempId === tempId ? { ...v, cutColors: { ...v.cutColors, [key]: color } } : v,
+      ),
+    )
+  }
+
+  /** Atalho do dropdown da categoria: pinta todas as peças dela de uma vez. */
+  function paintCategory(tempId: string, category: string, color: string) {
+    const keys = bom
+      .filter((b) => b.material_category === category)
+      .map((b) => cutLineKey(category, b.material_type))
+
+    setVariants((prev) =>
+      prev.map((v) =>
+        v.tempId === tempId
+          ? { ...v, cutColors: { ...v.cutColors, ...Object.fromEntries(keys.map((k) => [k, color])) } }
+          : v,
       ),
     )
   }
@@ -305,10 +326,11 @@ export function ProdutoModal({
     const invalidBom = bom.some((b) => isNaN(parseFloat(b.quantity_needed)) || parseFloat(b.quantity_needed) <= 0)
     if (invalidBom) { setError('Verifique as quantidades da receita.'); return }
 
-    const semCor = variants.find((v) => requiredCategories.some((c) => !v.cutColors[c]?.trim()))
+    const semCor = variants.find((v) => requiredCutKeys.some((k) => !v.cutColors[k]?.trim()))
     if (semCor) {
-      const faltando = requiredCategories.filter((c) => !semCor.cutColors[c]?.trim())
-      setError(`Variante "${variantSummary(semCor)}": defina a cor de ${faltando.join(', ')}.`)
+      const faltando = requiredCutKeys.filter((k) => !semCor.cutColors[k]?.trim())
+      const nomes = faltando.map((k) => k.replace('||', ' › ')).join(', ')
+      setError(`Variante "${variantSummary(semCor)}": defina a cor de ${nomes}.`)
       return
     }
 
@@ -563,8 +585,8 @@ export function ProdutoModal({
                 <table className="tbl" style={{ fontSize: 12 }}>
                   <thead>
                     <tr>
+                      <th style={{ width: 120 }}>Categoria</th>
                       <th>Insumo</th>
-                      <th style={{ width: 110 }}>Categoria</th>
                       <th style={{ width: 90 }}>Qtd. / unid.</th>
                       <th style={{ width: 32 }}></th>
                     </tr>
@@ -572,14 +594,14 @@ export function ProdutoModal({
                   <tbody>
                     {bom.map((b) => (
                       <tr key={b.tempBomId}>
+                        <td style={{ padding: '4px 10px' }} className="cust-meta">
+                          {b.material_category}
+                        </td>
                         <td style={{ padding: '4px 10px' }}>
                           {b.material_type}
                           {cutCategorySet.has(b.material_category) && (
                             <span className="cust-meta"> · cor da variante</span>
                           )}
-                        </td>
-                        <td style={{ padding: '4px 10px' }} className="cust-meta">
-                          {b.material_category}
                         </td>
                         <td style={{ padding: '4px 10px' }}>
                           <input
@@ -698,7 +720,8 @@ export function ProdutoModal({
                           colors={colors}
                           rawMaterials={rawMaterials}
                           cutColors={v.cutColors}
-                          onCutColorChange={(cat, color) => setCutColor(v.tempId, cat, color)}
+                          onCutColorChange={(key, color) => setCutColor(v.tempId, key, color)}
+                          onPaintCategory={(cat, color) => paintCategory(v.tempId, cat, color)}
                           onColorCreated={handleColorCreated}
                           variantKey={v.tempId}
                         />

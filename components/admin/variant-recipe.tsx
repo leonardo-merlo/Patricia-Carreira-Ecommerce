@@ -1,11 +1,13 @@
 "use client"
 
-// Client component: reage à troca de cor no dropdown recalculando o estoque de
-// cada peça na hora, sem round-trip.
+// Client component: reage à troca de cor recalculando o estoque na hora, sem
+// round-trip, e guarda o estado de aberto/fechado do bloco.
 
+import { useState } from 'react'
 import { AdminIcon } from '@/components/admin/admin-icon'
 import { ColorSelect } from '@/components/admin/color-select'
-import type { CutCategoryRow, MaterialColor } from '@/lib/types'
+import { createPurchaseForCut } from '@/lib/actions/recipe-materials'
+import { cutLineKey, type CutCategoryRow, type MaterialColor } from '@/lib/types'
 import type { RawMaterialRow } from '@/lib/supabase/admin-queries'
 
 /** Uma linha da receita do produto, como o modal a mantém em memória. */
@@ -21,9 +23,11 @@ interface VariantRecipeProps {
   cutCategories: CutCategoryRow[]
   colors: MaterialColor[]
   rawMaterials: RawMaterialRow[]
-  /** Cor escolhida por categoria nesta variante. */
+  /** Cor por peça, na chave `${categoria}||${peça}`. */
   cutColors: Record<string, string>
-  onCutColorChange: (category: string, color: string) => void
+  onCutColorChange: (key: string, color: string) => void
+  /** Pinta todas as peças de uma categoria de uma vez. */
+  onPaintCategory: (category: string, color: string) => void
   onColorCreated: (color: MaterialColor) => void
   variantKey: string
 }
@@ -74,6 +78,94 @@ function resolveLine(
   }
 }
 
+/** Botão que cria o pedido de compra da peça sem sair do modal. */
+function PurchaseButton({
+  category,
+  materialType,
+  color,
+  unit,
+  defaultQty,
+}: {
+  category: string
+  materialType: string
+  color: string | null
+  unit: string
+  defaultQty: number
+}) {
+  const [open, setOpen] = useState(false)
+  const [qty, setQty] = useState(String(defaultQty || 1))
+  const [saving, setSaving] = useState(false)
+  const [done, setDone] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleCreate() {
+    const parsed = parseFloat(qty.replace(',', '.'))
+    if (isNaN(parsed) || parsed <= 0) {
+      setError('Quantidade inválida.')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    const result = await createPurchaseForCut({
+      category,
+      material_type: materialType,
+      color,
+      quantity: parsed,
+      unit,
+    })
+    setSaving(false)
+    if (!result.success) {
+      setError(result.error)
+      return
+    }
+    setDone(true)
+    setOpen(false)
+  }
+
+  if (done) {
+    return <span style={{ fontSize: 11, color: 'var(--green)' }}>pedido criado</span>
+  }
+
+  if (open) {
+    return (
+      <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+        <input
+          className="input"
+          autoFocus
+          style={{ width: 60, height: 22, padding: '2px 6px', fontSize: 11 }}
+          value={qty}
+          onChange={(e) => setQty(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              handleCreate()
+            }
+          }}
+        />
+        <button className="btn sm primary" type="button" onClick={handleCreate} disabled={saving}>
+          {saving ? '…' : 'Pedir'}
+        </button>
+        <button className="icon-btn" type="button" onClick={() => setOpen(false)} title="Cancelar">
+          <AdminIcon name="x" size={10} />
+        </button>
+        {error && <span style={{ fontSize: 10.5, color: 'var(--red)' }}>{error}</span>}
+      </span>
+    )
+  }
+
+  return (
+    <button
+      className="icon-btn"
+      type="button"
+      title="Criar pedido de compra"
+      data-testid={`btn-comprar-${materialType}`}
+      onClick={() => setOpen(true)}
+    >
+      <AdminIcon name="plus" size={11} />
+    </button>
+  )
+}
+
 function StatusCell({ status }: { status: LineStatus }) {
   if (status.kind === 'no-color') {
     return <span style={{ color: 'var(--text-3)' }}>escolha a cor</span>
@@ -90,8 +182,11 @@ function StatusCell({ status }: { status: LineStatus }) {
 
 /**
  * A receita da variante: as linhas vêm da receita do produto, e as de corte
- * ganham cor e saldo concretos. A cor é escolhida por CATEGORIA, não por peça —
- * uma variante tem uma cor de lona que vale para as 12 peças de lona dela.
+ * ganham cor e saldo concretos.
+ *
+ * A cor é POR PEÇA — a frente de lona pode ser azul e as costas verde. O
+ * dropdown ao lado da categoria é atalho: pinta todas as peças dela de uma vez,
+ * e cada peça continua editável depois.
  */
 export function VariantRecipe({
   bom,
@@ -100,9 +195,12 @@ export function VariantRecipe({
   rawMaterials,
   cutColors,
   onCutColorChange,
+  onPaintCategory,
   onColorCreated,
   variantKey,
 }: VariantRecipeProps) {
+  const [open, setOpen] = useState(false)
+
   if (bom.length === 0) {
     return (
       <div className="cust-meta">
@@ -118,84 +216,147 @@ export function VariantRecipe({
     ...categories.filter((c) => !cutSet.has(c)).sort(),
   ]
 
-  const faltando = ordered.filter((c) => cutSet.has(c) && !cutColors[c])
+  const faltando = bom.filter(
+    (b) =>
+      cutSet.has(b.material_category) &&
+      !cutColors[cutLineKey(b.material_category, b.material_type)],
+  )
 
   return (
     <div style={{ display: 'grid', gap: 10 }}>
-      <div style={{ fontSize: 12, fontWeight: 500 }}>
-        Receita desta variante{' '}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        data-testid={`toggle-receita-${variantKey}`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          cursor: 'pointer',
+          font: 'inherit',
+          fontSize: 12,
+          fontWeight: 500,
+          textAlign: 'left',
+        }}
+      >
+        <AdminIcon name={open ? 'chevDown' : 'chevRight'} size={12} />
+        Receita desta variante
         <span className="cust-meta">· herdada do produto ({bom.length} itens)</span>
-      </div>
+        {faltando.length > 0 && (
+          <span style={{ fontSize: 11, color: 'var(--red)' }}>
+            · {faltando.length} sem cor
+          </span>
+        )}
+      </button>
 
-      {ordered.map((category) => {
-        const lines = bom.filter((b) => b.material_category === category)
-        const isCut = cutSet.has(category)
-        const chosen = cutColors[category] ?? ''
+      {open &&
+        ordered.map((category) => {
+          const lines = bom.filter((b) => b.material_category === category)
+          const isCut = cutSet.has(category)
+          const catColors = colors.filter((c) => c.category === category)
+          // Cor comum a todas as peças, se houver — senão o atalho fica vazio.
+          const chosenAll = lines
+            .map((l) => cutColors[cutLineKey(category, l.material_type)] ?? '')
+            .reduce((acc, cur, i) => (i === 0 ? cur : acc === cur ? acc : ''), '')
 
-        return (
-          <div
-            key={category}
-            style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}
-          >
+          return (
             <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '6px 10px',
-                background: 'var(--surface-2)',
-              }}
+              key={category}
+              style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}
             >
-              <div style={{ flex: 1, fontSize: 12, fontWeight: 500 }}>{category}</div>
-              {isCut ? (
-                <div style={{ width: 200 }}>
-                  <ColorSelect
-                    category={category}
-                    colors={colors.filter((c) => c.category === category)}
-                    value={chosen}
-                    onChange={(c) => onCutColorChange(category, c)}
-                    onColorCreated={onColorCreated}
-                    testId={`select-cor-${category.replace(/\s+/g, '-').toLowerCase()}-${variantKey}`}
-                  />
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '6px 10px',
+                  background: 'var(--surface-2)',
+                }}
+              >
+                <div style={{ flex: 1, fontSize: 12, fontWeight: 500 }}>{category}</div>
+                {isCut ? (
+                  <div style={{ width: 190 }}>
+                    <ColorSelect
+                      category={category}
+                      colors={catColors}
+                      value={chosenAll}
+                      onChange={(c) => onPaintCategory(category, c)}
+                      onColorCreated={onColorCreated}
+                      testId={`select-cor-${category.replace(/\s+/g, '-').toLowerCase()}-${variantKey}`}
+                    />
+                  </div>
+                ) : (
+                  <div className="cust-meta">cor fixa</div>
+                )}
+                <div className="cust-meta" style={{ width: 62, textAlign: 'right' }}>
+                  {lines.length} {lines.length === 1 ? 'item' : 'itens'}
                 </div>
-              ) : (
-                <div className="cust-meta">cor fixa</div>
-              )}
-              <div className="cust-meta" style={{ width: 70, textAlign: 'right' }}>
-                {lines.length} {lines.length === 1 ? 'item' : 'itens'}
               </div>
+
+              {isCut && (
+                <div className="cust-meta" style={{ padding: '4px 10px', fontSize: 10.5 }}>
+                  O seletor acima pinta todas as peças de uma vez — troque abaixo as que forem diferentes.
+                </div>
+              )}
+
+              <table className="tbl" style={{ fontSize: 11.5 }}>
+                <tbody>
+                  {lines.map((line) => {
+                    const key = cutLineKey(category, line.material_type)
+                    const chosen = cutColors[key] ?? ''
+                    const status = resolveLine(line, chosen || undefined, isCut, rawMaterials)
+                    return (
+                      <tr key={`${key}-${line.raw_material_id ?? ''}`}>
+                        <td style={{ padding: '3px 10px' }}>{line.material_type}</td>
+                        <td style={{ padding: '3px 10px', width: 60 }} className="cust-meta">
+                          {line.quantity_needed} un
+                        </td>
+                        <td style={{ padding: '3px 10px', width: 170 }}>
+                          {isCut ? (
+                            <ColorSelect
+                              category={category}
+                              colors={catColors}
+                              value={chosen}
+                              onChange={(c) => onCutColorChange(key, c)}
+                              onColorCreated={onColorCreated}
+                              testId={`select-cor-peca-${key}-${variantKey}`}
+                            />
+                          ) : (
+                            <span className="cust-meta">cor fixa</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '3px 10px', width: 175 }}>
+                          <StatusCell status={status} />
+                        </td>
+                        <td style={{ padding: '3px 6px', width: 34, textAlign: 'center' }}>
+                          {(status.kind === 'unregistered' || status.kind === 'short') && (
+                            <PurchaseButton
+                              category={category}
+                              materialType={line.material_type}
+                              color={isCut ? chosen || null : null}
+                              unit={status.kind === 'short' ? status.unit : 'unidade'}
+                              defaultQty={parseFloat(line.quantity_needed) || 1}
+                            />
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
+          )
+        })}
 
-            <table className="tbl" style={{ fontSize: 11.5 }}>
-              <tbody>
-                {lines.map((line) => {
-                  const status = resolveLine(line, chosen || undefined, isCut, rawMaterials)
-                  return (
-                    <tr
-                      key={`${line.material_category}-${line.material_type}-${line.raw_material_id ?? ''}`}
-                    >
-                      <td style={{ padding: '3px 10px' }}>{line.material_type}</td>
-                      <td style={{ padding: '3px 10px', width: 70 }} className="cust-meta">
-                        {line.quantity_needed} un
-                      </td>
-                      <td style={{ padding: '3px 10px', width: 190 }}>
-                        <StatusCell status={status} />
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )
-      })}
-
-      {faltando.length > 0 && (
+      {open && faltando.length > 0 && (
         <div
           style={{ fontSize: 11.5, color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 4 }}
         >
           <AdminIcon name="x" size={11} />
-          Defina a cor de {faltando.join(', ')} para salvar.
+          {faltando.length} {faltando.length === 1 ? 'peça sem cor' : 'peças sem cor'} — preencha para salvar.
         </div>
       )}
     </div>

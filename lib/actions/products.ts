@@ -3,6 +3,7 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAdmin } from '@/lib/server/auth'
 import { revalidatePath } from 'next/cache'
+import { cutLineKey } from '@/lib/types'
 import type { CutCategory } from '@/lib/types'
 
 export async function toggleProductStatus(productId: string, isActive: boolean): Promise<void> {
@@ -119,9 +120,10 @@ export type VariantInput = {
   stock_quantity: number
   images: string[]
   /**
-   * Cor de produção por categoria de corte: { 'Corte Lona': 'Mostarda', ... }.
-   * Precisa cobrir toda categoria que a receita do produto usa — o servidor
-   * recusa se faltar, mesmo que o cliente tenha deixado passar.
+   * Cor de produção por PEÇA de corte, na chave `${categoria}||${peça}`:
+   * { 'Corte Lona||Frente': 'Azul', 'Corte Lona||Costas': 'Verde', ... }.
+   * Precisa cobrir toda peça de corte da receita — o servidor recusa se faltar,
+   * mesmo que o cliente tenha deixado passar.
    */
   cut_colors: Record<string, string>
 }
@@ -151,11 +153,21 @@ async function saveProductBom(
   if (insError) throw new Error(insError.message)
 }
 
-/** Categorias de corte que a receita exige — ou seja, que a variante deve colorir. */
-function requiredCategories(bom: ProductBomInput[]): string[] {
-  return Array.from(
-    new Set(bom.map((b) => b.material_category).filter((c): c is string => Boolean(c))),
-  )
+/** Peça de corte da receita que a variante precisa colorir. */
+type CutLine = { category: string; material_type: string }
+
+/** Peças de corte que a receita exige — ou seja, que a variante deve colorir. */
+function requiredCutLines(bom: ProductBomInput[]): CutLine[] {
+  const seen = new Set<string>()
+  const lines: CutLine[] = []
+  for (const b of bom) {
+    if (!b.material_category || !b.material_type) continue
+    const key = cutLineKey(b.material_category, b.material_type)
+    if (seen.has(key)) continue
+    seen.add(key)
+    lines.push({ category: b.material_category, material_type: b.material_type })
+  }
+  return lines
 }
 
 /**
@@ -169,12 +181,15 @@ async function saveVariantCutColors(
   supabase: ReturnType<typeof createServiceClient>,
   variantId: string,
   cutColors: Record<string, string>,
-  required: string[],
+  required: CutLine[],
   sku: string,
 ): Promise<void> {
-  const missing = required.filter((c) => !cutColors[c]?.trim())
+  const missing = required.filter(
+    (l) => !cutColors[cutLineKey(l.category, l.material_type)]?.trim(),
+  )
   if (missing.length > 0) {
-    throw new Error(`Variante ${sku}: defina a cor de ${missing.join(', ')} antes de salvar.`)
+    const nomes = missing.map((l) => `${l.category} › ${l.material_type}`).join(', ')
+    throw new Error(`Variante ${sku}: defina a cor de ${nomes} antes de salvar.`)
   }
 
   const { error: delError } = await supabase
@@ -185,10 +200,11 @@ async function saveVariantCutColors(
 
   if (required.length === 0) return
 
-  const rows = required.map((category) => ({
+  const rows = required.map((l) => ({
     variant_id: variantId,
-    category,
-    color: cutColors[category].trim(),
+    category: l.category,
+    material_type: l.material_type,
+    color: cutColors[cutLineKey(l.category, l.material_type)].trim(),
   }))
 
   const { error: insError } = await supabase.from('variant_cut_colors').insert(rows)
@@ -256,7 +272,7 @@ export async function updateProduct(productId: string, data: UpdateProductData):
 
   await saveProductBom(supabase, productId, data.bom)
 
-  const required = requiredCategories(data.bom)
+  const required = requiredCutLines(data.bom)
 
   for (const v of data.variants) {
     const fields = {
@@ -357,7 +373,7 @@ export async function createProduct(data: CreateProductInput): Promise<string> {
 
   await saveProductBom(supabase, product.id as string, data.bom)
 
-  const required = requiredCategories(data.bom)
+  const required = requiredCutLines(data.bom)
 
   for (const v of data.variants) {
     const { data: created, error: varError } = await supabase

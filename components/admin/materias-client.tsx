@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { AdminIcon } from '@/components/admin/admin-icon'
 import { ColorSelect } from '@/components/admin/color-select'
 import type { RawMaterialRow, ProductWithBOM, PendingCutMaterial, PurchaseRequestRow } from '@/lib/supabase/admin-queries'
+import { cutLineKey } from '@/lib/types'
 import type { CutCategoryRow, MaterialColor } from '@/lib/types'
 import type { Supplier } from '@/lib/actions/suppliers'
 import {
@@ -149,19 +150,21 @@ export function MateriasClient({
   const productsWithBOM = products.filter((p) => p.bom.length > 0)
   const selectedProduct = products.find((p) => p.id === selectedProductId) ?? null
 
-  // Cores da variante escolhida no "ver como", por categoria de corte.
+  // Cores da variante escolhida no "ver como", por PEÇA de corte.
   const recipeVariantColors: Record<string, string> = Object.fromEntries(
     ((selectedProduct?.variants ?? []).find((v) => v.id === recipeVariantId)?.cut_colors ?? [])
-      .map((c) => [c.category, c.color]),
+      .map((c) => [cutLineKey(c.category, c.material_type), c.color]),
   )
 
-  // Variantes que ainda não declaram alguma categoria de corte da receita.
-  const categoriasExigidas = Array.from(
-    new Set((selectedProduct?.bom ?? []).filter((b) => b.is_cut).map((b) => b.material_category)),
-  )
-  const variantesSemCor = (selectedProduct?.variants ?? []).filter((v) =>
-    categoriasExigidas.some((c) => !v.cut_colors.some((cc) => cc.category === c)),
-  )
+  // Variantes que ainda não declaram alguma peça de corte da receita.
+  const pecasExigidas = (selectedProduct?.bom ?? [])
+    .filter((b) => b.is_cut && b.material_type)
+    .map((b) => cutLineKey(b.material_category, b.material_type ?? ''))
+
+  const variantesSemCor = (selectedProduct?.variants ?? []).filter((v) => {
+    const tem = new Set(v.cut_colors.map((cc) => cutLineKey(cc.category, cc.material_type)))
+    return pecasExigidas.some((k) => !tem.has(k))
+  })
 
   const estimatedCost = selectedProduct
     ? selectedProduct.bom.reduce((sum, b) => {
@@ -668,7 +671,7 @@ export function MateriasClient({
                             </div>
                           </td>
                           <td className="cust-meta">
-                            {b.is_cut ? (recipeVariantColors[b.material_category] ?? 'cor da variante') : '—'}
+                            {b.is_cut ? (recipeVariantColors[cutLineKey(b.material_category, b.material_type ?? '')] ?? 'cor da variante') : '—'}
                           </td>
                           <td className="num" style={{ fontWeight: 500 }}>
                             {bomEditMode ? (

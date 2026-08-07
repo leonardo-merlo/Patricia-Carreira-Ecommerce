@@ -178,11 +178,23 @@ export type MaterialColor = {
   sort_order: number;
 };
 
-/** A cor que uma variante usa numa categoria de corte. */
+/**
+ * A cor que uma variante usa numa PEÇA de corte.
+ *
+ * É por peça, não por categoria: na ficha do Henrique a frente de lona pode ser
+ * azul e as costas verde. O dropdown da categoria na UI é atalho para pintar
+ * todas as peças de uma vez, não o dado em si.
+ */
 export type VariantCutColor = {
   category: string;
+  material_type: string;
   color: string;
 };
+
+/** Chave de uma peça de corte dentro da receita. */
+export function cutLineKey(category: string, materialType: string): string {
+  return `${category}||${materialType}`;
+}
 
 /** Categorias de matéria-prima que não dependem da variante. */
 export type FixedMaterialCategory = "Aplicações" | "Metais" | "Aviamentos";
