@@ -1223,8 +1223,12 @@
 
 /* Sidebar vira gaveta */
 @media (max-width: 900px) {
+  /* grid-template-rows explícito: o .admin-root tem min-height: 100vh, e no
+   * mobile passa a ter duas linhas (barra + conteúdo). Sem isto o grid divide
+   * a sobra de altura entre as duas e a barra do topo incha — visível só nas
+   * telas de conteúdo curto, que são justamente as que sobram altura. */
   .admin-root,
-  .admin-root.sidebar-collapsed { grid-template-columns: 1fr; }
+  .admin-root.sidebar-collapsed { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
 
   .admin-root .admin-mobile-bar {
     display: flex;
