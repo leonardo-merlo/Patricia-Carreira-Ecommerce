@@ -199,8 +199,6 @@ export function VariantRecipe({
   onColorCreated,
   variantKey,
 }: VariantRecipeProps) {
-  const [open, setOpen] = useState(false)
-
   if (bom.length === 0) {
     return (
       <div className="cust-meta">
@@ -224,36 +222,15 @@ export function VariantRecipe({
 
   return (
     <div style={{ display: 'grid', gap: 10 }}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        data-testid={`toggle-receita-${variantKey}`}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          background: 'none',
-          border: 'none',
-          padding: 0,
-          cursor: 'pointer',
-          font: 'inherit',
-          fontSize: 12,
-          fontWeight: 500,
-          textAlign: 'left',
-        }}
-      >
-        <AdminIcon name={open ? 'chevDown' : 'chevRight'} size={12} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500 }}>
         Receita desta variante
         <span className="cust-meta">· herdada do produto ({bom.length} itens)</span>
         {faltando.length > 0 && (
-          <span style={{ fontSize: 11, color: 'var(--red)' }}>
-            · {faltando.length} sem cor
-          </span>
+          <span style={{ fontSize: 11, color: 'var(--red)' }}>· {faltando.length} sem cor</span>
         )}
-      </button>
+      </div>
 
-      {open &&
-        ordered.map((category) => {
+      {ordered.map((category) => {
           const lines = bom.filter((b) => b.material_category === category)
           const isCut = cutSet.has(category)
           const catColors = colors.filter((c) => c.category === category)
@@ -349,9 +326,9 @@ export function VariantRecipe({
               </table>
             </div>
           )
-        })}
+      })}
 
-      {open && faltando.length > 0 && (
+      {faltando.length > 0 && (
         <div
           style={{ fontSize: 11.5, color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 4 }}
         >

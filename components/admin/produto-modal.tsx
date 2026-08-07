@@ -182,6 +182,10 @@ export function ProdutoModal({
   const [colors, setColors] = useState<MaterialColor[]>(materialColors)
   const [materialOptions, setMaterialOptions] = useState<RecipeMaterialOption[]>(recipeMaterials)
 
+  // Receita padrão nasce fechada em produto que já tem receita — são 34 linhas
+  // na Flora, e o que se edita no dia a dia é a variante logo abaixo.
+  const [bomOpen, setBomOpen] = useState(mode === 'create')
+
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -575,12 +579,20 @@ export function ProdutoModal({
 
           {/* Receita padrão — vem antes das variantes, que a herdam */}
           <div>
-            <label style={{ fontSize: 12, fontWeight: 500, display: 'block', marginBottom: 6 }}>
-              Receita padrão — herdada por todas as {variants.length}{' '}
-              {variants.length === 1 ? 'variante' : 'variantes'}
-            </label>
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, cursor: 'pointer' }}
+              onClick={() => setBomOpen((v) => !v)}
+              data-testid="toggle-receita-padrao"
+            >
+              <AdminIcon name={bomOpen ? 'chevDown' : 'chevRight'} size={12} />
+              <div style={{ fontWeight: 600, fontSize: 13 }}>Receita padrão</div>
+              <span className="cust-meta">
+                {bom.length} {bom.length === 1 ? 'insumo' : 'insumos'} · herdada pelas{' '}
+                {variants.length} {variants.length === 1 ? 'variante' : 'variantes'}
+              </span>
+            </div>
 
-            {bom.length > 0 && (
+            {bomOpen && bom.length > 0 && (
               <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', marginBottom: 8 }}>
                 <table className="tbl" style={{ fontSize: 12 }}>
                   <thead>
@@ -626,13 +638,15 @@ export function ProdutoModal({
               </div>
             )}
 
-            <MaterialSelect
-              options={materialOptions}
-              cutCategories={cutCategories}
-              usedKeys={usedBomKeys}
-              onPick={addBomRow}
-              onCreated={(o) => setMaterialOptions((prev) => [...prev, o])}
-            />
+            {bomOpen && (
+              <MaterialSelect
+                options={materialOptions}
+                cutCategories={cutCategories}
+                usedKeys={usedBomKeys}
+                onPick={addBomRow}
+                onCreated={(o) => setMaterialOptions((prev) => [...prev, o])}
+              />
+            )}
           </div>
 
           {/* Variantes */}
