@@ -533,6 +533,9 @@ function SectionNotif({ s, onToggle }: { s: StoreSettings; onToggle: (key: BoolK
 
 export default function ConfigPage() {
   const [active, setActive] = useState<Section>("perfil")
+  // No celular a tela vira duas etapas: lista de seções → seção escolhida.
+  // No desktop este estado é ignorado, o layout continua de duas colunas.
+  const [mobileShowSection, setMobileShowSection] = useState(false)
   const [settings, setSettings] = useState<StoreSettings | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -584,15 +587,32 @@ export default function ConfigPage() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "var(--gap)", alignItems: "flex-start" }}>
-        <div className="card" style={{ padding: "8px 0", position: "sticky", top: 78 }}>
+      {/* Botão de voltar: só existe no celular, e só depois de escolher uma seção */}
+      {mobileShowSection && (
+        <button
+          type="button"
+          className="btn ghost config-back-btn"
+          id="btn-config-voltar"
+          data-testid="btn-config-voltar"
+          onClick={() => setMobileShowSection(false)}
+          style={{ marginBottom: 12 }}
+        >
+          <AdminIcon name="chevLeft" size={14} /> Todas as configurações
+        </button>
+      )}
+
+      <div
+        className={`config-layout ${mobileShowSection ? "showing-section" : "showing-list"}`}
+        style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "var(--gap)", alignItems: "flex-start" }}
+      >
+        <div className="card config-nav" style={{ padding: "8px 0", position: "sticky", top: 78 }}>
           {sections.map(s => (
             <button
               key={s.id}
               type="button"
               className={`sidebar-item ${active === s.id ? "active" : ""}`}
               id={`btn-config-${s.id}`}
-              onClick={() => setActive(s.id)}
+              onClick={() => { setActive(s.id); setMobileShowSection(true) }}
               style={{
                 width: "calc(100% - 16px)", borderRadius: 5, margin: "1px 8px",
                 background: active === s.id ? "var(--accent-soft)" : "transparent",
@@ -608,7 +628,7 @@ export default function ConfigPage() {
           ))}
         </div>
 
-        <div>{renderSection()}</div>
+        <div className="config-section">{renderSection()}</div>
       </div>
     </div>
   )

@@ -1209,10 +1209,15 @@
    página lateralmente sobre um layout de desktop.
    ══════════════════════════════════════════════════════ */
 
-/* Telas médias: densidade menor antes de perder a sidebar */
+/* Telas médias: densidade menor antes de perder a sidebar.
+ *
+ * O !important aqui não é preguiça: várias telas passam
+ * style={{ gridTemplateColumns: ... }} inline (dashboard, financeiro,
+ * relatórios), e estilo inline ganha de qualquer seletor. Sem !important a
+ * media query é ignorada e as colunas de desktop ficam espremidas no celular. */
 @media (max-width: 1280px) {
-  .admin-root .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .admin-root .dash-row { grid-template-columns: minmax(0, 1fr); }
+  .admin-root .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .admin-root .dash-row { grid-template-columns: minmax(0, 1fr) !important; }
   .admin-root .kanban-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
@@ -1289,15 +1294,30 @@
   .admin-root .page-header { flex-direction: column; align-items: flex-start; gap: 10px; }
   .admin-root .page-actions { width: 100%; flex-wrap: wrap; }
   .admin-root .topbar { padding: 12px 16px; }
-  .admin-root .search-input { width: 100%; }
   .admin-root .kanban-board { grid-template-columns: minmax(0, 1fr); }
+
+  /* Barras de filtro — a causa do "cortado para a direita".
+   * .card-header e a .row dentro dele não quebravam linha, e os campos têm
+   * largura fixa inline (width: 280, width: 220), então tudo era empurrado
+   * para fora do card em vez de descer. */
+  .admin-root .card-header { flex-wrap: wrap; align-items: flex-start; }
+  .admin-root .card-header > .row {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start !important;
+  }
+  .admin-root .card-header .search-input { width: 100% !important; }
+  .admin-root .card-header .select,
+  .admin-root .card-header .input { width: auto !important; flex: 1 1 160px; min-width: 0; }
 }
 
 /* Celular */
 @media (max-width: 640px) {
   .admin-root { --base-size: 14px; --row-h: 40px; --gap: 12px; }
 
-  .admin-root .kpi-grid { grid-template-columns: minmax(0, 1fr); }
+  .admin-root .kpi-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  /* Cards curtos (só rótulo + número) aguentam duas colunas no celular */
+  .admin-root .kpi-grid.cols-2-mobile { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   .admin-root .page { padding: 14px 12px 32px; }
   .admin-root .page-title { font-size: 20px; }
 
@@ -1305,9 +1325,27 @@
   .admin-root .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .admin-root table.tbl { min-width: 560px; }
 
+  /* Modais: as larguras vinham inline (440, 560, 720, 760px) e o .modal tem
+   * overflow: hidden — o que não cabia era cortado, não rolava. */
   .admin-root .drawer { width: 100%; }
   .admin-root .modal-backdrop { padding: 12px; place-items: end center; }
-  .admin-root .modal { width: 100%; max-height: 92vh; overflow-y: auto; }
+  .admin-root .modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 92vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  /* Os formulários dentro dos modais usam grids inline de 2, 3 e 4 colunas.
+   * Estilo inline ganha de qualquer seletor, então só o atributo alcança. */
+  .admin-root .modal [style*="grid-template-columns"],
+  .admin-root .drawer [style*="grid-template-columns"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .admin-root .card-header > .row { gap: 8px; }
+  .admin-root .card-header .select,
+  .admin-root .card-header .input { flex: 1 1 100%; }
+
   .admin-root .modal-footer,
   .admin-root .drawer-footer { flex-wrap: wrap; }
   .admin-root .modal-footer .btn,
@@ -1324,6 +1362,19 @@
 
   .admin-root .confirm-modal-actions { flex-direction: column; }
   .admin-root .confirm-modal-actions .btn { width: 100%; }
+}
+
+/* Configurações: no desktop é lista à esquerda + seção à direita. No celular
+ * as duas colunas não cabem, então vira duas etapas — escolhe a seção na
+ * lista, a seção abre sozinha, e o botão "Todas as configurações" volta. */
+.admin-root .config-back-btn { display: none; }
+
+@media (max-width: 900px) {
+  .admin-root .config-layout { grid-template-columns: minmax(0, 1fr) !important; }
+  .admin-root .config-nav { position: static !important; }
+  .admin-root .config-layout.showing-list .config-section { display: none; }
+  .admin-root .config-layout.showing-section .config-nav { display: none; }
+  .admin-root .config-back-btn { display: inline-flex; }
 }
 
 @media (prefers-reduced-motion: reduce) {

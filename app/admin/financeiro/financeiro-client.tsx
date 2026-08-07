@@ -346,7 +346,7 @@ export function FinanceiroClient({
       </div>
 
       {/* Resultado do mês — 3 colunas */}
-      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 16 }}>
+      <div className="kpi-grid cols-2-mobile" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 16 }}>
         <div className="kpi">
           <div className="kpi-label">
             <span className="dot" style={{ background: 'var(--green)' }} />
@@ -378,7 +378,7 @@ export function FinanceiroClient({
       </div>
 
       {/* Contas a pagar — 3 colunas */}
-      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+      <div className="kpi-grid cols-2-mobile" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         <div className="kpi">
           <div className="kpi-label">
             <span className="dot" style={{ background: 'var(--accent)' }} />
