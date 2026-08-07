@@ -2,42 +2,53 @@
  * All rules scoped under .admin-root to prevent conflicts with store styles.
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url('../brand.css');
 
 .admin-root {
-  --sidebar-bg: #16162a;
-  --sidebar-fg: #c8c8d6;
-  --sidebar-fg-muted: #6f6f80;
-  --sidebar-border: #262638;
+  /* Barra escura: carvão amarronzado, derivado do marrom do hero da loja.
+   * Mesma escuridão de antes — o que muda é a temperatura. */
+  --sidebar-bg: var(--pc-charcoal);
+  --sidebar-fg: #d9cabd;
+  --sidebar-fg-muted: #9a8878;
+  --sidebar-border: var(--pc-charcoal-lift);
 
-  --accent: #c97d60;
-  --accent-hover: #b86d50;
-  --accent-soft: #f6ebe5;
-  --accent-soft-2: #ecd5cb;
+  --accent: var(--pc-clay);
+  --accent-hover: var(--pc-clay-hover);
+  --accent-soft: var(--pc-clay-soft);
+  --accent-soft-2: var(--pc-clay-soft-2);
 
-  --bg: #fafaf7;
+  --bg: var(--pc-parchment);
   --surface: #ffffff;
-  --surface-2: #f6f5f1;
-  --surface-hover: #f9f7f3;
+  --surface-2: #f7f1e7;
+  --surface-hover: #fbf6ee;
+  --sand: var(--pc-sand);
 
-  --border: #ececec;
-  --border-strong: #d9d9d9;
-  --border-input: #d4d4d4;
+  --border: #eae1d5;
+  --border-strong: #d9cbb9;
+  --border-input: #d4c5b3;
 
-  --text: #1a1a2e;
-  --text-2: #5a5a66;
-  --text-3: #8a8a95;
+  --text: var(--pc-ink);
+  --text-2: #5b4d42;
+  --text-3: var(--pc-brown-mute);
 
-  --green: #16a34a;
-  --green-soft: #e7f5ec;
-  --yellow: #b88516;
-  --yellow-soft: #fbf2dc;
-  --blue: #2563eb;
-  --blue-soft: #e3ecfe;
-  --purple: #7c3aed;
-  --purple-soft: #efe7fd;
-  --red: #c13838;
-  --red-soft: #fbe6e6;
+  --green: var(--pc-olive);
+  --green-soft: var(--pc-olive-soft);
+  --yellow: var(--pc-amber);
+  --yellow-soft: var(--pc-amber-soft);
+  --blue: var(--pc-cobalt);
+  --blue-soft: var(--pc-cobalt-soft);
+  --purple: var(--pc-gold);
+  --purple-soft: var(--pc-gold-soft);
+  --red: var(--pc-red);
+  --red-soft: var(--pc-red-soft);
+
+  /* Consumidas pelo kanban de produção. Antes não existiam em lugar nenhum
+   * e caíam nos fallbacks do Tailwind — daí o indigo #6366f1 solto. */
+  --bg-surface: var(--surface);
+  --bg-muted: var(--surface-2);
+  --text-muted: var(--text-3);
+  --color-primary: var(--accent);
+  --border-subtle: var(--border);
 
   --base-size: 13px;
   --row-h: 36px;
@@ -45,14 +56,17 @@
   --pad-card: 16px;
   --pad-cell: 8px 12px;
 
+  --sidebar-w: 208px;
+  --sidebar-w-collapsed: 56px;
+
   --radius: 6px;
   --radius-lg: 10px;
 
-  --shadow-sm: 0 1px 2px rgba(20, 20, 30, 0.04);
-  --shadow-md: 0 4px 12px rgba(20, 20, 30, 0.06), 0 1px 3px rgba(20, 20, 30, 0.05);
-  --shadow-drawer: -16px 0 40px rgba(20, 20, 30, 0.10);
+  --shadow-sm: 0 1px 2px rgba(var(--pc-shadow-rgb), 0.05);
+  --shadow-md: 0 4px 12px rgba(var(--pc-shadow-rgb), 0.07), 0 1px 3px rgba(var(--pc-shadow-rgb), 0.05);
+  --shadow-drawer: -16px 0 40px rgba(var(--pc-shadow-rgb), 0.12);
 
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
   font-size: var(--base-size);
   font-feature-settings: "cv11", "ss01", "ss03";
   color: var(--text);
@@ -61,10 +75,11 @@
   line-height: 1.45;
 
   display: grid;
-  grid-template-columns: 232px 1fr;
+  grid-template-columns: var(--sidebar-w) 1fr;
   min-height: 100vh;
-  min-width: 1280px;
 }
+
+.admin-root.sidebar-collapsed { grid-template-columns: var(--sidebar-w-collapsed) 1fr; }
 
 .admin-root * { box-sizing: border-box; }
 
@@ -80,28 +95,44 @@
   position: sticky;
   top: 0;
   height: 100vh;
-  border-right: 1px solid #000;
+  border-right: 1px solid var(--sidebar-border);
 }
 .admin-root .sidebar-brand {
-  padding: 18px 18px 14px;
+  padding: 14px 12px;
   display: flex;
   align-items: center;
   gap: 10px;
   border-bottom: 1px solid var(--sidebar-border);
+  min-height: 60px;
 }
-.admin-root .sidebar-logo {
-  width: 30px;
-  height: 30px;
-  border-radius: 7px;
-  background: linear-gradient(135deg, #c97d60 0%, #a8625a 100%);
+.admin-root .sidebar-collapse-btn {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--sidebar-fg-muted);
+  padding: 4px;
+  border-radius: 4px;
   display: grid;
   place-items: center;
-  font-weight: 700;
-  color: #fff;
-  font-size: 13px;
-  letter-spacing: 0.02em;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
   flex-shrink: 0;
+}
+.admin-root .sidebar-collapse-btn:hover { background: rgba(255,255,255,0.07); color: #fff; }
+/* Placa bege atrás da logo — a flor é linha preta, precisa de fundo claro
+ * para existir sobre a barra escura. */
+.admin-root .sidebar-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--sand);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  padding: 3px;
+}
+.admin-root .sidebar-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 .admin-root .sidebar-brand-text {
   display: flex;
@@ -166,7 +197,7 @@
   padding: 1px 6px;
   border-radius: 999px;
   background: rgba(255,255,255,0.08);
-  color: #c8c8d6;
+  color: var(--sidebar-fg);
 }
 .admin-root .sidebar-item .nav-badge.alert {
   background: var(--accent);
@@ -174,17 +205,23 @@
 }
 .admin-root .sidebar-footer {
   margin-top: auto;
-  padding: 12px;
+  padding: 8px;
   border-top: 1px solid var(--sidebar-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.admin-root .sidebar-user-row {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding: 6px 10px 2px;
 }
 .admin-root .sidebar-avatar {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #4a4a6a, #2a2a3a);
+  background: var(--pc-terracotta-cta);
   color: #fff;
   display: grid;
   place-items: center;
@@ -210,6 +247,35 @@
   border-radius: 4px;
 }
 .admin-root .sidebar-footer .ico-btn:hover { background: rgba(255,255,255,0.06); color: #fff; }
+
+/* === SIDEBAR COLAPSADA (desktop) === */
+.admin-root.sidebar-collapsed .sidebar-brand { justify-content: center; padding: 14px 8px; }
+.admin-root.sidebar-collapsed .sidebar-brand-text,
+.admin-root.sidebar-collapsed .sidebar-section-label,
+.admin-root.sidebar-collapsed .sidebar-item span,
+.admin-root.sidebar-collapsed .sidebar-item .nav-badge,
+.admin-root.sidebar-collapsed .sidebar-user,
+.admin-root.sidebar-collapsed .sidebar-collapse-btn { display: none; }
+.admin-root.sidebar-collapsed .sidebar-nav { padding: 4px 6px; }
+.admin-root.sidebar-collapsed .sidebar-item { justify-content: center; padding: 8px 0; }
+.admin-root.sidebar-collapsed .sidebar-item.active::before { left: -6px; }
+.admin-root.sidebar-collapsed .sidebar-user-row { justify-content: center; padding: 6px 0 2px; }
+.admin-root.sidebar-collapsed .sidebar-footer .ico-btn { display: none; }
+/* Ponto no ícone no lugar do badge numérico escondido */
+.admin-root.sidebar-collapsed .sidebar-item:has(.nav-badge.alert)::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* === BARRA MOBILE === */
+.admin-root .admin-mobile-bar { display: none; }
+.admin-root .sidebar-scrim { display: none; }
 
 /* === MAIN AREA === */
 .admin-root .main {
@@ -330,6 +396,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
+  min-width: 0;
 }
 .admin-root .card-header {
   display: flex;
@@ -344,9 +411,11 @@
 .admin-root .card-body.flush { padding: 0; }
 
 /* === KPI CARDS === */
+/* minmax(0, 1fr) e não 1fr: com 1fr a coluna tem min-width: auto e uma
+ * tabela larga empurra o card para fora do container em vez de rolar dentro. */
 .admin-root .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--gap);
 }
 .admin-root .kpi {
@@ -400,7 +469,7 @@
 .admin-root .kpi-spark { position: absolute; right: 12px; bottom: 10px; opacity: 0.65; }
 
 /* === TABLES === */
-.admin-root .table-wrap { overflow: auto; }
+.admin-root .table-wrap { overflow: auto; min-width: 0; }
 .admin-root table.tbl {
   width: 100%;
   border-collapse: collapse;
@@ -411,12 +480,12 @@
   text-align: left;
   font-weight: 500;
   font-size: 11px;
-  color: var(--text-3);
+  color: #6d5b4a;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
-  background: var(--surface-2);
+  background: var(--sand);
   white-space: nowrap;
 }
 .admin-root table.tbl th:first-child { padding-left: 16px; }
@@ -472,15 +541,15 @@
 .admin-root .badge.pendente { background: var(--yellow-soft); color: var(--yellow); }
 .admin-root .badge.producao { background: var(--blue-soft); color: var(--blue); }
 .admin-root .badge.enviado { background: var(--purple-soft); color: var(--purple); }
-.admin-root .badge.cancelado { background: #f0f0f0; color: #6a6a75; }
+.admin-root .badge.cancelado { background: #efe8de; color: #6d5b4a; }
 .admin-root .badge.esgotado { background: var(--red-soft); color: var(--red); }
 .admin-root .badge.baixo { background: var(--yellow-soft); color: var(--yellow); }
 .admin-root .badge.ok { background: var(--green-soft); color: var(--green); }
 .admin-root .badge.warn { background: var(--yellow-soft); color: var(--yellow); }
 .admin-root .badge.alert { background: var(--red-soft); color: var(--red); font-weight: 600; }
 .admin-root .badge.neutral { background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
-.admin-root .badge.varejo { background: #e9f1ff; color: #1d4ed8; }
-.admin-root .badge.atacado { background: #fff1e0; color: #b46415; }
+.admin-root .badge.varejo { background: var(--blue-soft); color: #00419e; }
+.admin-root .badge.atacado { background: #fff1e0; color: #8b5414; }
 
 /* === STOCK INDICATOR === */
 .admin-root .stock-num { font-variant-numeric: tabular-nums; font-weight: 500; }
@@ -539,7 +608,7 @@
   width: 28px;
   height: 16px;
   border-radius: 999px;
-  background: #d4d4d4;
+  background: #d4c5b3;
   display: inline-block;
   transition: background 120ms ease;
   flex-shrink: 0;
@@ -603,7 +672,7 @@
 /* === DASHBOARD === */
 .admin-root .dash-row {
   display: grid;
-  grid-template-columns: 1.6fr 1fr;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
   gap: var(--gap);
   margin-top: var(--gap);
 }
@@ -611,7 +680,7 @@
 /* === DRAWER === */
 .admin-root .drawer-backdrop {
   position: fixed; inset: 0;
-  background: rgba(20,20,30,0.32);
+  background: rgba(var(--pc-shadow-rgb), 0.34);
   z-index: 50;
   pointer-events: none;
   opacity: 0;
@@ -647,13 +716,13 @@
   display: flex;
   gap: 8px;
   justify-content: flex-end;
-  background: var(--surface-2);
+  background: var(--sand);
 }
 
 /* === MODAL === */
 .admin-root .modal-backdrop {
   position: fixed; inset: 0;
-  background: rgba(20,20,30,0.4);
+  background: rgba(var(--pc-shadow-rgb), 0.42);
   z-index: 60;
   display: grid;
   place-items: center;
@@ -684,7 +753,7 @@
   display: flex;
   gap: 8px;
   justify-content: flex-end;
-  background: var(--surface-2);
+  background: var(--sand);
 }
 
 /* === ACTIVITY LIST === */
@@ -750,7 +819,7 @@
   letter-spacing: 0.02em;
 }
 .admin-root .thumb.bag { background: linear-gradient(135deg, #d4b29a, #a87b5e); color: #fff; }
-.admin-root .thumb.cloth { background: linear-gradient(135deg, #c9b6c9, #8b6b8b); color: #fff; }
+.admin-root .thumb.cloth { background: linear-gradient(135deg, #c4b98f, #8a7f4a); color: #fff; }
 .admin-root .thumb.acc { background: linear-gradient(135deg, #d8c89a, #a08956); color: #fff; }
 .admin-root .thumb.mat { background: linear-gradient(135deg, #efe5dd, #c9b6a3); color: #6f5240; }
 
@@ -793,41 +862,48 @@
 .admin-root :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .admin-root .sidebar, .admin-root .topbar { user-select: none; }
 
-/* ── Kanban de produção ──────────────────────────────── */
-.kanban-board {
+/* ── Kanban de produção ───────────────────────────────
+ * Escopado sob .admin-root como o resto do arquivo. Antes estas regras eram
+ * globais e vazavam para a loja, e usavam variáveis (--bg-muted, --color-primary,
+ * --text-muted, --border-subtle) que não existiam — os fallbacks hardcoded
+ * traziam os cinzas frios e o indigo #6366f1 do Tailwind.
+ */
+.admin-root .kanban-board {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1rem;
   align-items: start;
   margin-top: 1rem;
 }
 
-.kanban-column {
-  background: var(--bg-surface, #fff);
-  border: 1px solid var(--border, #e5e7eb);
+.admin-root .kanban-column {
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
   overflow: hidden;
+  transition: background 0.15s, box-shadow 0.15s;
 }
 
-.kanban-column-header {
+.admin-root .kanban-column-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 0.75rem;
-  background: var(--bg-muted, #f9fafb);
-  border-bottom: 1px solid var(--border, #e5e7eb);
+  background: var(--sand);
+  border-bottom: 1px solid var(--border);
   font-weight: 600;
   font-size: 0.8125rem;
+  color: #6d5b4a;
 }
 
-.kanban-column-count {
-  background: var(--border, #e5e7eb);
+.admin-root .kanban-column-count {
+  background: rgba(var(--pc-shadow-rgb), 0.10);
   border-radius: 999px;
   padding: 0 0.375rem;
   font-size: 0.75rem;
 }
 
-.kanban-column-body {
+.admin-root .kanban-column-body {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -835,104 +911,128 @@
   min-height: 80px;
 }
 
-.kanban-empty {
-  color: var(--text-muted, #9ca3af);
+.admin-root .kanban-empty {
+  color: var(--text-3);
   font-size: 0.8125rem;
   text-align: center;
   padding: 1rem 0;
 }
 
-/* ── OP card ─────────────────────────────────────────── */
-.op-card {
-  background: var(--bg, #fff);
-  border: 1px solid var(--border, #e5e7eb);
+.admin-root .kanban-column--drop-target {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.admin-root .kanban-drop-placeholder {
+  border: 1.5px dashed var(--accent);
   border-radius: 0.375rem;
   padding: 0.625rem;
-  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--accent);
+  text-align: center;
+  background: var(--accent-soft);
+}
+
+/* ── OP card ─────────────────────────────────────────── */
+.admin-root .op-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  padding: 0.625rem;
+  cursor: grab;
   transition: border-color 0.15s, box-shadow 0.15s;
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
 }
 
-.op-card:hover,
-.op-card:focus {
-  border-color: var(--color-primary, #6366f1);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+.admin-root .op-card:hover,
+.admin-root .op-card:focus {
+  border-color: var(--accent);
+  box-shadow: 0 1px 4px rgba(var(--pc-shadow-rgb), 0.10);
   outline: none;
 }
 
-.op-card--missing { border-left: 3px solid #f59e0b; }
+.admin-root .op-card:active { cursor: grabbing; }
 
-.op-card-title {
+.admin-root .op-card--dragging {
+  opacity: 0.4;
+  border-style: dashed;
+}
+
+.admin-root .op-card--missing { border-left: 3px solid var(--yellow); border-radius: 0; }
+
+.admin-root .op-card-title {
   font-weight: 600;
   font-size: 0.8125rem;
   line-height: 1.3;
 }
 
-.op-card-meta {
-  color: var(--text-muted, #6b7280);
+.admin-root .op-card-meta {
+  color: var(--text-2);
   font-size: 0.75rem;
 }
 
-.op-card-categories {
+.admin-root .op-card-categories {
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem;
 }
 
-.op-cat-badge {
+.admin-root .op-cat-badge {
   font-size: 0.625rem;
   padding: 1px 5px;
   border-radius: 999px;
   font-weight: 500;
 }
 
-.op-cat-badge--done    { background: #d1fae5; color: #065f46; }
-.op-cat-badge--ok      { background: #e0f2fe; color: #0369a1; }
-.op-cat-badge--missing { background: #fef3c7; color: #92400e; }
+.admin-root .op-cat-badge--done    { background: var(--green-soft); color: var(--green); }
+.admin-root .op-cat-badge--ok      { background: var(--blue-soft);  color: #00419e; }
+.admin-root .op-cat-badge--missing { background: var(--yellow-soft); color: var(--yellow); }
 
-.op-card-advance {
+.admin-root .op-card-advance {
   align-self: flex-end;
   font-size: 0.6875rem;
   margin-top: 0.125rem;
 }
 
 /* ── OP checklist no modal ──────────────────────────── */
-.op-checklist {
+.admin-root .op-checklist {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--border, #e5e7eb);
+  border: 1px solid var(--border);
   border-radius: 0.375rem;
   overflow: hidden;
   margin-bottom: 0.75rem;
 }
 
-.op-checklist-header {
+.admin-root .op-checklist-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 0.75rem;
-  background: var(--bg-muted, #f9fafb);
+  background: var(--sand);
   font-weight: 600;
   font-size: 0.8125rem;
-  border-bottom: 1px solid var(--border, #e5e7eb);
+  border-bottom: 1px solid var(--border);
+  color: #6d5b4a;
 }
 
-.op-check-row {
+.admin-root .op-check-row {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 0.5rem;
   align-items: start;
   padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--border-subtle, #f3f4f6);
+  border-bottom: 1px solid var(--border);
 }
 
-.op-check-row:last-child { border-bottom: none; }
-.op-check-row--needs_laser   { background: #fffbeb; }
-.op-check-row--needs_purchase { background: #fff1f2; }
+.admin-root .op-check-row:last-child { border-bottom: none; }
+.admin-root .op-check-row--needs_laser    { background: var(--yellow-soft); }
+.admin-root .op-check-row--needs_purchase { background: var(--red-soft); }
 
-.op-check-label {
+.admin-root .op-check-label {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -941,9 +1041,9 @@
   grid-column: 1;
 }
 
-.op-check-category { font-weight: 500; }
+.admin-root .op-check-category { font-weight: 500; }
 
-.op-check-status {
+.admin-root .op-check-status {
   font-size: 0.75rem;
   font-weight: 500;
   grid-column: 2;
@@ -951,53 +1051,22 @@
   padding-top: 2px;
 }
 
-.op-check-status--ok             { color: #059669; }
-.op-check-status--needs_laser    { color: #d97706; }
-.op-check-status--needs_purchase { color: #dc2626; }
+.admin-root .op-check-status--ok             { color: var(--green); }
+.admin-root .op-check-status--needs_laser    { color: var(--yellow); }
+.admin-root .op-check-status--needs_purchase { color: var(--red); }
 
-.op-check-detail {
+.admin-root .op-check-detail {
   grid-column: 1 / -1;
   font-size: 0.75rem;
-  color: var(--text-muted, #6b7280);
+  color: var(--text-2);
   padding-left: 1.25rem;
 }
 
-.op-notes {
+.admin-root .op-notes {
   padding: 0.5rem 0.75rem;
-  background: var(--bg-muted, #f9fafb);
+  background: var(--surface-2);
   border-radius: 0.25rem;
   font-size: 0.875rem;
-}
-
-/* ── Drag & drop do kanban ──────────────────────────── */
-.op-card {
-  cursor: grab;
-}
-.op-card:active { cursor: grabbing; }
-
-.op-card--dragging {
-  opacity: 0.4;
-  border-style: dashed;
-}
-
-.kanban-column {
-  transition: background 0.15s, box-shadow 0.15s;
-}
-
-.kanban-column--drop-target {
-  background: var(--accent-soft, #fff4ec);
-  box-shadow: inset 0 0 0 2px var(--accent, #c2410c);
-}
-
-.kanban-drop-placeholder {
-  border: 1.5px dashed var(--accent, #c2410c);
-  border-radius: 0.375rem;
-  padding: 0.625rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--accent, #c2410c);
-  text-align: center;
-  background: rgba(194, 65, 12, 0.04);
 }
 
 /* ── Modal de confirmação (mover/iniciar OP) ─────────── */
@@ -1008,66 +1077,66 @@
   text-align: center;
 }
 
-.confirm-modal-icon {
+.admin-root .confirm-modal-icon {
   width: 48px;
   height: 48px;
   border-radius: 999px;
   display: grid;
   place-items: center;
   margin: 0 auto 12px;
-  background: var(--accent-soft, #fff4ec);
-  color: var(--accent, #c2410c);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
-.confirm-modal-title {
+.admin-root .confirm-modal-title {
   font-size: 15px;
   font-weight: 600;
   margin: 0 0 6px;
 }
 
-.confirm-modal-text {
+.admin-root .confirm-modal-text {
   font-size: 13px;
-  color: var(--text-2, #555);
+  color: var(--text-2);
   margin: 0 0 20px;
   line-height: 1.5;
 }
 
-.confirm-modal-actions {
+.admin-root .confirm-modal-actions {
   display: flex;
   gap: 8px;
   justify-content: center;
 }
 
-.confirm-modal-actions .btn {
+.admin-root .confirm-modal-actions .btn {
   min-width: 120px;
   justify-content: center;
 }
 
 /* ── Checklist de materiais no card ─────────────────── */
-.op-card-materials {
+.admin-root .op-card-materials {
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
-  border-top: 1px solid var(--border-subtle, #f3f4f6);
+  border-top: 1px solid var(--border);
   padding-top: 0.375rem;
   cursor: default;
 }
 
-.op-mat-group {
+.admin-root .op-mat-group {
   display: flex;
   flex-direction: column;
   gap: 0.125rem;
 }
 
-.op-mat-group-title {
+.admin-root .op-mat-group-title {
   font-size: 0.625rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-muted, #9ca3af);
+  color: var(--text-3);
 }
 
-.op-mat-row {
+.admin-root .op-mat-row {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
@@ -1076,52 +1145,182 @@
   cursor: pointer;
 }
 
-.op-mat-row input[type='checkbox'] {
+.admin-root .op-mat-row input[type='checkbox'] {
   width: 0.875rem;
   height: 0.875rem;
   cursor: pointer;
-  accent-color: var(--accent, #c2410c);
+  accent-color: var(--accent);
 }
 
-.op-mat-name { line-height: 1.25; }
+.admin-root .op-mat-name { line-height: 1.25; }
 
-.op-mat-state {
+.admin-root .op-mat-state {
   display: inline-block;
   margin-left: 5px;
   padding: 0 5px;
   border-radius: 999px;
-  background: var(--bg-muted, #f1f1f4);
-  color: var(--text-muted, #6b7280);
+  background: var(--surface-2);
+  color: var(--text-2);
   font-size: 0.625rem;
   font-weight: 600;
   vertical-align: middle;
 }
 
-.op-mat-name--done {
+.admin-root .op-mat-name--done {
   text-decoration: line-through;
-  color: var(--text-muted, #9ca3af);
+  color: var(--text-3);
 }
 
-.op-mat-avail {
+.admin-root .op-mat-avail {
   font-size: 0.6875rem;
   font-weight: 500;
   white-space: nowrap;
 }
-.op-mat-avail.ok  { color: #059669; }
-.op-mat-avail.low { color: #dc2626; }
+.admin-root .op-mat-avail.ok  { color: var(--green); }
+.admin-root .op-mat-avail.low { color: var(--red); }
 
 /* ── Agrupamento por categoria no checklist do modal ── */
-.op-check-group {
-  border-bottom: 1px solid var(--border-subtle, #f3f4f6);
+.admin-root .op-check-group {
+  border-bottom: 1px solid var(--border);
 }
-.op-check-group:last-child { border-bottom: none; }
+.admin-root .op-check-group:last-child { border-bottom: none; }
 
-.op-check-group-title {
+.admin-root .op-check-group-title {
   font-size: 0.6875rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-muted, #9ca3af);
+  color: var(--text-3);
   padding: 0.375rem 0.75rem 0.125rem;
-  background: var(--bg-muted, #f9fafb);
+  background: var(--surface-2);
+}
+
+/* ══════════════════════════════════════════════════════
+   RESPONSIVO
+   O painel não tinha nenhuma media query e travava em
+   min-width: 1280px — no celular o Henrique arrastava a
+   página lateralmente sobre um layout de desktop.
+   ══════════════════════════════════════════════════════ */
+
+/* Telas médias: densidade menor antes de perder a sidebar */
+@media (max-width: 1280px) {
+  .admin-root .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-root .dash-row { grid-template-columns: minmax(0, 1fr); }
+  .admin-root .kanban-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Sidebar vira gaveta */
+@media (max-width: 900px) {
+  .admin-root,
+  .admin-root.sidebar-collapsed { grid-template-columns: 1fr; }
+
+  .admin-root .admin-mobile-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--sidebar-bg);
+    color: #fff;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+  }
+  .admin-root .admin-mobile-bar .sidebar-logo { width: 28px; height: 28px; border-radius: 7px; }
+  .admin-root .admin-mobile-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+  }
+  .admin-root .admin-mobile-menu-btn {
+    background: transparent;
+    border: none;
+    color: var(--sidebar-fg);
+    padding: 6px;
+    border-radius: 6px;
+    display: grid;
+    place-items: center;
+  }
+  .admin-root .admin-mobile-menu-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+
+  .admin-root .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 60;
+    width: 264px;
+    transform: translateX(-100%);
+    transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1);
+    border-right: 1px solid var(--sidebar-border);
+  }
+  .admin-root .sidebar.mobile-open { transform: translateX(0); }
+
+  /* Colapsada é conceito de desktop — na gaveta sempre expandida */
+  .admin-root.sidebar-collapsed .sidebar-brand-text,
+  .admin-root.sidebar-collapsed .sidebar-section-label,
+  .admin-root.sidebar-collapsed .sidebar-item span,
+  .admin-root.sidebar-collapsed .sidebar-item .nav-badge,
+  .admin-root.sidebar-collapsed .sidebar-user,
+  .admin-root.sidebar-collapsed .sidebar-footer .ico-btn { display: initial; }
+  .admin-root.sidebar-collapsed .sidebar-item { justify-content: flex-start; padding: 7px 10px; }
+  .admin-root.sidebar-collapsed .sidebar-user-row { justify-content: flex-start; padding: 6px 10px 2px; }
+  .admin-root.sidebar-collapsed .sidebar-brand { justify-content: flex-start; padding: 14px 12px; }
+  .admin-root .sidebar-collapse-btn { display: none; }
+
+  .admin-root .sidebar-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(var(--pc-shadow-rgb), 0.42);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms ease;
+  }
+  .admin-root .sidebar-scrim.open { opacity: 1; pointer-events: auto; }
+
+  .admin-root .page { padding: 16px 16px 32px; }
+  .admin-root .page-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .admin-root .page-actions { width: 100%; flex-wrap: wrap; }
+  .admin-root .topbar { padding: 12px 16px; }
+  .admin-root .search-input { width: 100%; }
+  .admin-root .kanban-board { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Celular */
+@media (max-width: 640px) {
+  .admin-root { --base-size: 14px; --row-h: 40px; --gap: 12px; }
+
+  .admin-root .kpi-grid { grid-template-columns: minmax(0, 1fr); }
+  .admin-root .page { padding: 14px 12px 32px; }
+  .admin-root .page-title { font-size: 20px; }
+
+  /* Tabelas: rolagem contida no card, nunca na página */
+  .admin-root .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .admin-root table.tbl { min-width: 560px; }
+
+  .admin-root .drawer { width: 100%; }
+  .admin-root .modal-backdrop { padding: 12px; place-items: end center; }
+  .admin-root .modal { width: 100%; max-height: 92vh; overflow-y: auto; }
+  .admin-root .modal-footer,
+  .admin-root .drawer-footer { flex-wrap: wrap; }
+  .admin-root .modal-footer .btn,
+  .admin-root .drawer-footer .btn { flex: 1; justify-content: center; }
+
+  /* Alvos de toque: 30px de input não dá no dedo */
+  .admin-root .input, .admin-root .select { height: 38px; font-size: 14px; }
+  .admin-root .btn { padding: 8px 14px; font-size: 13.5px; }
+  .admin-root .btn.sm { padding: 5px 10px; font-size: 12.5px; }
+  .admin-root .icon-btn { width: 34px; height: 34px; }
+
+  .admin-root .tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .admin-root .tab { white-space: nowrap; }
+
+  .admin-root .confirm-modal-actions { flex-direction: column; }
+  .admin-root .confirm-modal-actions .btn { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-root .sidebar,
+  .admin-root .sidebar-scrim,
+  .admin-root .drawer { transition: none; }
 }

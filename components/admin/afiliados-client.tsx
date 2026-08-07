@@ -146,22 +146,22 @@ export function AfiliadosClient({ initialData }: AfiliadosClientProps) {
 
       <div className="kpi-grid">
         <div className="kpi">
-          <div className="kpi-label"><span className="dot" style={{ background: '#c97d60' }} />Afiliadas ativas</div>
+          <div className="kpi-label"><span className="dot" style={{ background: 'var(--accent)' }} />Afiliadas ativas</div>
           <div className="kpi-value">{afiliadas.length}</div>
           <div className="kpi-trend"><span className="subtle">total cadastradas</span></div>
         </div>
         <div className="kpi">
-          <div className="kpi-label"><span className="dot" style={{ background: '#7c3aed' }} />Vendas no mês</div>
+          <div className="kpi-label"><span className="dot" style={{ background: 'var(--purple)' }} />Vendas no mês</div>
           <div className="kpi-value">{totalSalesMonth}</div>
           <div className="kpi-trend"><span className="subtle">via cupons de afiliadas</span></div>
         </div>
         <div className="kpi">
-          <div className="kpi-label"><span className="dot" style={{ background: '#2563eb' }} />Receita gerada</div>
+          <div className="kpi-label"><span className="dot" style={{ background: 'var(--blue)' }} />Receita gerada</div>
           <div className="kpi-value"><span className="unit">R$</span>{totalRevenueMonth.toLocaleString('pt-BR')}</div>
           <div className="kpi-trend"><span className="subtle">este mês</span></div>
         </div>
         <div className="kpi">
-          <div className="kpi-label"><span className="dot" style={{ background: '#d97706' }} />A pagar</div>
+          <div className="kpi-label"><span className="dot" style={{ background: 'var(--yellow)' }} />A pagar</div>
           <div className="kpi-value"><span className="unit">R$</span>{totalPending.toLocaleString('pt-BR')}</div>
           <div className="kpi-trend"><span className="subtle">{pendingCount} afiliadas pendentes</span></div>
         </div>
@@ -269,8 +269,8 @@ export function AfiliadosClient({ initialData }: AfiliadosClientProps) {
                           data-testid={`btn-toggle-paid-${a.id}`}
                           disabled={isPending}
                           style={{
-                            background: a.paidMonth ? '#dcfce7' : '#fef3c7',
-                            color: a.paidMonth ? '#15803d' : '#92400e',
+                            background: a.paidMonth ? 'var(--green-soft)' : 'var(--yellow-soft)',
+                            color: a.paidMonth ? 'var(--green)' : 'var(--yellow)',
                             border: 'none', padding: '3px 10px 3px 8px', borderRadius: 20, fontSize: 11.5,
                             fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
                           }}
@@ -319,7 +319,7 @@ export function AfiliadosClient({ initialData }: AfiliadosClientProps) {
                                       <td className="num" style={{ fontWeight: 500 }}>{fmt(h.commission)}</td>
                                       <td>
                                         <span style={{
-                                          background: h.paid ? '#dcfce7' : '#fef3c7', color: h.paid ? '#15803d' : '#92400e',
+                                          background: h.paid ? 'var(--green-soft)' : 'var(--yellow-soft)', color: h.paid ? 'var(--green)' : 'var(--yellow)',
                                           padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 500,
                                         }}>
                                           {h.paid ? 'Pago' : 'Pendente'}
@@ -417,10 +417,10 @@ export function AfiliadosClient({ initialData }: AfiliadosClientProps) {
             </div>
             <div className="drawer-footer" style={{ flexDirection: 'column', gap: 10, alignItems: 'stretch' }}>
               {editing && inviteState === 'error' && inviteError && (
-                <p style={{ fontSize: 12, color: '#dc2626', margin: 0 }}>Erro ao enviar convite: {inviteError}</p>
+                <p style={{ fontSize: 12, color: 'var(--red)', margin: 0 }}>Erro ao enviar convite: {inviteError}</p>
               )}
               {editing && inviteState === 'sent' && (
-                <p style={{ fontSize: 12, color: '#16a34a', margin: 0 }}>Convite enviado para {form.email}</p>
+                <p style={{ fontSize: 12, color: 'var(--green)', margin: 0 }}>Convite enviado para {form.email}</p>
               )}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn ghost" onClick={closeDrawer}>Fechar</button>

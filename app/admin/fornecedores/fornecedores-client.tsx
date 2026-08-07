@@ -26,7 +26,7 @@ function Stars({ rating }: { rating: number }) {
           width="11"
           height="11"
           viewBox="0 0 12 12"
-          fill={i <= rating ? '#f59e0b' : 'var(--border-strong)'}
+          fill={i <= rating ? 'var(--yellow)' : 'var(--border-strong)'}
         >
           <path d="M6 1l1.4 2.8 3.1.45-2.25 2.2.53 3.1L6 8l-2.78 1.55.53-3.1L1.5 4.25l3.1-.45z" />
         </svg>
@@ -55,7 +55,7 @@ function StarPicker({
             width="16"
             height="16"
             viewBox="0 0 12 12"
-            fill={i <= value ? '#f59e0b' : 'var(--border-strong)'}
+            fill={i <= value ? 'var(--yellow)' : 'var(--border-strong)'}
           >
             <path d="M6 1l1.4 2.8 3.1.45-2.25 2.2.53 3.1L6 8l-2.78 1.55.53-3.1L1.5 4.25l3.1-.45z" />
           </svg>

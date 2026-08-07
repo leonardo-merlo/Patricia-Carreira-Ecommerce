@@ -63,28 +63,28 @@ export function RelatoriosClient({ data, period }: RelatoriosClientProps) {
       value: formatPrice(kpis.revenue),
       raw: null,
       delta: fmtDelta(kpis.revenue_delta_pct, prevLabel),
-      dot: '#c97d60',
+      dot: 'var(--accent)',
     },
     {
       label: 'Ticket médio',
       value: formatPrice(kpis.avg_ticket),
       raw: null,
       delta: fmtDelta(kpis.avg_ticket_delta_pct, prevLabel),
-      dot: '#2563eb',
+      dot: 'var(--blue)',
     },
     {
       label: 'Pedidos pagos',
       value: String(kpis.order_count),
       raw: null,
       delta: fmtDelta(kpis.order_count_delta_pct, prevLabel),
-      dot: '#7c3aed',
+      dot: 'var(--purple)',
     },
     {
       label: 'Clientes ativos',
       value: String(client_stats.retail_unique + client_stats.wholesale_active),
       raw: null,
       delta: null,
-      dot: '#16a34a',
+      dot: 'var(--green)',
     },
   ]
 
@@ -146,7 +146,7 @@ export function RelatoriosClient({ data, period }: RelatoriosClientProps) {
             </div>
             <div className="row" style={{ gap: 12, fontSize: 11.5, color: 'var(--text-2)' }}>
               <span className="row" style={{ gap: 4 }}>
-                <span style={{ width: 10, height: 10, background: '#c97d60', borderRadius: 2 }} /> Receita
+                <span style={{ width: 10, height: 10, background: 'var(--accent)', borderRadius: 2 }} /> Receita
               </span>
             </div>
           </div>
@@ -295,8 +295,8 @@ export function RelatoriosClient({ data, period }: RelatoriosClientProps) {
           <div className="card-header"><h3 className="ttl">Canais de venda</h3></div>
           <div className="card-body" style={{ display: 'grid', gap: 14 }}>
             {[
-              { label: 'E-commerce (Varejo)', val: channels.retail, pct: retailPct, color: '#c97d60' },
-              { label: 'Atacado (Manual)', val: channels.wholesale, pct: wholesalePct, color: '#7c3aed' },
+              { label: 'E-commerce (Varejo)', val: channels.retail, pct: retailPct, color: 'var(--accent)' },
+              { label: 'Atacado (Manual)', val: channels.wholesale, pct: wholesalePct, color: 'var(--purple)' },
             ].map((c, i) => (
               <div key={i}>
                 <div className="row between" style={{ marginBottom: 6 }}>

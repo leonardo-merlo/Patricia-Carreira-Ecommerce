@@ -1,12 +1,17 @@
 "use client"
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { AdminIcon } from './admin-icon'
 
 interface AdminSidebarProps {
   openOrders: number
   lowStock: number
+  mobileOpen: boolean
+  collapsed: boolean
+  onToggleCollapsed: () => void
+  onNavigate: () => void
 }
 
 const secondaryNav = [
@@ -16,10 +21,16 @@ const secondaryNav = [
   { href: '/admin/cupons', label: 'Cupons', icon: 'creditCard' as const },
   { href: '/admin/clientes', label: 'Clientes', icon: 'users' as const },
   { href: '/admin/fornecedores', label: 'Fornecedores', icon: 'truck' as const },
-  { href: '/admin/config', label: 'Configurações', icon: 'settings' as const },
 ]
 
-export function AdminSidebar({ openOrders, lowStock }: AdminSidebarProps) {
+export function AdminSidebar({
+  openOrders,
+  lowStock,
+  mobileOpen,
+  collapsed,
+  onToggleCollapsed,
+  onNavigate,
+}: AdminSidebarProps) {
   const pathname = usePathname()
 
   const isActive = (href: string) => {
@@ -36,13 +47,33 @@ export function AdminSidebar({ openOrders, lowStock }: AdminSidebarProps) {
   ]
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`} id="admin-sidebar">
       <div className="sidebar-brand">
-        <div className="sidebar-logo">PC</div>
-        <div className="sidebar-brand-text">
+        <span className="sidebar-logo">
+          <Image
+            src="/images/logo/logo-v2.png"
+            alt=""
+            width={32}
+            height={32}
+            aria-hidden="true"
+          />
+        </span>
+        <span className="sidebar-brand-text">
           <span className="sidebar-brand-name">Patrícia Carreira</span>
           <span className="sidebar-brand-sub">Painel administrativo</span>
-        </div>
+        </span>
+        <button
+          className="sidebar-collapse-btn"
+          onClick={onToggleCollapsed}
+          title={collapsed ? 'Expandir menu' : 'Recolher menu'}
+          aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
+          aria-expanded={!collapsed}
+          aria-controls="admin-sidebar"
+          id="btn-sidebar-collapse"
+          data-testid="btn-sidebar-collapse"
+        >
+          <AdminIcon name={collapsed ? 'chevRight' : 'chevLeft'} size={14} />
+        </button>
       </div>
 
       <div className="sidebar-section-label">Operação</div>
@@ -51,7 +82,9 @@ export function AdminSidebar({ openOrders, lowStock }: AdminSidebarProps) {
           <Link
             key={item.href}
             href={item.href}
+            onClick={onNavigate}
             className={`sidebar-item ${isActive(item.href) ? 'active' : ''}`}
+            title={collapsed ? item.label : undefined}
             id={`sidebar-nav-${item.href.replace('/admin/', '').replace('/admin', 'dashboard')}`}
           >
             <AdminIcon name={item.icon} />
@@ -71,7 +104,9 @@ export function AdminSidebar({ openOrders, lowStock }: AdminSidebarProps) {
           <Link
             key={item.href}
             href={item.href}
+            onClick={onNavigate}
             className={`sidebar-item ${isActive(item.href) ? 'active' : ''}`}
+            title={collapsed ? item.label : undefined}
             id={`sidebar-nav-${item.href.replace('/admin/', '')}`}
           >
             <AdminIcon name={item.icon} />
@@ -81,14 +116,27 @@ export function AdminSidebar({ openOrders, lowStock }: AdminSidebarProps) {
       </nav>
 
       <div className="sidebar-footer">
-        <div className="sidebar-avatar">HC</div>
-        <div className="sidebar-user">
-          <span className="name">Henrique Carreira</span>
-          <span className="role">Proprietário</span>
+        <Link
+          href="/admin/config"
+          onClick={onNavigate}
+          className={`sidebar-item ${isActive('/admin/config') ? 'active' : ''}`}
+          title={collapsed ? 'Configurações' : undefined}
+          id="sidebar-nav-config"
+        >
+          <AdminIcon name="settings" />
+          <span>Configurações</span>
+        </Link>
+
+        <div className="sidebar-user-row">
+          <div className="sidebar-avatar">HC</div>
+          <div className="sidebar-user">
+            <span className="name">Henrique Carreira</span>
+            <span className="role">Proprietário</span>
+          </div>
+          <button className="ico-btn" title="Sair" aria-label="Sair" id="btn-logout">
+            <AdminIcon name="logout" size={14} />
+          </button>
         </div>
-        <button className="ico-btn" title="Sair" id="btn-logout">
-          <AdminIcon name="logout" size={14} />
-        </button>
       </div>
     </aside>
   )

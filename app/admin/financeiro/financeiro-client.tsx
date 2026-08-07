@@ -602,7 +602,7 @@ export function FinanceiroClient({
         <div className="drawer-body">
           <div style={{ display: 'grid', gap: 12 }}>
             {formError && (
-              <div style={{ background: '#fee2e2', color: '#dc2626', padding: '8px 12px', borderRadius: 6, fontSize: 13 }}>
+              <div style={{ background: 'var(--red-soft)', color: 'var(--red)', padding: '8px 12px', borderRadius: 6, fontSize: 13 }}>
                 {formError}
               </div>
             )}
@@ -783,7 +783,7 @@ export function FinanceiroClient({
               <button
                 id="btn-confirmar-exclusao-conta"
                 className="btn"
-                style={{ background: '#dc2626', color: '#fff', borderColor: '#dc2626' }}
+                style={{ background: 'var(--red)', color: '#fff', borderColor: 'var(--red)' }}
                 onClick={handleDelete}
                 disabled={isPending}
               >

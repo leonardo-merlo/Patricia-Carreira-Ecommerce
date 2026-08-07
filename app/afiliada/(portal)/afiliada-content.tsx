@@ -339,7 +339,7 @@ export function AfiliadaContent({ name, commissionPct, paymentDay, couponCode, o
                           <div className="tl-left">
                             <div
                               className={`tl-dot ${!item.dotYellow && i > 0 ? 'gray' : ''}`}
-                              style={item.dotYellow ? { background: '#fac775' } : undefined}
+                              style={item.dotYellow ? { background: 'var(--pc-gold-soft)' } : undefined}
                             />
                             <div className="tl-line" />
                           </div>

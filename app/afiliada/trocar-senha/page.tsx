@@ -9,8 +9,8 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 8,
   border: '1.5px solid #e2d4c4',
   fontSize: 14,
-  color: '#1a1208',
-  background: '#fdfaf7',
+  color: 'var(--pc-ink)',
+  background: 'var(--pc-parchment)',
   outline: 'none',
   transition: 'border-color 0.15s',
   width: '100%',
@@ -53,12 +53,12 @@ export default function TrocarSenhaPage() {
 
   const wrapper: React.CSSProperties = {
     minHeight: '100vh',
-    background: '#f5ede0',
+    background: 'var(--pc-sand)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     padding: '24px 16px',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
+    fontFamily: 'var(--font-be-vietnam), system-ui, -apple-system, sans-serif',
   }
 
   const card: React.CSSProperties = {
@@ -72,7 +72,7 @@ export default function TrocarSenhaPage() {
 
   const header = (
     <div style={{ textAlign: 'center', marginBottom: 32 }}>
-      <h1 style={{ fontSize: 22, fontWeight: 700, color: '#1a1208', margin: 0, letterSpacing: '-0.3px' }}>
+      <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--pc-ink)', margin: 0, letterSpacing: '-0.3px' }}>
         Patrícia Carreira
       </h1>
     </div>
@@ -86,14 +86,14 @@ export default function TrocarSenhaPage() {
           <div style={{ textAlign: 'center' }}>
             <div style={{
               width: 48, height: 48, borderRadius: '50%',
-              background: '#f0f7ee', display: 'flex',
+              background: 'var(--pc-olive-soft)', display: 'flex',
               alignItems: 'center', justifyContent: 'center',
               margin: '0 auto 16px', fontSize: 22,
             }}>✓</div>
-            <p style={{ fontSize: 14, fontWeight: 600, color: '#1a1208', margin: '0 0 8px' }}>
+            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--pc-ink)', margin: '0 0 8px' }}>
               Senha atualizada!
             </p>
-            <p style={{ fontSize: 13, color: '#8a7560', margin: 0 }}>
+            <p style={{ fontSize: 13, color: 'var(--pc-brown-mute)', margin: 0 }}>
               Redirecionando para o painel…
             </p>
           </div>
@@ -108,12 +108,12 @@ export default function TrocarSenhaPage() {
         <div style={card}>
           {header}
           <div style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: 13, color: '#8a7560', margin: '0 0 16px' }}>
+            <p style={{ fontSize: 13, color: 'var(--pc-brown-mute)', margin: '0 0 16px' }}>
               Verificando o link de recuperação…
             </p>
-            <p style={{ fontSize: 12, color: '#b09e8a', margin: 0 }}>
+            <p style={{ fontSize: 12, color: 'var(--pc-brown-mute)', margin: 0 }}>
               Chegou aqui por engano?{' '}
-              <a href="/afiliada/entrar" style={{ color: '#5c4a32' }}>Voltar ao login</a>
+              <a href="/afiliada/entrar" style={{ color: 'var(--pc-brown)' }}>Voltar ao login</a>
             </p>
           </div>
         </div>
@@ -125,13 +125,13 @@ export default function TrocarSenhaPage() {
     <div style={wrapper}>
       <div style={card}>
         {header}
-        <p style={{ fontSize: 13, color: '#5c4a32', margin: '0 0 24px', lineHeight: 1.6 }}>
+        <p style={{ fontSize: 13, color: 'var(--pc-brown)', margin: '0 0 24px', lineHeight: 1.6 }}>
           Defina sua nova senha de acesso ao painel de afiliada.
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label htmlFor="password" style={{ fontSize: 12, fontWeight: 600, color: '#5c4a32', letterSpacing: '0.3px' }}>
+            <label htmlFor="password" style={{ fontSize: 12, fontWeight: 600, color: 'var(--pc-brown)', letterSpacing: '0.3px' }}>
               NOVA SENHA
             </label>
             <input
@@ -142,13 +142,13 @@ export default function TrocarSenhaPage() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               style={inputStyle}
-              onFocus={e => { e.currentTarget.style.borderColor = '#c4a882' }}
+              onFocus={e => { e.currentTarget.style.borderColor = 'var(--pc-clay)' }}
               onBlur={e => { e.currentTarget.style.borderColor = '#e2d4c4' }}
             />
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label htmlFor="confirm" style={{ fontSize: 12, fontWeight: 600, color: '#5c4a32', letterSpacing: '0.3px' }}>
+            <label htmlFor="confirm" style={{ fontSize: 12, fontWeight: 600, color: 'var(--pc-brown)', letterSpacing: '0.3px' }}>
               CONFIRMAR SENHA
             </label>
             <input
@@ -158,15 +158,15 @@ export default function TrocarSenhaPage() {
               value={confirm}
               onChange={e => setConfirm(e.target.value)}
               style={inputStyle}
-              onFocus={e => { e.currentTarget.style.borderColor = '#c4a882' }}
+              onFocus={e => { e.currentTarget.style.borderColor = 'var(--pc-clay)' }}
               onBlur={e => { e.currentTarget.style.borderColor = '#e2d4c4' }}
             />
           </div>
 
           {error && (
             <p style={{
-              fontSize: 13, color: '#c0392b', margin: 0,
-              padding: '10px 14px', background: '#fff0ee',
+              fontSize: 13, color: 'var(--pc-red)', margin: 0,
+              padding: '10px 14px', background: 'var(--pc-red-soft)',
               borderRadius: 8, border: '1px solid #f5c6c2',
             }}>
               {error}
@@ -180,7 +180,7 @@ export default function TrocarSenhaPage() {
               marginTop: 4,
               padding: '12px 24px',
               borderRadius: 8,
-              background: '#1a1208',
+              background: 'var(--pc-terracotta)',
               color: '#ffffff',
               fontSize: 14,
               fontWeight: 600,

@@ -1,6 +1,15 @@
-import { AdminSidebar } from '@/components/admin/admin-sidebar'
+import { Inter } from 'next/font/google'
+import { AdminShell } from '@/components/admin/admin-shell'
 import { getSidebarCounts } from '@/lib/supabase/admin-queries'
 import './admin.css'
+
+// Inter era carregada por @import de CDN dentro do CSS — bloqueava o render
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-inter',
+  display: 'swap',
+})
 
 export const metadata = {
   title: 'Painel Admin — Patrícia Carreira',
@@ -10,11 +19,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const counts = await getSidebarCounts()
 
   return (
-    <div className="admin-root">
-      <AdminSidebar openOrders={counts.open_orders} lowStock={counts.low_stock} />
-      <div className="main">
-        {children}
-      </div>
-    </div>
+    <AdminShell
+      openOrders={counts.open_orders}
+      lowStock={counts.low_stock}
+      fontClassName={inter.variable}
+    >
+      {children}
+    </AdminShell>
   )
 }

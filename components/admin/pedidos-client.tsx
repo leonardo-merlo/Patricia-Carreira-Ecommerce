@@ -319,7 +319,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                           <td>{o.date}</td>
                           <td>
                             <div className="row" style={{ gap: 8 }}>
-                              <div className="thumb" style={{ width: 22, height: 22, fontSize: 9, background: 'linear-gradient(135deg,#c9b6c9,#8b6b8b)', color: '#fff' }}>{initials}</div>
+                              <div className="thumb" style={{ width: 22, height: 22, fontSize: 9, background: 'linear-gradient(135deg,#c4b98f,#8a7f4a)', color: '#fff' }}>{initials}</div>
                               <div>
                                 <div style={{ fontWeight: 500 }}>{o.customer_name}</div>
                                 <div className="cust-meta">{o.customer_location}</div>
@@ -419,7 +419,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                                       </button>
                                     )}
                                     {nfeError[o.id] && (
-                                      <div style={{ fontSize: 11, color: 'var(--error, #e53e3e)', marginTop: 4 }}>{nfeError[o.id]}</div>
+                                      <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>{nfeError[o.id]}</div>
                                     )}
                                   </div>
                                   {o.melhor_envio_order_id && (
@@ -464,7 +464,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                                         Imprimir Etiqueta
                                       </button>
                                       {labelError[o.id] && (
-                                        <div style={{ fontSize: 11, color: 'var(--error, #e53e3e)' }}>{labelError[o.id]}</div>
+                                        <div style={{ fontSize: 11, color: 'var(--red)' }}>{labelError[o.id]}</div>
                                       )}
                                     </div>
                                   )}

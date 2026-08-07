@@ -67,12 +67,12 @@ function isExpired(coupon: Coupon): boolean {
 }
 
 function statusLabel(coupon: Coupon): { label: string; style: React.CSSProperties } {
-  if (!coupon.is_active) return { label: 'Inativo', style: { background: '#f1f5f9', color: '#64748b' } }
-  if (isExpired(coupon)) return { label: 'Expirado', style: { background: '#fee2e2', color: '#dc2626' } }
+  if (!coupon.is_active) return { label: 'Inativo', style: { background: 'var(--surface-2)', color: 'var(--text-2)' } }
+  if (isExpired(coupon)) return { label: 'Expirado', style: { background: 'var(--red-soft)', color: 'var(--red)' } }
   if (coupon.max_uses !== null && coupon.uses_count >= coupon.max_uses) {
-    return { label: 'Esgotado', style: { background: '#fef3c7', color: '#92400e' } }
+    return { label: 'Esgotado', style: { background: 'var(--yellow-soft)', color: 'var(--yellow)' } }
   }
-  return { label: 'Ativo', style: { background: '#dcfce7', color: '#15803d' } }
+  return { label: 'Ativo', style: { background: 'var(--green-soft)', color: 'var(--green)' } }
 }
 
 export function CuponsClient({ initialCoupons }: Props) {
@@ -196,22 +196,22 @@ export function CuponsClient({ initialCoupons }: Props) {
 
       <div className="kpi-grid">
         <div className="kpi">
-          <div className="kpi-label"><span className="dot" style={{ background: '#c97d60' }} />Total de cupons</div>
+          <div className="kpi-label"><span className="dot" style={{ background: 'var(--accent)' }} />Total de cupons</div>
           <div className="kpi-value">{coupons.length}</div>
           <div className="kpi-trend"><span className="subtle">cadastrados</span></div>
         </div>
         <div className="kpi">
-          <div className="kpi-label"><span className="dot" style={{ background: '#15803d' }} />Cupons ativos</div>
+          <div className="kpi-label"><span className="dot" style={{ background: 'var(--green)' }} />Cupons ativos</div>
           <div className="kpi-value">{activeCount}</div>
           <div className="kpi-trend"><span className="subtle">válidos agora</span></div>
         </div>
         <div className="kpi">
-          <div className="kpi-label"><span className="dot" style={{ background: '#2563eb' }} />Total de usos</div>
+          <div className="kpi-label"><span className="dot" style={{ background: 'var(--blue)' }} />Total de usos</div>
           <div className="kpi-value">{totalUses}</div>
           <div className="kpi-trend"><span className="subtle">desde a criação</span></div>
         </div>
         <div className="kpi">
-          <div className="kpi-label"><span className="dot" style={{ background: '#dc2626' }} />Expirados</div>
+          <div className="kpi-label"><span className="dot" style={{ background: 'var(--red)' }} />Expirados</div>
           <div className="kpi-value">{coupons.filter(isExpired).length}</div>
           <div className="kpi-trend"><span className="subtle">prazo vencido</span></div>
         </div>
@@ -496,8 +496,8 @@ export function CuponsClient({ initialCoupons }: Props) {
 
             {formError && (
               <div style={{
-                background: '#fee2e2',
-                color: '#dc2626',
+                background: 'var(--red-soft)',
+                color: 'var(--red)',
                 padding: '8px 12px',
                 borderRadius: 6,
                 fontSize: 13,
@@ -551,7 +551,7 @@ export function CuponsClient({ initialCoupons }: Props) {
               <button className="btn ghost" onClick={() => setDeleteConfirm(null)}>Cancelar</button>
               <button
                 className="btn"
-                style={{ background: '#dc2626', color: '#fff', borderColor: '#dc2626' }}
+                style={{ background: 'var(--red)', color: '#fff', borderColor: 'var(--red)' }}
                 onClick={() => handleDelete(deleteConfirm)}
                 disabled={isPending}
                 data-testid="btn-confirmar-exclusao"

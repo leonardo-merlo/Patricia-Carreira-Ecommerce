@@ -1,0 +1,48 @@
+/* Patrícia Carreira — tokens de marca
+ *
+ * Fonte única dos valores que a loja já usa. O admin (.admin-root) e o portal
+ * da afiliada (.afiliada-portal) mapeiam estes tokens para os nomes locais
+ * deles — os escopos continuam isolados, só os valores são compartilhados.
+ *
+ * Só declara custom properties. Não aplica estilo nenhum, então importar em
+ * qualquer lugar é inócuo.
+ */
+
+:root {
+  /* Tintas — do mais escuro ao mais claro */
+  --pc-ink:            #1e1b13;  /* preto quente: texto principal */
+  --pc-ink-deep:       #3d1f0e;  /* marrom escuro do hero da loja */
+  --pc-charcoal:       #2a1a12;  /* carvão amarronzado: fundo escuro */
+  --pc-charcoal-lift:  #3d2a1e;  /* borda/divisor sobre o carvão */
+
+  /* Terracota — a cor da marca */
+  --pc-terracotta:      #823b18;  /* primária da loja */
+  --pc-terracotta-cta:  #7a3a22;  /* botões do carrossel */
+  --pc-terracotta-deep: #5f2c17;  /* hover dos botões */
+  --pc-clay:            #c97d60;  /* terracota clara: acento do admin */
+  --pc-clay-hover:      #b86d50;
+  --pc-clay-soft:       #f6ebe5;
+  --pc-clay-soft-2:     #ecd5cb;
+
+  /* Neutros quentes */
+  --pc-brown:      #8b5e3c;
+  --pc-brown-mute: #7d6f64;
+  --pc-sand:       #f5ede0;  /* bege das seções da loja */
+  --pc-cream:      #fff8ef;  /* fundo da loja */
+  --pc-parchment:  #fdf9f2;  /* creme suave, para telas densas */
+
+  /* Acentos de apoio */
+  --pc-olive:      #6b6b2a;  /* verde da faixa de anúncio */
+  --pc-olive-soft: #eef0dd;
+  --pc-gold:       #6b4900;  /* dourado envelhecido (terciária) */
+  --pc-gold-soft:  #ffdead;
+  --pc-amber:      #b88516;
+  --pc-amber-soft: #fbf2dc;
+  --pc-cobalt:     #2559bd;  /* secundária editorial */
+  --pc-cobalt-soft:#dae2ff;
+  --pc-red:        #ba1a1a;
+  --pc-red-soft:   #ffdad6;
+
+  /* Sombra: preto-marrom, nunca preto-azul */
+  --pc-shadow-rgb: 61, 31, 14;
+}

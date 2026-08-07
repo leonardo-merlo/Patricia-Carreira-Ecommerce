@@ -33,7 +33,7 @@ const sparkPaths = [
   'M2 14 L14 16 L26 12 L38 14 L50 12 L62 16 L78 14',
 ]
 
-const kpiColors = ['#16a34a', '#c97d60', '#b88516', '#2563eb']
+const kpiColors = ['var(--green)', 'var(--accent)', 'var(--yellow)', 'var(--blue)']
 
 function getGreeting(): string {
   const h = new Date().getHours()
@@ -178,7 +178,7 @@ export default async function AdminDashboard() {
                               width: 22, height: 22, fontSize: 9,
                               background: isAtacado
                                 ? 'linear-gradient(135deg,#d8c89a,#a08956)'
-                                : 'linear-gradient(135deg,#c9b6c9,#8b6b8b)',
+                                : 'linear-gradient(135deg,#c4b98f,#8a7f4a)',
                               color: '#fff',
                             }}>
                               {initials}

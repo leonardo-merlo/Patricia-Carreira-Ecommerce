@@ -1,18 +1,22 @@
 "use client"
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 type Mode = 'login' | 'forgot' | 'sent'
 
+const FOCUS_BORDER = 'var(--pc-clay)'
+const IDLE_BORDER = '#e2d4c4'
+
 const inputStyle: React.CSSProperties = {
-  padding: '10px 14px',
+  padding: '11px 14px',
   borderRadius: 8,
-  border: '1.5px solid #e2d4c4',
-  fontSize: 14,
-  color: '#1a1208',
-  background: '#fdfaf7',
+  border: `1.5px solid ${IDLE_BORDER}`,
+  fontSize: 15,
+  color: 'var(--pc-ink)',
+  background: 'var(--pc-parchment)',
   outline: 'none',
   transition: 'border-color 0.15s',
   width: '100%',
@@ -22,15 +26,15 @@ const inputStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
   fontSize: 12,
   fontWeight: 600,
-  color: '#5c4a32',
+  color: 'var(--pc-brown)',
   letterSpacing: '0.3px',
 }
 
 const btnPrimaryStyle: React.CSSProperties = {
   marginTop: 4,
-  padding: '12px 24px',
+  padding: '13px 24px',
   borderRadius: 8,
-  background: '#1a1208',
+  background: 'var(--pc-terracotta)',
   color: '#ffffff',
   fontSize: 14,
   fontWeight: 600,
@@ -39,14 +43,25 @@ const btnPrimaryStyle: React.CSSProperties = {
   width: '100%',
 }
 
+const linkBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  fontSize: 12,
+  color: 'var(--pc-brown-mute)',
+  padding: '6px 0',
+  textDecoration: 'underline',
+  textUnderlineOffset: 3,
+}
+
 const errorStyle: React.CSSProperties = {
   fontSize: 13,
-  color: '#c0392b',
+  color: 'var(--pc-red)',
   margin: 0,
   padding: '10px 14px',
-  background: '#fff0ee',
+  background: 'var(--pc-red-soft)',
   borderRadius: 8,
-  border: '1px solid #f5c6c2',
+  border: '1px solid #f0c4bf',
 }
 
 export default function AfiliadaEntrarPage() {
@@ -99,37 +114,46 @@ export default function AfiliadaEntrarPage() {
     <div
       style={{
         minHeight: '100vh',
-        background: '#f5ede0',
+        background: 'var(--pc-sand)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '24px 16px',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
+        fontFamily: 'var(--font-be-vietnam), system-ui, -apple-system, sans-serif',
       }}
     >
       <div
         style={{
           background: '#ffffff',
-          borderRadius: 16,
-          padding: '48px 40px',
+          borderRadius: 12,
+          padding: '40px 32px',
           width: '100%',
           maxWidth: 400,
-          boxShadow: '0 4px 24px rgba(0,0,0,0.07)',
+          boxShadow: '0 4px 24px rgba(var(--pc-shadow-rgb), 0.10)',
         }}
       >
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <Image
+            src="/images/logo/logo-v2.png"
+            alt=""
+            width={56}
+            height={56}
+            aria-hidden="true"
+            style={{ display: 'block', margin: '0 auto 12px', height: 56, width: 'auto' }}
+            priority
+          />
           <h1
             style={{
               fontSize: 22,
               fontWeight: 700,
-              color: '#1a1208',
+              color: 'var(--pc-ink)',
               margin: 0,
               letterSpacing: '-0.3px',
             }}
           >
             Patrícia Carreira
           </h1>
-          <p style={{ fontSize: 13, color: '#8a7560', marginTop: 6, marginBottom: 0 }}>
+          <p style={{ fontSize: 13, color: 'var(--pc-brown-mute)', marginTop: 6, marginBottom: 0 }}>
             {mode === 'login'
               ? 'Área da Afiliada'
               : mode === 'forgot'
@@ -151,8 +175,8 @@ export default function AfiliadaEntrarPage() {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 style={inputStyle}
-                onFocus={e => { e.currentTarget.style.borderColor = '#c4a882' }}
-                onBlur={e => { e.currentTarget.style.borderColor = '#e2d4c4' }}
+                onFocus={e => { e.currentTarget.style.borderColor = FOCUS_BORDER }}
+                onBlur={e => { e.currentTarget.style.borderColor = IDLE_BORDER }}
               />
             </div>
 
@@ -166,8 +190,8 @@ export default function AfiliadaEntrarPage() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 style={inputStyle}
-                onFocus={e => { e.currentTarget.style.borderColor = '#c4a882' }}
-                onBlur={e => { e.currentTarget.style.borderColor = '#e2d4c4' }}
+                onFocus={e => { e.currentTarget.style.borderColor = FOCUS_BORDER }}
+                onBlur={e => { e.currentTarget.style.borderColor = IDLE_BORDER }}
               />
             </div>
 
@@ -184,16 +208,7 @@ export default function AfiliadaEntrarPage() {
             <button
               type="button"
               onClick={switchToForgot}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: 12,
-                color: '#8a7560',
-                padding: '4px 0',
-                textDecoration: 'underline',
-                textUnderlineOffset: 3,
-              }}
+              style={linkBtnStyle}
             >
               Esqueci minha senha
             </button>
@@ -203,7 +218,7 @@ export default function AfiliadaEntrarPage() {
         {/* ── Esqueci a senha ── */}
         {mode === 'forgot' && (
           <form onSubmit={handleForgot} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <p style={{ fontSize: 13, color: '#5c4a32', margin: 0, lineHeight: 1.6 }}>
+            <p style={{ fontSize: 13, color: 'var(--pc-brown)', margin: 0, lineHeight: 1.6 }}>
               Informe o seu e-mail de afiliada. Vamos enviar um link para você definir uma nova senha.
             </p>
 
@@ -217,8 +232,8 @@ export default function AfiliadaEntrarPage() {
                 value={forgotEmail}
                 onChange={e => setForgotEmail(e.target.value)}
                 style={inputStyle}
-                onFocus={e => { e.currentTarget.style.borderColor = '#c4a882' }}
-                onBlur={e => { e.currentTarget.style.borderColor = '#e2d4c4' }}
+                onFocus={e => { e.currentTarget.style.borderColor = FOCUS_BORDER }}
+                onBlur={e => { e.currentTarget.style.borderColor = IDLE_BORDER }}
               />
             </div>
 
@@ -235,16 +250,7 @@ export default function AfiliadaEntrarPage() {
             <button
               type="button"
               onClick={() => { setMode('login'); setError(null) }}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: 12,
-                color: '#8a7560',
-                padding: '4px 0',
-                textDecoration: 'underline',
-                textUnderlineOffset: 3,
-              }}
+              style={linkBtnStyle}
             >
               Voltar ao login
             </button>
@@ -259,7 +265,7 @@ export default function AfiliadaEntrarPage() {
                 width: 48,
                 height: 48,
                 borderRadius: '50%',
-                background: '#f0f7ee',
+                background: 'var(--pc-olive-soft)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -269,25 +275,16 @@ export default function AfiliadaEntrarPage() {
             >
               ✓
             </div>
-            <p style={{ fontSize: 14, color: '#1a1208', margin: 0, fontWeight: 600 }}>
+            <p style={{ fontSize: 14, color: 'var(--pc-ink)', margin: 0, fontWeight: 600 }}>
               Link enviado!
             </p>
-            <p style={{ fontSize: 13, color: '#5c4a32', margin: 0, lineHeight: 1.6 }}>
+            <p style={{ fontSize: 13, color: 'var(--pc-brown)', margin: 0, lineHeight: 1.6 }}>
               Verifique a caixa de entrada de <strong>{forgotEmail}</strong> e clique no link para definir sua nova senha.
             </p>
             <button
               type="button"
               onClick={() => { setMode('login'); setError(null) }}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: 12,
-                color: '#8a7560',
-                padding: '4px 0',
-                textDecoration: 'underline',
-                textUnderlineOffset: 3,
-              }}
+              style={linkBtnStyle}
             >
               Voltar ao login
             </button>
@@ -299,7 +296,7 @@ export default function AfiliadaEntrarPage() {
             style={{
               textAlign: 'center',
               fontSize: 12,
-              color: '#b09e8a',
+              color: 'var(--pc-brown-mute)',
               marginTop: 28,
               marginBottom: 0,
             }}

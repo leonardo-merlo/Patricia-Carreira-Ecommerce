@@ -358,7 +358,7 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
                               width: 26, height: 26, fontSize: 10,
                               background: c.type === 'wholesale'
                                 ? 'linear-gradient(135deg,#d8c89a,#a08956)'
-                                : 'linear-gradient(135deg,#c9b6c9,#8b6b8b)',
+                                : 'linear-gradient(135deg,#c4b98f,#8a7f4a)',
                               color: '#fff',
                             }}
                           >

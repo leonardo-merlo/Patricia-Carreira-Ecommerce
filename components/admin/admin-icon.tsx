@@ -8,7 +8,7 @@ type IconName =
   | "package" | "truck" | "user" | "users" | "money" | "cart" | "filter"
   | "download" | "history" | "list" | "moreH" | "sparkles" | "tag" | "factory"
   | "store" | "creditCard" | "fileText" | "plug" | "mail" | "mapPin" | "wallet"
-  | "instagram"
+  | "instagram" | "menu" | "chevLeft"
 
 interface AdminIconProps {
   name: IconName
@@ -28,6 +28,8 @@ const paths: Record<IconName, React.ReactNode> = {
   minus: <path d="M3 8h10"/>,
   chevDown: <path d="M4 6l4 4 4-4"/>,
   chevRight: <path d="M6 4l4 4-4 4"/>,
+  chevLeft: <path d="M10 4L6 8l4 4"/>,
+  menu: <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/>,
   chevUp: <path d="M4 10l4-4 4 4"/>,
   arrowUp: <><path d="M8 13V3"/><path d="M4 7l4-4 4 4"/></>,
   arrowDown: <><path d="M8 3v10"/><path d="M4 9l4 4 4-4"/></>,
