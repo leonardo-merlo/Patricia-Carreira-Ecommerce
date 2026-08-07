@@ -249,13 +249,20 @@
 .admin-root .sidebar-footer .ico-btn:hover { background: rgba(255,255,255,0.06); color: #fff; }
 
 /* === SIDEBAR COLAPSADA (desktop) === */
-.admin-root.sidebar-collapsed .sidebar-brand { justify-content: center; padding: 14px 8px; }
+/* O botão de recolher NÃO entra nesta lista: escondê-lo deixa a barra sem
+ * como voltar a expandir. Ele desce para baixo da logo. */
+.admin-root.sidebar-collapsed .sidebar-brand {
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 8px;
+}
 .admin-root.sidebar-collapsed .sidebar-brand-text,
 .admin-root.sidebar-collapsed .sidebar-section-label,
 .admin-root.sidebar-collapsed .sidebar-item span,
 .admin-root.sidebar-collapsed .sidebar-item .nav-badge,
-.admin-root.sidebar-collapsed .sidebar-user,
-.admin-root.sidebar-collapsed .sidebar-collapse-btn { display: none; }
+.admin-root.sidebar-collapsed .sidebar-user { display: none; }
+.admin-root.sidebar-collapsed .sidebar-collapse-btn { margin-left: 0; width: 100%; }
 .admin-root.sidebar-collapsed .sidebar-nav { padding: 4px 6px; }
 .admin-root.sidebar-collapsed .sidebar-item { justify-content: center; padding: 8px 0; }
 .admin-root.sidebar-collapsed .sidebar-item.active::before { left: -6px; }
