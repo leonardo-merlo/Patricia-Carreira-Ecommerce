@@ -123,8 +123,21 @@ function getAuthHeader(): string {
 
 // Determina CFOP baseado no estado do destinatário vs estado do emitente
 function determineCfop(destinatarioUf: string): string {
-  const emitenteUf = process.env.STORE_ESTADO ?? ''
-  return destinatarioUf.toUpperCase() === emitenteUf.toUpperCase() ? '5102' : '6102'
+  const emitenteUf = (process.env.STORE_ESTADO ?? '').trim()
+  return destinatarioUf.trim().toUpperCase() === emitenteUf.toUpperCase() ? '5102' : '6102'
+}
+
+// 5102 e 6102 são o mesmo par — qual dos dois vale depende do destino da venda,
+// não do cadastro do produto. Como products.cfop nasce com '6102' por default,
+// respeitar o cadastro faria toda venda dentro da Bahia sair com o CFOP errado
+// e ser rejeitada pela SEFAZ. Um CFOP fora desse par é escolha deliberada de
+// quem cadastrou (operação especial) e continua valendo.
+function resolveCfop(cfopCadastrado: string | null | undefined, destinatarioUf: string): string {
+  const configurado = (cfopCadastrado ?? '').trim()
+  if (!configurado || configurado === '5102' || configurado === '6102') {
+    return determineCfop(destinatarioUf)
+  }
+  return configurado
 }
 
 // Mapeia método de pagamento do sistema para código Focus NFe
@@ -335,7 +348,7 @@ export function buildNfePayload(
       numero_item: index + 1,
       // NCM já validado acima — cast seguro
       codigo_ncm: item.product_variant!.product!.ncm!,
-      cfop: item.product_variant?.product?.cfop ?? determineCfop(customer.address!.state),
+      cfop: resolveCfop(item.product_variant?.product?.cfop, customer.address!.state),
       descricao: item.product_variant?.product?.name ?? 'Produto',
       quantidade_comercial: item.quantity,
       quantidade_tributavel: item.quantity,
