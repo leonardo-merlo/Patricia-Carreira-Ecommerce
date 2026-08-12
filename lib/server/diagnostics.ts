@@ -165,26 +165,52 @@ async function checkFocusNfe(): Promise<ServiceCheck> {
     return { service: 'Focus NFe', ok: false, environment, detail: 'FOCUS_NFE_TOKEN não definido' }
   }
 
+  const auth = { Authorization: `Basic ${Buffer.from(`${token}:`).toString('base64')}` }
+
   try {
-    const res = await fetchWithTimeout(`${base}/empresas`, {
-      headers: { Authorization: `Basic ${Buffer.from(`${token}:`).toString('base64')}` },
-    })
-    if (res.status === 403 || res.status === 401) {
-      return { service: 'Focus NFe', ok: false, environment, detail: 'token recusado — confira se é o token deste ambiente' }
+    // /empresas só responde ao token principal da conta. O token que a aplicação
+    // usa é o da empresa, que emite nota mas não lista empresas — por isso 403
+    // aqui não é token errado, e a checagem cai na consulta de NF-e abaixo.
+    const res = await fetchWithTimeout(`${base}/empresas`, { headers: auth })
+
+    if (res.ok) {
+      const data = (await res.json()) as Array<{ nome_fantasia?: string; razao_social?: string }>
+      const empresa = Array.isArray(data) ? data[0] : undefined
+      return {
+        service: 'Focus NFe',
+        ok: true,
+        environment,
+        detail: empresa
+          ? `token principal · empresa ${empresa.nome_fantasia ?? empresa.razao_social ?? '—'} cadastrada`
+          : 'token principal válido, mas nenhuma empresa cadastrada',
+      }
     }
-    if (!res.ok) {
+
+    if (res.status !== 401 && res.status !== 403) {
       return { service: 'Focus NFe', ok: false, environment, detail: `API respondeu ${res.status}` }
     }
-    const data = (await res.json()) as Array<{ nome_fantasia?: string; razao_social?: string; cnpj?: string }>
-    const empresa = Array.isArray(data) ? data[0] : undefined
-    return {
-      service: 'Focus NFe',
-      ok: true,
-      environment,
-      detail: empresa
-        ? `empresa ${empresa.nome_fantasia ?? empresa.razao_social ?? '—'} cadastrada`
-        : 'token válido, mas nenhuma empresa cadastrada — suba o certificado A1',
+
+    // Consulta de uma referência que sabidamente não existe: 404 significa que a
+    // autenticação passou e o token só não achou a nota — que é o que queremos saber.
+    const probe = await fetchWithTimeout(`${base}/nfe/diagnostico-inexistente`, { headers: auth })
+
+    if (probe.status === 404) {
+      return {
+        service: 'Focus NFe',
+        ok: true,
+        environment,
+        detail: 'token da empresa válido — emissão liberada do lado da API',
+      }
     }
+    if (probe.status === 401 || probe.status === 403) {
+      return {
+        service: 'Focus NFe',
+        ok: false,
+        environment,
+        detail: 'token recusado — confira se copiou o token do ambiente certo',
+      }
+    }
+    return { service: 'Focus NFe', ok: false, environment, detail: `API respondeu ${probe.status}` }
   } catch (err) {
     return { service: 'Focus NFe', ok: false, environment, detail: describeError(err) }
   }
