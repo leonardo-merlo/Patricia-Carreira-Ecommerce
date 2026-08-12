@@ -117,6 +117,17 @@ export function AdminSidebar({
 
       <div className="sidebar-footer">
         <Link
+          href="/admin/diagnostico"
+          onClick={onNavigate}
+          className={`sidebar-item ${isActive('/admin/diagnostico') ? 'active' : ''}`}
+          title={collapsed ? 'Diagnóstico' : undefined}
+          id="sidebar-nav-diagnostico"
+        >
+          <AdminIcon name="plug" />
+          <span>Diagnóstico</span>
+        </Link>
+
+        <Link
           href="/admin/config"
           onClick={onNavigate}
           className={`sidebar-item ${isActive('/admin/config') ? 'active' : ''}`}

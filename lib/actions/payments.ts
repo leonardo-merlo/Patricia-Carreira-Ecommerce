@@ -7,6 +7,7 @@ import {
   type MPPaymentResult,
 } from '@/lib/integrations/mercadopago'
 import { saveOrder, type OrderFormData, type OrderLineItem } from '@/lib/server/orders'
+import { fulfillPaidOrder } from '@/lib/server/fulfillment'
 import { validateCoupon } from '@/lib/actions/coupons'
 import { computeCouponDiscount } from '@/lib/supabase/coupons'
 import { getShippingOptions } from '@/lib/actions/shipping'
@@ -221,14 +222,15 @@ export async function createPayment(
       )
     }
 
-    // Save order to DB and decrement stock (for card, immediately; for pix/boleto, on webhook)
+    // O pedido nasce pendente. Cartão costuma voltar 'approved' já na criação: nesse
+    // caso o pós-pagamento roda aqui, porque o webhook do MP chegaria depois (ou nem
+    // chegaria) e o cliente não pode ficar sem etiqueta, nota e email por causa disso.
     let orderId = result.id
     const saved = await saveOrder({
       formData: input.orderData.formData,
       lineItems: priced.lineItems,
       paymentId: result.id,
       paymentMethod: input.method,
-      paymentStatus: result.status === 'approved' ? 'paid' : 'pending',
       totalAmount: priced.total,
       shippingAmount: priced.shippingAmount,
       shippingMethod: priced.shippingMethod,
@@ -239,6 +241,16 @@ export async function createPayment(
     })
     if (saved.ok) {
       orderId = saved.orderId
+
+      if (result.status === 'approved') {
+        try {
+          await fulfillPaidOrder(saved.orderId)
+        } catch (err) {
+          console.error('[createPayment] erro no pós-pagamento:', err)
+          // Pagamento já foi aprovado — não bloquear o cliente. O webhook do MP
+          // ainda pode reprocessar, e o pedido fica visível no painel.
+        }
+      }
     } else {
       console.error('[createPayment] saveOrder failed:', saved.error)
       // Payment processed — don't block the user but log for manual reconciliation

@@ -92,11 +92,23 @@ export type FocusNfePayload = {
 // HELPERS INTERNOS
 // ─────────────────────────────────────────────────────────────────────────────
 
+function isHomologacao(): boolean {
+  return (process.env.FOCUS_NFE_AMBIENTE ?? 'producao').trim() === 'homologacao'
+}
+
 function getBaseUrl(): string {
-  const ambiente = process.env.FOCUS_NFE_AMBIENTE ?? 'producao'
-  return ambiente === 'homologacao'
+  return isHomologacao()
     ? 'https://homologacao.focusnfe.com.br/v2'
     : 'https://api.focusnfe.com.br/v2'
+}
+
+// A SEFAZ exige este nome exato no destinatário de qualquer NF-e de homologação —
+// nota com o nome real do cliente volta rejeitada.
+const NOME_DESTINATARIO_HOMOLOGACAO =
+  'NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL'
+
+function onlyDigits(value: string | undefined | null): string {
+  return (value ?? '').replace(/\D/g, '')
 }
 
 function getAuthHeader(): string {
@@ -289,21 +301,24 @@ export function buildNfePayload(
     presenca_comprador: 2,   // operação não presencial / internet
     modalidade_frete: 1,     // CIF (por conta do emitente)
     emitente: {
-      cnpj: process.env.STORE_CNPJ ?? '',
-      inscricao_estadual: process.env.STORE_IE ?? '',
+      cnpj: onlyDigits(process.env.STORE_CNPJ),
+      // IE aceita 'ISENTO', então só tira espaço — não pode virar só dígitos
+      inscricao_estadual: (process.env.STORE_IE ?? '').trim(),
       nome: process.env.STORE_NOME ?? '',
       logradouro: process.env.STORE_LOGRADOURO ?? '',
       numero: process.env.STORE_NUMERO ?? '',
       complemento: process.env.STORE_COMPLEMENTO ?? '',
       bairro: process.env.STORE_BAIRRO ?? '',
       municipio: process.env.STORE_CIDADE ?? '',
-      uf: process.env.STORE_ESTADO ?? '',
-      cep: process.env.STORE_CEP_ORIGEM ?? '',
-      codigo_regime_tributario: Number(process.env.FOCUS_NFE_REGIME_TRIBUTARIO ?? '1'),
+      uf: (process.env.STORE_ESTADO ?? '').trim(),
+      cep: onlyDigits(process.env.STORE_CEP_ORIGEM),
+      codigo_regime_tributario: Number(
+        (process.env.FOCUS_NFE_REGIME_TRIBUTARIO ?? '1').trim() || '1'
+      ),
     },
     destinatario: {
-      cpf_cnpj: customer.cpf_cnpj ?? '',
-      nome_completo: customer.name,
+      cpf_cnpj: onlyDigits(customer.cpf_cnpj),
+      nome_completo: isHomologacao() ? NOME_DESTINATARIO_HOMOLOGACAO : customer.name,
       email: customer.email ?? '',
       endereco: {
         logradouro: customer.address.street,
@@ -312,7 +327,7 @@ export function buildNfePayload(
         bairro: customer.address.neighborhood,
         municipio: customer.address.city,
         uf: customer.address.state,
-        cep: customer.address.zip.replace('-', ''),
+        cep: onlyDigits(customer.address.zip),
       },
       indicador_inscricao_estadual: 9, // não contribuinte
     },

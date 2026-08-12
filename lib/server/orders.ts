@@ -1,5 +1,4 @@
 import { createServiceClient } from '@/lib/supabase/service'
-import { recordCouponUsage } from '@/lib/supabase/coupons'
 import type { PaymentMethod } from '@/lib/types'
 
 export type OrderFormData = {
@@ -32,7 +31,6 @@ type SaveOrderInput = {
   lineItems: OrderLineItem[]
   paymentId: string
   paymentMethod: PaymentMethod
-  paymentStatus: 'pending' | 'paid'
   totalAmount: number
   shippingAmount: number
   discountAmount: number
@@ -125,18 +123,21 @@ export async function saveOrder(
     }
   }
 
+  // O pedido sempre nasce pendente. Quem o marca como pago é fulfillPaidOrder,
+  // único lugar que baixa estoque, consome cupom e dispara etiqueta/NF-e/email —
+  // tanto para o webhook do MP quanto para o cartão aprovado na hora.
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .insert({
       customer_id: customerId,
       type: 'retail',
-      status: input.paymentStatus === 'paid' ? 'paid' : 'pending',
+      status: 'pending',
       total_amount: input.totalAmount,
       discount_amount: input.discountAmount,
       shipping_amount: input.shippingAmount,
       shipping_method: input.shippingMethod,
       melhor_envio_service_id: input.melhorEnvioServiceId,
-      payment_status: input.paymentStatus,
+      payment_status: 'pending',
       payment_id: input.paymentId,
       payment_method: input.paymentMethod,
       coupon_id: input.couponId,
@@ -164,24 +165,6 @@ export async function saveOrder(
     return { ok: false, error: 'Erro ao salvar itens do pedido' }
   }
 
-  if (input.paymentStatus === 'paid') {
-    try {
-      await decrementStockFromItems(supabase, input.lineItems)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erro ao decrementar estoque'
-      console.error('[saveOrder] stock decrement error:', msg)
-      await flagStockFailure(order.id)
-    }
-
-    if (input.couponId) {
-      try {
-        await recordCouponUsage(input.couponId, order.id, input.userId, input.formData.email)
-      } catch (err) {
-        console.error('[saveOrder] recordCouponUsage error:', err)
-      }
-    }
-  }
-
   return { ok: true, orderId: order.id }
 }
 
@@ -202,19 +185,6 @@ export async function flagStockFailure(orderId: string): Promise<void> {
     .from('orders')
     .update({ notes: existing ? `${existing}\n${STOCK_FAILURE_FLAG}` : STOCK_FAILURE_FLAG })
     .eq('id', orderId)
-}
-
-async function decrementStockFromItems(
-  supabase: ReturnType<typeof createServiceClient>,
-  lineItems: OrderLineItem[]
-) {
-  for (const item of lineItems) {
-    const { error } = await supabase.rpc('decrement_stock', {
-      p_variant_id: item.variantId,
-      p_quantity: item.quantity,
-    })
-    if (error) throw new Error(`Estoque insuficiente para variante ${item.variantId}: ${error.message}`)
-  }
 }
 
 export async function decrementStockByOrderId(orderId: string): Promise<void> {
