@@ -13,7 +13,11 @@ export const metadata = {
 
 export default async function DiagnosticoPage() {
   const diag = await runDiagnostics()
-  const tudoOk = diag.missingRequired.length === 0 && diag.services.every((s) => s.ok) && diag.appUrlIsPublic
+  const tudoOk =
+    diag.missingRequired.length === 0 &&
+    diag.services.every((s) => s.ok) &&
+    diag.sender.every((f) => f.ok) &&
+    diag.appUrlIsPublic
 
   return (
     <div className="page" id="page-diagnostico">
@@ -81,6 +85,39 @@ export default async function DiagnosticoPage() {
                     <td style={{ color: 'var(--text-2)' }}>{s.detail}</td>
                     <td>
                       <span className={`badge ${s.ok ? 'ok' : 'alert'}`}>{s.ok ? 'respondendo' : 'com problema'}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" id="diagnostico-remetente" style={{ marginBottom: 16 }}>
+        <div className="card-header">
+          <h2 className="ttl">Remetente do frete</h2>
+          <span className="sub">exatamente o que é enviado ao Melhor Envio ao comprar a etiqueta</span>
+        </div>
+        <div className="card-body flush">
+          <div className="table-wrap">
+            <table className="tbl" data-testid="tabela-remetente">
+              <thead>
+                <tr>
+                  <th>Campo</th>
+                  <th>Valor</th>
+                  <th>Exigência</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {diag.sender.map((f) => (
+                  <tr key={f.label} data-testid="linha-remetente" data-campo={f.label}>
+                    <td style={{ fontWeight: 600 }}>{f.label}</td>
+                    <td style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11.5 }}>{f.value}</td>
+                    <td style={{ color: 'var(--text-2)' }}>{f.note}</td>
+                    <td>
+                      <span className={`badge ${f.ok ? 'ok' : 'alert'}`}>{f.ok ? 'válido' : 'inválido'}</span>
                     </td>
                   </tr>
                 ))}

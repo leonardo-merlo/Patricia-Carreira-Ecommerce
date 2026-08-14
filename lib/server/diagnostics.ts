@@ -4,6 +4,8 @@
 // segredo. Só presença, prefixo público (TEST-/APP_USR-) e o que a própria API do
 // parceiro responde. O que sai daqui vai para a tela.
 
+import { isValidCep, meDocumentFields, onlyDigits } from '@/lib/documento'
+
 export type EnvCheck = {
   name: string
   present: boolean
@@ -33,12 +35,20 @@ export type WebhookUrl = {
   ready: boolean
 }
 
+export type SenderField = {
+  label: string
+  value: string
+  ok: boolean
+  note: string
+}
+
 export type Diagnostics = {
   appUrl: string | null
   appUrlIsPublic: boolean
   groups: EnvGroup[]
   services: ServiceCheck[]
   webhooks: WebhookUrl[]
+  sender: SenderField[]
   missingRequired: string[]
 }
 
@@ -362,6 +372,59 @@ function buildWebhooks(appUrl: string | null, appUrlIsPublic: boolean): WebhookU
   ]
 }
 
+// O remetente é o que o Melhor Envio mais recusa: ele valida dígito de CPF/CNPJ
+// e formato de CEP, e devolve 422 com o pedido inteiro barrado. Mostrar o valor
+// resolvido aqui (dado público da loja, não credencial) evita adivinhação.
+function buildSender(): SenderField[] {
+  const cnpj = onlyDigits(process.env.STORE_CNPJ)
+  const documento = onlyDigits(process.env.STORE_DOCUMENTO)
+  const cep = onlyDigits(process.env.STORE_CEP_ORIGEM)
+  const uf = (process.env.STORE_ESTADO ?? '').trim().toUpperCase()
+
+  const docFields = meDocumentFields(cnpj || documento)
+  const docOk = Boolean(docFields.company_document || docFields.document)
+
+  return [
+    {
+      label: 'Documento enviado ao ME',
+      value: docFields.company_document
+        ? `CNPJ ${docFields.company_document}`
+        : docFields.document
+          ? `CPF ${docFields.document}`
+          : cnpj || documento || '(vazio)',
+      ok: docOk,
+      note: docOk
+        ? 'dígito verificador confere'
+        : 'nenhum documento válido — o ME recusa o pedido com 422',
+    },
+    {
+      label: 'CEP de origem',
+      value: cep || '(vazio)',
+      ok: isValidCep(cep),
+      note: isValidCep(cep) ? '8 dígitos' : 'precisa ter 8 dígitos, só números',
+    },
+    { label: 'Estado', value: uf || '(vazio)', ok: uf.length === 2, note: 'sigla de 2 letras' },
+    {
+      label: 'Cidade',
+      value: process.env.STORE_CIDADE ?? '(vazio)',
+      ok: Boolean((process.env.STORE_CIDADE ?? '').trim()),
+      note: 'obrigatória',
+    },
+    {
+      label: 'Logradouro e número',
+      value: `${process.env.STORE_LOGRADOURO ?? ''} ${process.env.STORE_NUMERO ?? ''}`.trim() || '(vazio)',
+      ok: Boolean((process.env.STORE_LOGRADOURO ?? '').trim() && (process.env.STORE_NUMERO ?? '').trim()),
+      note: 'obrigatórios',
+    },
+    {
+      label: 'Bairro',
+      value: process.env.STORE_BAIRRO ?? '(vazio)',
+      ok: Boolean((process.env.STORE_BAIRRO ?? '').trim()),
+      note: 'obrigatório',
+    },
+  ]
+}
+
 export async function runDiagnostics(): Promise<Diagnostics> {
   const appUrl = env('NEXT_PUBLIC_APP_URL') || null
   const appUrlIsPublic = Boolean(
@@ -387,6 +450,7 @@ export async function runDiagnostics(): Promise<Diagnostics> {
     groups,
     services,
     webhooks: buildWebhooks(appUrl, appUrlIsPublic),
+    sender: buildSender(),
     missingRequired,
   }
 }

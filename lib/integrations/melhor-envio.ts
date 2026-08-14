@@ -29,11 +29,14 @@ export type MEQuoteResult = {
   error?: string
 }
 
-type MEAddress = {
+export type MEAddress = {
   name: string
   phone: string
   email: string
-  document: string
+  /** CPF, só quando for pessoa física — o ME valida o dígito e recusa o resto */
+  document?: string
+  /** CNPJ, quando for pessoa jurídica */
+  company_document?: string
   address: string
   number: string
   complement: string
@@ -42,6 +45,21 @@ type MEAddress = {
   state_abbr: string
   postal_code: string
   country_id: 'BR'
+}
+
+/** Item do carrinho como o ME espera: o que é, quantos e quanto vale. */
+export type MECartProduct = {
+  name: string
+  quantity: number
+  unitary_value: number
+}
+
+/** Cada volume é um pacote físico. Item com quantidade 2 vira dois volumes. */
+export type MEVolume = {
+  height: number
+  width: number
+  length: number
+  weight: number
 }
 
 export async function calculateShipping(
@@ -81,7 +99,8 @@ type AddToCartInput = {
   serviceId: number
   from: MEAddress
   to: MEAddress
-  items: MEShippingItem[]
+  products: MECartProduct[]
+  volumes: MEVolume[]
   orderId: string   // our internal order ID, stored as tag for later lookup
   totalValue: number
 }
@@ -94,15 +113,8 @@ export async function addToCart(input: AddToCartInput): Promise<string> {
       service: input.serviceId,
       from: input.from,
       to: input.to,
-      products: input.items.map((i) => ({
-        weight: i.weight,
-        width: i.width,
-        height: i.height,
-        length: i.length,
-        quantity: i.quantity,
-        insurance_value: input.totalValue / input.items.reduce((s, x) => s + x.quantity, 0),
-      })),
-      volumes: [],
+      products: input.products,
+      volumes: input.volumes,
       options: {
         insurance_value: input.totalValue,
         receipt: false,

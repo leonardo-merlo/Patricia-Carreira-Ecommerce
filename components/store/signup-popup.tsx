@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -16,6 +17,7 @@ const COUPON_CODE = "BEMVINDA10"
 const DELAY_MS = 3000
 
 export function SignupPopup() {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<"form" | "success">("form")
   const [name, setName] = useState("")
@@ -52,7 +54,7 @@ export function SignupPopup() {
     setLoading(true)
 
     const supabase = createClient()
-    const { error: signUpError } = await supabase.auth.signUp({
+    const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -68,6 +70,22 @@ export function SignupPopup() {
       )
       setLoading(false)
       return
+    }
+
+    // Para e-mail que já tem conta o Supabase devolve sucesso sem criar nada —
+    // é a proteção contra enumeração de e-mails. A pista é identities vazio.
+    // Sem esta checagem o popup comemora, nada acontece, e a pessoa depois
+    // tenta entrar com a senha nova e leva "e-mail ou senha incorretos".
+    if (data.user && (data.user.identities?.length ?? 0) === 0) {
+      setError("Este e-mail já tem uma conta. Faça login para acessar seus benefícios.")
+      setLoading(false)
+      return
+    }
+
+    // Com confirmação de e-mail desligada o signUp já devolve sessão: a pessoa
+    // segue navegando logada, sem precisar repetir a senha em outra tela.
+    if (data.session) {
+      router.refresh()
     }
 
     setSuccessName(name.split(" ")[0])

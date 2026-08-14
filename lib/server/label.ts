@@ -4,28 +4,30 @@ import {
   checkoutCart,
   generateLabel,
   getTrackingCode,
-  type MEShippingItem,
+  type MEAddress,
+  type MECartProduct,
+  type MEVolume,
 } from '@/lib/integrations/melhor-envio'
+import { meDocumentFields, onlyDigits } from '@/lib/documento'
 
-type MEAddressField = {
-  name: string; phone: string; email: string; document: string
-  address: string; number: string; complement: string; district: string
-  city: string; state_abbr: string; postal_code: string; country_id: 'BR'
-}
+export function buildStoreAddress(): MEAddress {
+  // A loja é PJ: o CNPJ é o documento que identifica o remetente. STORE_DOCUMENTO
+  // fica como alternativa para quando só houver CPF cadastrado.
+  const documento = meDocumentFields(process.env.STORE_CNPJ)
+  const fallback = meDocumentFields(process.env.STORE_DOCUMENTO)
 
-function buildStoreAddress(): MEAddressField {
   return {
     name: process.env.STORE_NOME ?? 'Patricia Carreira',
-    phone: (process.env.STORE_TELEFONE ?? '').replace(/\D/g, ''),
+    phone: onlyDigits(process.env.STORE_TELEFONE),
     email: process.env.STORE_EMAIL ?? '',
-    document: (process.env.STORE_DOCUMENTO ?? '').replace(/\D/g, ''),
+    ...(documento.company_document || documento.document ? documento : fallback),
     address: process.env.STORE_LOGRADOURO ?? '',
     number: process.env.STORE_NUMERO ?? '',
     complement: process.env.STORE_COMPLEMENTO ?? '',
     district: process.env.STORE_BAIRRO ?? '',
     city: process.env.STORE_CIDADE ?? '',
-    state_abbr: process.env.STORE_ESTADO ?? '',
-    postal_code: (process.env.STORE_CEP_ORIGEM ?? '').replace(/\D/g, ''),
+    state_abbr: (process.env.STORE_ESTADO ?? '').trim().toUpperCase(),
+    postal_code: onlyDigits(process.env.STORE_CEP_ORIGEM),
     country_id: 'BR',
   }
 }
@@ -38,7 +40,7 @@ async function fetchOrderForLabel(orderId: string) {
     .select(`
       id, total_amount, melhor_envio_service_id,
       customer:customers(name, email, phone, cpf_cnpj, address),
-      items:order_items(quantity, product_variant_id)
+      items:order_items(quantity, unit_price, product_name, product_variant_id)
     `)
     .eq('id', orderId)
     .maybeSingle()
@@ -46,35 +48,59 @@ async function fetchOrderForLabel(orderId: string) {
   return rawOrder
 }
 
-async function buildShippingItems(
-  orderItems: Array<{ quantity: number; product_variant_id: string | null }>
-): Promise<MEShippingItem[]> {
+type OrderItemForShipping = {
+  quantity: number
+  unit_price: number
+  product_name: string | null
+  product_variant_id: string | null
+}
+
+// O ME separa as duas coisas: products é o conteúdo declarado (o que é e quanto
+// vale, usado no seguro e na nota do transportador) e volumes são os pacotes
+// físicos. Item com quantidade 2 vira um product de quantidade 2 e dois volumes.
+async function buildCartPayload(
+  orderItems: OrderItemForShipping[]
+): Promise<{ products: MECartProduct[]; volumes: MEVolume[] }> {
   const supabase = createServiceClient()
   const variantIds = orderItems.map((i) => i.product_variant_id).filter(Boolean) as string[]
 
   const { data: variants } = await supabase
     .from('product_variants')
-    .select('id, product:products(weight_grams, length_cm, width_cm, height_cm)')
+    .select('id, product:products(name, weight_grams, length_cm, width_cm, height_cm)')
     .in('id', variantIds)
 
-  return orderItems.flatMap((item) => {
-    if (!item.product_variant_id) return []
+  const products: MECartProduct[] = []
+  const volumes: MEVolume[] = []
+
+  for (const item of orderItems) {
+    if (!item.product_variant_id) continue
+
     const variant = variants?.find((v) => v.id === item.product_variant_id)
     const productRaw = variant?.product
     const product = (Array.isArray(productRaw) ? productRaw[0] : productRaw) as {
-      weight_grams: number | null; length_cm: number | null
+      name: string | null; weight_grams: number | null; length_cm: number | null
       width_cm: number | null; height_cm: number | null
     } | null | undefined
 
-    if (!product?.weight_grams) return []
-    return [{
-      weight: product.weight_grams / 1000,
-      width: product.width_cm ?? 10,
-      height: product.height_cm ?? 5,
-      length: product.length_cm ?? 20,
+    if (!product?.weight_grams) continue
+
+    products.push({
+      name: item.product_name ?? product.name ?? 'Produto',
       quantity: item.quantity,
-    }]
-  })
+      unitary_value: Number(item.unit_price),
+    })
+
+    for (let i = 0; i < item.quantity; i++) {
+      volumes.push({
+        weight: product.weight_grams / 1000,
+        width: product.width_cm ?? 10,
+        height: product.height_cm ?? 5,
+        length: product.length_cm ?? 20,
+      })
+    }
+  }
+
+  return { products, volumes }
 }
 
 // Called from the MP payment webhook after payment is confirmed
@@ -97,24 +123,23 @@ export async function purchaseShippingLabel(orderId: string): Promise<void> {
   } | null
   if (!customerAddress) throw new Error('Endereço do cliente não cadastrado')
 
-  type ItemRaw = { quantity: number; product_variant_id: string | null }
-  const orderItems = rawOrder.items as unknown as ItemRaw[]
-  const items = await buildShippingItems(orderItems)
+  const orderItems = rawOrder.items as unknown as OrderItemForShipping[]
+  const { products, volumes } = await buildCartPayload(orderItems)
 
-  if (items.length === 0) throw new Error('Nenhum produto com dimensões para gerar etiqueta')
+  if (products.length === 0) throw new Error('Nenhum produto com dimensões para gerar etiqueta')
 
-  const to: MEAddressField = {
+  const to: MEAddress = {
     name: customerRaw.name,
-    phone: (customerRaw.phone ?? '').replace(/\D/g, ''),
+    phone: onlyDigits(customerRaw.phone),
     email: customerRaw.email ?? '',
-    document: (customerRaw.cpf_cnpj ?? '').replace(/\D/g, ''),
+    ...meDocumentFields(customerRaw.cpf_cnpj),
     address: customerAddress.street,
     number: customerAddress.number,
     complement: customerAddress.complement ?? '',
     district: customerAddress.neighborhood,
     city: customerAddress.city,
-    state_abbr: customerAddress.state,
-    postal_code: customerAddress.zip.replace(/\D/g, ''),
+    state_abbr: customerAddress.state.trim().toUpperCase(),
+    postal_code: onlyDigits(customerAddress.zip),
     country_id: 'BR',
   }
 
@@ -123,7 +148,8 @@ export async function purchaseShippingLabel(orderId: string): Promise<void> {
     serviceId: rawOrder.melhor_envio_service_id as number,
     from: buildStoreAddress(),
     to,
-    items,
+    products,
+    volumes,
     orderId,
     totalValue: Number(rawOrder.total_amount),
   })
