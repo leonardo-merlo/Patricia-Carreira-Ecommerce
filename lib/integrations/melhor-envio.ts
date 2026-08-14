@@ -62,6 +62,23 @@ export type MEVolume = {
   weight: number
 }
 
+/**
+ * Lê a resposta como JSON sem confiar no status. O ME responde 200 com HTML
+ * quando a rota existe mas o verbo está errado, e aí o `res.json()` cru estoura
+ * "Unexpected token '<'" — mensagem que não diz nada a quem está no painel.
+ */
+async function lerJson<T>(res: Response, contexto: string): Promise<T> {
+  const texto = await res.text()
+  try {
+    return JSON.parse(texto) as T
+  } catch {
+    const inicio = texto.trim().slice(0, 80)
+    throw new Error(
+      `Melhor Envio: resposta inesperada na ${contexto} (${res.status}, ${res.headers.get('content-type') ?? 'sem content-type'}): ${inicio}`
+    )
+  }
+}
+
 export async function calculateShipping(
   toCep: string,
   items: MEShippingItem[],
@@ -92,7 +109,7 @@ export async function calculateShipping(
     throw new Error(`Melhor Envio: erro ao calcular frete (${res.status}): ${text}`)
   }
 
-  return res.json() as Promise<MEQuoteResult[]>
+  return lerJson<MEQuoteResult[]>(res, 'cotação de frete')
 }
 
 type AddToCartInput = {
@@ -132,7 +149,7 @@ export async function addToCart(input: AddToCartInput): Promise<string> {
     throw new Error(`Melhor Envio: erro ao adicionar ao carrinho (${res.status}): ${text}`)
   }
 
-  const data = (await res.json()) as { id: string }
+  const data = await lerJson<{ id: string }>(res, 'inclusão no carrinho')
   return data.id
 }
 
@@ -173,17 +190,54 @@ export async function generateLabel(meOrderIds: string[]): Promise<void> {
     const text = await res.text()
     throw new Error(`Melhor Envio: erro ao gerar etiqueta (${res.status}): ${text}`)
   }
+
+  // O ME responde 200 mesmo quando não gerou nada: cada envio volta com um
+  // status booleano e a explicação. Sem olhar isso, uma recusa real passaria
+  // por sucesso. "Já está gerado" é o único caso de falso negativo — para nós
+  // significa que a etiqueta existe, que é o que queríamos.
+  const data = await lerJson<Record<string, { status?: boolean; message?: string }>>(
+    res,
+    'geração de etiqueta'
+  )
+
+  const falhas = Object.values(data).filter(
+    (r) => r?.status === false && !/j[áa] est[áa] gerad/i.test(r.message ?? '')
+  )
+
+  if (falhas.length > 0) {
+    throw new Error(
+      `Melhor Envio: etiqueta não gerada — ${falhas.map((f) => f.message ?? 'motivo não informado').join('; ')}`
+    )
+  }
 }
 
+type METrackingEntry = {
+  status?: string
+  /** Código da transportadora — só existe depois da postagem. */
+  tracking?: string | null
+  /** Código do próprio Melhor Envio, disponível assim que a etiqueta é gerada. */
+  melhorenvio_tracking?: string | null
+}
+
+/**
+ * Consulta de rastreio. É POST com os ids no corpo: em GET o Melhor Envio
+ * responde 200 com uma página HTML, e o `res.json()` estourava
+ * "Unexpected token '<'" — que era o erro que aparecia no painel ao gerar a
+ * etiqueta, escondendo o fato de que a etiqueta já tinha sido gerada.
+ */
 export async function getTrackingCode(meOrderId: string): Promise<string | null> {
-  const res = await fetch(`${baseUrl()}/me/shipment/tracking?orders[]=${meOrderId}`, {
+  const res = await fetch(`${baseUrl()}/me/shipment/tracking`, {
+    method: 'POST',
     headers: authHeaders(),
+    body: JSON.stringify({ orders: [meOrderId] }),
   })
 
   if (!res.ok) return null
 
-  const data = (await res.json()) as Record<string, { tracking?: string }>
-  return data[meOrderId]?.tracking ?? null
+  const data = await lerJson<Record<string, METrackingEntry>>(res, 'consulta de rastreio')
+  const entrada = data[meOrderId]
+  // Antes da postagem só existe o código do ME; o dos Correios entra depois.
+  return entrada?.tracking || entrada?.melhorenvio_tracking || null
 }
 
 export async function printLabel(meOrderIds: string[]): Promise<string> {
@@ -198,6 +252,6 @@ export async function printLabel(meOrderIds: string[]): Promise<string> {
     throw new Error(`Melhor Envio: erro ao imprimir etiqueta (${res.status}): ${text}`)
   }
 
-  const data = (await res.json()) as { url: string }
+  const data = await lerJson<{ url: string }>(res, 'impressão da etiqueta')
   return data.url
 }
