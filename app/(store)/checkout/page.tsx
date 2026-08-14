@@ -13,6 +13,7 @@ import { useCart } from "@/lib/cart-context"
 import { fetchAddressByCEP } from "@/lib/integrations/viacep"
 import { createPayment } from "@/lib/actions/payments"
 import { getShippingOptions } from "@/lib/actions/shipping"
+import { getCheckoutPrefill } from "@/lib/actions/customers"
 import type { PaymentMethod } from "@/lib/actions/payments"
 import type { ShippingOption } from "@/lib/types"
 
@@ -170,6 +171,43 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (hydrated && cart.items.length === 0 && !loading) router.replace("/carrinho")
   }, [hydrated, cart.items.length, router, loading])
+
+  // Cliente logada não redigita o que já está no cadastro dela. Visitante recebe
+  // null e segue com o formulário em branco.
+  useEffect(() => {
+    let ativo = true
+
+    getCheckoutPrefill()
+      .then((dados) => {
+        if (!ativo || !dados) return
+
+        setPersonal({
+          name: dados.name,
+          email: dados.email,
+          phone: dados.phone ? maskPhone(dados.phone) : "",
+          cpf: dados.cpf ? maskCPF(dados.cpf) : "",
+        })
+
+        if (dados.address?.zip) {
+          setAddress({
+            cep: maskCEP(dados.address.zip),
+            street: dados.address.street,
+            number: dados.address.number,
+            complement: dados.address.complement,
+            neighborhood: dados.address.neighborhood,
+            city: dados.address.city,
+            state: dados.address.state,
+          })
+        }
+      })
+      .catch(() => {
+        // Sem prefill o checkout funciona igual — não vale interromper a compra
+      })
+
+    return () => {
+      ativo = false
+    }
+  }, [])
 
   // Detect card brand from BIN (first 6 digits) via MP SDK
   useEffect(() => {

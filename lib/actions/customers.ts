@@ -1,8 +1,70 @@
 'use server'
 
 import { createServiceClient } from '@/lib/supabase/service'
+import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/server/auth'
 import { revalidatePath } from 'next/cache'
+
+export type CheckoutPrefill = {
+  name: string
+  email: string
+  phone: string
+  cpf: string
+  address: {
+    street: string
+    number: string
+    complement: string
+    neighborhood: string
+    city: string
+    state: string
+    zip: string
+  } | null
+}
+
+/**
+ * Dados da própria cliente logada para preencher o checkout. Sem sessão devolve
+ * null — visitante segue com o formulário em branco, como sempre.
+ * Nunca recebe um id por parâmetro: o cadastro lido é sempre o do dono da sessão.
+ */
+export async function getCheckoutPrefill(): Promise<CheckoutPrefill | null> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const service = createServiceClient()
+
+  const { data: customer } = await service
+    .from('customers')
+    .select('name, email, phone, cpf_cnpj, address')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  const { data: profile } = await service
+    .from('user_profiles')
+    .select('name, phone, cpf')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const address = (customer?.address ?? null) as CheckoutPrefill['address']
+
+  return {
+    name: customer?.name ?? profile?.name ?? '',
+    email: customer?.email ?? user.email ?? '',
+    phone: customer?.phone ?? profile?.phone ?? '',
+    cpf: customer?.cpf_cnpj ?? profile?.cpf ?? '',
+    address: address
+      ? {
+          street: address.street ?? '',
+          number: address.number ?? '',
+          complement: address.complement ?? '',
+          neighborhood: address.neighborhood ?? '',
+          city: address.city ?? '',
+          state: address.state ?? '',
+          zip: address.zip ?? '',
+        }
+      : null,
+  }
+}
 
 type Address = {
   street?: string

@@ -89,15 +89,21 @@ export async function saveOrder(
       customerId = created.id
     }
   } else {
-    // Guest: deduplicate by email (user_id IS NULL)
-    const { data: existing } = input.formData.email
+    // Convidado: procura por email sem exigir que o cadastro seja de convidado.
+    // Antes filtrava por user_id IS NULL, então quem já tinha conta e comprava
+    // sem entrar gerava um segundo cadastro com o mesmo email — e o pedido, preso
+    // nesse cadastro solto, nunca aparecia em "Meus pedidos". Ordenar com os
+    // nulos por último faz o cadastro com conta ganhar quando existirem os dois.
+    const { data: matches } = input.formData.email
       ? await supabase
           .from('customers')
           .select('id')
           .eq('email', input.formData.email)
-          .is('user_id', null)
-          .maybeSingle()
+          .order('user_id', { ascending: true, nullsFirst: false })
+          .limit(1)
       : { data: null }
+
+    const existing = matches?.[0] ?? null
 
     if (existing) {
       customerId = existing.id
