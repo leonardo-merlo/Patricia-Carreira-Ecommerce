@@ -38,6 +38,12 @@ type SaveOrderInput = {
   melhorEnvioServiceId: number | null
   couponId: string | null
   userId: string | null
+  /**
+   * Status inicial do pagamento. 'pending' no caminho normal — quem promove para
+   * 'paid' é sempre fulfillPaidOrder. 'failed' quando o MP já recusou na criação:
+   * o pedido fica gravado como rastro da tentativa, sem baixar estoque.
+   */
+  paymentStatus?: 'pending' | 'failed'
 }
 
 export async function saveOrder(
@@ -141,21 +147,22 @@ export async function saveOrder(
     }
   }
 
-  // O pedido sempre nasce pendente. Quem o marca como pago é fulfillPaidOrder,
-  // único lugar que baixa estoque, consome cupom e dispara etiqueta/NF-e/email —
-  // tanto para o webhook do MP quanto para o cartão aprovado na hora.
+  // O pedido nunca nasce pago. Quem o marca como pago é fulfillPaidOrder, único
+  // lugar que baixa estoque, consome cupom e dispara etiqueta/NF-e/email — tanto
+  // para o webhook do MP quanto para o cartão aprovado na hora.
+  const paymentStatus = input.paymentStatus ?? 'pending'
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .insert({
       customer_id: customerId,
       type: 'retail',
-      status: 'pending',
+      status: paymentStatus === 'failed' ? 'cancelled' : 'pending',
       total_amount: input.totalAmount,
       discount_amount: input.discountAmount,
       shipping_amount: input.shippingAmount,
       shipping_method: input.shippingMethod,
       melhor_envio_service_id: input.melhorEnvioServiceId,
-      payment_status: 'pending',
+      payment_status: paymentStatus,
       payment_id: input.paymentId,
       payment_method: input.paymentMethod,
       coupon_id: input.couponId,

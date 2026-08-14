@@ -4,6 +4,7 @@ import {
   createPixPayment,
   createBoletoPayment,
   createCardPayment,
+  describeRejection,
   type MPPaymentResult,
 } from '@/lib/integrations/mercadopago'
 import { saveOrder, type OrderFormData, type OrderLineItem } from '@/lib/server/orders'
@@ -121,7 +122,11 @@ async function priceOrder(
   let discountAmount = 0
   let couponId: string | null = null
   if (orderData.couponCode) {
-    const { coupon, error: couponError } = await validateCoupon(orderData.couponCode, subtotal)
+    const { coupon, error: couponError } = await validateCoupon(
+      orderData.couponCode,
+      subtotal,
+      orderData.formData.email,
+    )
     if (!coupon) {
       return { ok: false, error: couponError ?? 'Cupom inválido ou expirado.' }
     }
@@ -222,6 +227,11 @@ export async function createPayment(
       )
     }
 
+    // O MP recusa na própria criação: cartão sem limite, CVV errado, antifraude.
+    // Sem esta checagem o pedido era gravado como pendente e o checkout mostrava
+    // tela de sucesso — carrinho limpo, cliente achando que comprou, nada cobrado.
+    const rejected = result.status === 'rejected' || result.status === 'cancelled'
+
     // O pedido nasce pendente. Cartão costuma voltar 'approved' já na criação: nesse
     // caso o pós-pagamento roda aqui, porque o webhook do MP chegaria depois (ou nem
     // chegaria) e o cliente não pode ficar sem etiqueta, nota e email por causa disso.
@@ -238,6 +248,8 @@ export async function createPayment(
       discountAmount: priced.discountAmount,
       couponId: priced.couponId,
       userId,
+      // Recusa vira rastro da tentativa, não pedido a atender.
+      paymentStatus: rejected ? 'failed' : 'pending',
     })
     if (saved.ok) {
       orderId = saved.orderId
@@ -254,6 +266,12 @@ export async function createPayment(
     } else {
       console.error('[createPayment] saveOrder failed:', saved.error)
       // Payment processed — don't block the user but log for manual reconciliation
+    }
+
+    if (rejected) {
+      // Volta como erro para o checkout manter o carrinho e deixar a cliente
+      // corrigir o cartão sem remontar o pedido.
+      return { ok: false, error: describeRejection(result.statusDetail) }
     }
 
     return { ok: true, data: { ...result, method: input.method }, orderId }

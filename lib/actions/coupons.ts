@@ -23,6 +23,12 @@ type CouponInput = {
 export async function validateCoupon(
   code: string,
   subtotal: number,
+  /**
+   * E-mail informado no checkout. O carrinho não tem esse dado e chama sem ele;
+   * o checkout passa, e é o que fecha o limite por pessoa para quem compra sem
+   * conta — só pelo user_id, convidada usava o mesmo cupom quantas vezes quisesse.
+   */
+  email?: string | null,
 ): Promise<{ coupon: Coupon | null; error: string | null }> {
   if (!code.trim()) return { coupon: null, error: 'Informe um código de cupom.' }
 
@@ -42,13 +48,18 @@ export async function validateCoupon(
       const supabaseAuth = createClient()
       const { data: { user } } = await supabaseAuth.auth.getUser()
 
-      if (user) {
+      const normalizedEmail = email?.trim().toLowerCase() || null
+      const identities: string[] = []
+      if (user) identities.push(`user_id.eq.${user.id}`)
+      if (normalizedEmail) identities.push(`email.eq.${normalizedEmail}`)
+
+      if (identities.length > 0) {
         const supabase = createServiceClient()
         const { count } = await supabase
           .from('coupon_usages')
           .select('*', { count: 'exact', head: true })
           .eq('coupon_id', coupon.id)
-          .eq('user_id', user.id)
+          .or(identities.join(','))
 
         if ((count ?? 0) >= coupon.max_uses_per_user) {
           return { coupon: null, error: 'Você já utilizou este cupom.' }

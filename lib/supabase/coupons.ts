@@ -65,11 +65,13 @@ export async function recordCouponUsage(
 ): Promise<void> {
   const supabase = createServiceClient()
 
+  // Normalizado na gravação porque validateCoupon compara por igualdade — um
+  // "Maria@Gmail.com" gravado como veio nunca casaria com "maria@gmail.com".
   const { error: usageError } = await supabase.from('coupon_usages').insert({
     coupon_id: couponId,
     order_id: orderId,
     user_id: userId,
-    email: email ?? null,
+    email: email?.trim().toLowerCase() || null,
   })
   if (usageError) console.error('[recordCouponUsage] insert:', usageError)
 

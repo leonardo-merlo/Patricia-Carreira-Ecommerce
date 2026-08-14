@@ -22,6 +22,8 @@ export type MPPayer = {
 export type MPPaymentResult = {
   id: string
   status: string
+  /** Motivo detalhado do MP — 'accredited', 'cc_rejected_insufficient_amount', etc. */
+  statusDetail: string
   pixCode?: string
   pixQrBase64?: string
   boletoUrl?: string
@@ -59,6 +61,7 @@ export async function createPixPayment(
   return {
     id: String(result.id),
     status: result.status ?? 'pending',
+    statusDetail: result.status_detail ?? '',
     pixCode: extra.point_of_interaction?.transaction_data?.qr_code,
     pixQrBase64: extra.point_of_interaction?.transaction_data?.qr_code_base64,
   }
@@ -90,9 +93,36 @@ export async function createBoletoPayment(
   return {
     id: String(result.id),
     status: result.status ?? 'pending',
+    statusDetail: result.status_detail ?? '',
     boletoUrl: extra.transaction_details?.external_resource_url,
     boletoBarcode: extra.barcode?.content,
   }
+}
+
+// O MP devolve o motivo da recusa em status_detail. Sem tradução o cliente vê
+// "erro ao processar" e tenta o mesmo cartão de novo; com ela sabe se corrige o
+// CVV, troca de cartão ou liga para o banco.
+const REJECTION_MESSAGES: Record<string, string> = {
+  cc_rejected_bad_filled_card_number: 'Número do cartão inválido. Confira os dígitos e tente de novo.',
+  cc_rejected_bad_filled_date: 'Data de validade inválida. Confira e tente de novo.',
+  cc_rejected_bad_filled_security_code: 'Código de segurança (CVV) inválido. Confira e tente de novo.',
+  cc_rejected_bad_filled_other: 'Algum dado do cartão está incorreto. Confira e tente de novo.',
+  cc_rejected_insufficient_amount: 'Cartão sem limite disponível para este valor.',
+  cc_rejected_high_risk: 'Pagamento recusado pelo banco. Tente outro cartão ou pague com PIX.',
+  cc_rejected_max_attempts: 'Muitas tentativas com este cartão. Tente outro cartão ou aguarde alguns minutos.',
+  cc_rejected_call_for_authorize: 'O banco precisa autorizar este valor. Ligue para o banco ou use outro cartão.',
+  cc_rejected_card_disabled: 'Cartão desabilitado. Ligue para o banco ou use outro cartão.',
+  cc_rejected_duplicated_payment: 'Já existe um pagamento igual a este. Confira seus pedidos antes de tentar de novo.',
+  cc_rejected_card_error: 'Não foi possível processar este cartão. Tente outro cartão ou pague com PIX.',
+  cc_rejected_invalid_installments: 'Este cartão não aceita o número de parcelas escolhido.',
+  cc_rejected_other_reason: 'Pagamento recusado pelo banco. Tente outro cartão ou pague com PIX.',
+}
+
+export function describeRejection(statusDetail: string): string {
+  return (
+    REJECTION_MESSAGES[statusDetail] ??
+    'Pagamento não autorizado. Tente outro cartão ou pague com PIX.'
+  )
 }
 
 export async function createCardPayment(
@@ -124,5 +154,6 @@ export async function createCardPayment(
   return {
     id: String(result.id),
     status: result.status ?? 'pending',
+    statusDetail: result.status_detail ?? '',
   }
 }

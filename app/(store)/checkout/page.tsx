@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { cn, formatPrice } from "@/lib/utils"
+import { isValidCpf } from "@/lib/documento"
 import { useCart } from "@/lib/cart-context"
 import { fetchAddressByCEP } from "@/lib/integrations/viacep"
 import { createPayment } from "@/lib/actions/payments"
@@ -113,7 +114,8 @@ function validate(
   a: Address,
   method: PaymentMethod | null,
   card: Card,
-  shipping: ShippingOption | null
+  shipping: ShippingOption | null,
+  paymentMethodId: string
 ): Errors {
   const e: Errors = {}
   if (!p.name.trim()) e.name = "Nome obrigatório"
@@ -130,9 +132,15 @@ function validate(
   if (!method) e.method = "Selecione a forma de pagamento"
   // Toda venda de varejo emite NF-e, e a nota exige o CPF do destinatário —
   // sem ele a SEFAZ rejeita depois do pagamento, com o cliente já fora da loja.
-  if (p.cpf.replace(/\D/g, "").length !== 11) e.cpf = "CPF obrigatório"
+  // Confere o dígito verificador: um CPF de 11 dígitos que não fecha passa aqui
+  // e só quebra na emissão da nota, quando já não dá para pedir correção.
+  if (!p.cpf.trim()) e.cpf = "CPF obrigatório"
+  else if (!isValidCpf(p.cpf)) e.cpf = "CPF inválido"
   if (method === "credit_card") {
     if (card.number.replace(/\s/g, "").length < 16) e.card_number = "Número inválido"
+    // Sem bandeira reconhecida o pagamento sai com a bandeira errada e o banco
+    // recusa sem explicar. Melhor barrar aqui, com o cartão ainda na tela.
+    else if (!paymentMethodId) e.card_number = "Não reconhecemos esta bandeira. Confira o número do cartão."
     if (!card.holder.trim()) e.card_holder = "Nome obrigatório"
     if (card.expiry.length < 5) e.card_expiry = "Validade inválida"
     if (card.cvv.length < 3) e.card_cvv = "CVV inválido"
@@ -167,6 +175,9 @@ export default function CheckoutPage() {
   const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null)
   const [freeShippingThreshold, setFreeShippingThreshold] = useState(599)
   const [acceptedTerms, setAcceptedTerms] = useState(false)
+  // CEP que veio do cadastro e ainda não foi cotado. O prefill preenche o endereço
+  // sem passar pelo campo de CEP, então precisa pedir a cotação por fora.
+  const [cepPendenteCotacao, setCepPendenteCotacao] = useState<string | null>(null)
 
   useEffect(() => {
     if (hydrated && cart.items.length === 0 && !loading) router.replace("/carrinho")
@@ -189,8 +200,9 @@ export default function CheckoutPage() {
         })
 
         if (dados.address?.zip) {
+          const cep = maskCEP(dados.address.zip)
           setAddress({
-            cep: maskCEP(dados.address.zip),
+            cep,
             street: dados.address.street,
             number: dados.address.number,
             complement: dados.address.complement,
@@ -198,6 +210,7 @@ export default function CheckoutPage() {
             city: dados.address.city,
             state: dados.address.state,
           })
+          setCepPendenteCotacao(cep)
         }
       })
       .catch(() => {
@@ -209,21 +222,67 @@ export default function CheckoutPage() {
     }
   }, [])
 
-  // Detect card brand from BIN (first 6 digits) via MP SDK
+  // Endereço vindo do cadastro não passa pelo campo de CEP, então a cotação nunca
+  // era disparada: a cliente via o endereço completo e "Preencha o CEP para ver as
+  // opções de frete", e só destravava reeditando o CEP à mão. Espera o carrinho
+  // hidratar porque a cotação precisa dos itens para calcular peso e dimensões.
+  useEffect(() => {
+    if (!hydrated || !cepPendenteCotacao || cart.items.length === 0) return
+    setCepPendenteCotacao(null)
+    void cotarFrete(cepPendenteCotacao)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, cepPendenteCotacao, cart.items.length])
+
+  // Bandeira do cartão pelo BIN (6 primeiros dígitos) via SDK do MP.
+  // Zerar a bandeira a cada mudança de número é o ponto central: sem isso, trocar
+  // de cartão mantinha a bandeira do anterior e o pagamento era enviado com a
+  // bandeira errada — o MP recusava um Mastercard dizendo que o Visa não confere.
   useEffect(() => {
     const bin = card.number.replace(/\s/g, "").substring(0, 6)
-    if (bin.length === 6 && mpRef.current) {
-      mpRef.current
-        .getPaymentMethods({ bin })
-        .then((res) => {
-          const id = res?.results?.[0]?.id
-          if (id) setPaymentMethodId(id)
-        })
-        .catch(() => {})
+    setPaymentMethodId("")
+
+    if (bin.length < 6 || !mpRef.current) return
+
+    let ativo = true
+    mpRef.current
+      .getPaymentMethods({ bin })
+      .then((res) => {
+        if (!ativo) return
+        const id = res?.results?.[0]?.id
+        if (id) setPaymentMethodId(id)
+      })
+      .catch(() => {
+        // Sem bandeira o submit já bloqueia com mensagem própria
+      })
+
+    return () => {
+      ativo = false
     }
   }, [card.number])
 
   if (!hydrated || cart.items.length === 0) return null
+
+  // Único lugar que pede cotação ao Melhor Envio — chamado tanto quando a cliente
+  // digita o CEP quanto quando ele já veio preenchido do cadastro.
+  async function cotarFrete(cep: string) {
+    setShippingLoading(true)
+    setShippingOptions([])
+    setShippingError("")
+    setSelectedShipping(null)
+    setShipping(0)
+
+    const cartItems = cart.items.map((i) => ({ variantId: i.variant.id, quantity: i.quantity }))
+    const resultado = await getShippingOptions(cep, cartItems)
+
+    setShippingLoading(false)
+
+    if (resultado.ok) {
+      setShippingOptions(resultado.options)
+      setFreeShippingThreshold(resultado.freeShippingThreshold)
+    } else {
+      setShippingError(resultado.error)
+    }
+  }
 
   async function handleCEPChange(value: string) {
     const masked = maskCEP(value)
@@ -232,21 +291,13 @@ export default function CheckoutPage() {
 
     if (masked.replace(/\D/g, "").length === 8) {
       setCepLoading(true)
-      setShippingLoading(true)
-      setShippingOptions([])
-      setShippingError("")
-      setSelectedShipping(null)
-      setShipping(0)
 
-      const cartItems = cart.items.map((i) => ({ variantId: i.variant.id, quantity: i.quantity }))
-
-      const [addressResult, shippingResult] = await Promise.all([
+      const [addressResult] = await Promise.all([
         fetchAddressByCEP(masked),
-        getShippingOptions(masked, cartItems),
+        cotarFrete(masked),
       ])
 
       setCepLoading(false)
-      setShippingLoading(false)
 
       if (addressResult) {
         setAddress((prev) => ({
@@ -260,13 +311,6 @@ export default function CheckoutPage() {
       } else {
         setCepError("CEP não encontrado")
         setCepAutoFilled({ city: false, state: false })
-      }
-
-      if (shippingResult.ok) {
-        setShippingOptions(shippingResult.options)
-        setFreeShippingThreshold(shippingResult.freeShippingThreshold)
-      } else {
-        setShippingError(shippingResult.error)
       }
     }
   }
@@ -294,7 +338,7 @@ export default function CheckoutPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    const errs = validate(personal, address, method, card, selectedShipping)
+    const errs = validate(personal, address, method, card, selectedShipping, paymentMethodId)
     if (Object.keys(errs).length > 0) {
       setErrors(errs)
       return

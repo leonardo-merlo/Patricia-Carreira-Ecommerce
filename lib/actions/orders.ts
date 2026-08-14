@@ -13,6 +13,46 @@ import {
 
 export type { OrderFormData, OrderLineItem } from '@/lib/server/orders'
 
+// ─── Consulta pública de pedido ──────────────────────────────────────────────
+
+/**
+ * Dados de um pedido para quem tem o link. Só o que o cliente precisa acompanhar:
+ * nada de CPF, endereço ou e-mail, porque a página é aberta sem login.
+ */
+export type PublicOrder = {
+  id: string
+  status: string
+  paymentStatus: string
+  paymentMethod: string | null
+  trackingCode: string | null
+  totalAmount: number
+  createdAt: string
+}
+
+export async function getPublicOrder(orderId: string): Promise<PublicOrder | null> {
+  // O id é uuid: um id inválido não chega a consultar o banco.
+  if (!/^[0-9a-f-]{36}$/i.test(orderId)) return null
+
+  const supabase = createServiceClient()
+  const { data, error } = await supabase
+    .from('orders')
+    .select('id, status, payment_status, payment_method, tracking_code, total_amount, created_at')
+    .eq('id', orderId)
+    .maybeSingle()
+
+  if (error || !data) return null
+
+  return {
+    id: data.id as string,
+    status: (data.status as string) ?? 'pending',
+    paymentStatus: (data.payment_status as string) ?? 'pending',
+    paymentMethod: (data.payment_method as string | null) ?? null,
+    trackingCode: (data.tracking_code as string | null) ?? null,
+    totalAmount: Number(data.total_amount ?? 0),
+    createdAt: data.created_at as string,
+  }
+}
+
 // ─── Atualizar status de pedido (varejo e atacado) ───────────────────────────
 
 export type UpdateOrderStatusResult =
