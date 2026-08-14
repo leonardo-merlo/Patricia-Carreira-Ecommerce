@@ -23,7 +23,7 @@ export default function CadastrarPage() {
     setLoading(true)
 
     const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { name } },
@@ -35,6 +35,17 @@ export default function CadastrarPage() {
           ? "Este email já tem uma conta. Tente entrar."
           : "Não foi possível criar a conta. Tente novamente."
       )
+      setLoading(false)
+      return
+    }
+
+    // Para e-mail que já tem conta o Supabase devolve sucesso sem criar nada —
+    // é a proteção contra enumeração de e-mails. A pista é identities vazio.
+    // Sem esta checagem a senha digitada aqui nunca chega a ser gravada, a
+    // pessoa é mandada para /conta sem sessão e depois leva "email ou senha
+    // incorretos" ao tentar entrar com ela. Mesma guarda do popup de cadastro.
+    if (data.user && (data.user.identities?.length ?? 0) === 0) {
+      setError("Este email já tem uma conta. Tente entrar.")
       setLoading(false)
       return
     }

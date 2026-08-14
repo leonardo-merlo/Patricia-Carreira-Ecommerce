@@ -23,13 +23,26 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Rotas de conta que não exigem sessão
   const isAuthRoute =
     pathname === '/conta/entrar' ||
     pathname === '/conta/cadastrar' ||
     pathname === '/conta/recuperar-senha' ||
     pathname === '/conta/redefinir-senha'
 
-  // /conta/** (exceto entrar/cadastrar) — exige autenticação
+  // Rotas que só fazem sentido para quem NÃO está logado.
+  // /conta/redefinir-senha fica de fora de propósito: o link de recuperação do
+  // Supabase troca o code por uma sessão antes de chegar na página, então quem
+  // vem do e-mail chega já autenticado — se redirecionasse, o formulário de
+  // nova senha nunca apareceria. Para quem já estava logado a página funciona
+  // como "trocar senha", e sem sessão o updateUser falha e a própria página
+  // avisa que o link expirou.
+  const isGuestOnlyRoute =
+    pathname === '/conta/entrar' ||
+    pathname === '/conta/cadastrar' ||
+    pathname === '/conta/recuperar-senha'
+
+  // /conta/** (exceto rotas de auth) — exige autenticação
   if (pathname.startsWith('/conta') && !isAuthRoute && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/conta/entrar'
@@ -37,8 +50,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Se já autenticado, redireciona entrar/cadastrar para /conta
-  if (isAuthRoute && user) {
+  // Se já autenticado, redireciona entrar/cadastrar/recuperar para /conta
+  if (isGuestOnlyRoute && user) {
     return NextResponse.redirect(new URL('/conta', request.url))
   }
 

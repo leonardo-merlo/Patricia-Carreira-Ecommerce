@@ -18,12 +18,18 @@ export default function RecuperarSenhaPage() {
     setLoading(true)
 
     const supabase = createClient()
-    const redirectTo =
-      typeof window !== "undefined"
-        ? `${window.location.origin}/auth/callback?next=/conta/redefinir-senha`
-        : "/auth/callback?next=/conta/redefinir-senha"
+    // A base vem de NEXT_PUBLIC_APP_URL (URL de produção, a mesma cadastrada na
+    // lista de redirects do Supabase). window.location.origin só entra como
+    // fallback de desenvolvimento: em preview ou localhost o link do e-mail
+    // apontaria para um domínio que o Supabase recusa.
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ??
+      (typeof window !== "undefined" ? window.location.origin : "")
+    // Passa pelo /auth/callback porque é lá que o code do e-mail vira sessão
+    // (cookie) antes de a página de nova senha renderizar.
+    const redirectTo = `${baseUrl}/auth/callback?next=/conta/redefinir-senha`
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo,
     })
 

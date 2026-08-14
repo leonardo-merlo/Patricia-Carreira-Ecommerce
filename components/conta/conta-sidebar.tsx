@@ -1,9 +1,19 @@
-"use client" // usePathname — o item ativo do menu depende da rota atual
+"use client" // usePathname (item ativo do menu) e estado do diálogo de saída
 
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { User, MapPin, ShoppingBag, Heart, LogOut, type LucideIcon } from "lucide-react"
 import { signOut } from "@/lib/actions/auth"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 
 type ItemMenu = {
   href: string
@@ -29,6 +39,7 @@ function iniciais(nome: string): string {
 
 export function ContaSidebar({ name, email }: { name: string | null; email: string }) {
   const pathname = usePathname()
+  const [confirmarSaida, setConfirmarSaida] = useState(false)
   const nomeCompleto = (name ?? "").trim()
   const primeiroNome = nomeCompleto.split(/\s+/)[0] ?? ""
   const sigla = iniciais(nomeCompleto)
@@ -85,17 +96,45 @@ export function ContaSidebar({ name, email }: { name: string | null; email: stri
           )
         })}
 
-        <form action={signOut} className="contents">
-          <button
-            type="submit"
-            id="menu-sair"
-            className="flex shrink-0 items-center gap-3 whitespace-nowrap border-b-2 border-transparent px-4 py-3 text-left font-label-md text-label-md text-on-surface-variant transition-colors hover:border-outline-variant hover:text-on-surface md:border-b-0 md:border-l-2 md:px-4"
-          >
-            <LogOut className="h-4 w-4 shrink-0" />
-            Sair
-          </button>
-        </form>
+        {/* Sair abre confirmação — um clique sozinho não derruba a sessão */}
+        <button
+          type="button"
+          id="menu-sair"
+          onClick={() => setConfirmarSaida(true)}
+          className="flex shrink-0 items-center gap-3 whitespace-nowrap border-b-2 border-transparent px-4 py-3 text-left font-label-md text-label-md text-on-surface-variant transition-colors hover:border-outline-variant hover:text-on-surface md:border-b-0 md:border-l-2 md:px-4"
+        >
+          <LogOut className="h-4 w-4 shrink-0" />
+          Sair
+        </button>
       </nav>
+
+      <Dialog open={confirmarSaida} onOpenChange={setConfirmarSaida}>
+        <DialogContent
+          id="dialog-confirmar-saida"
+          className="max-w-sm p-6"
+          aria-describedby="dialog-confirmar-saida-descricao"
+        >
+          <DialogHeader>
+            <DialogTitle>Deseja sair da sua conta?</DialogTitle>
+            <DialogDescription id="dialog-confirmar-saida-descricao">
+              Você precisará entrar de novo para ver seus pedidos e favoritos.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <DialogClose asChild>
+              <Button type="button" variant="outline" id="btn-cancelar-saida">
+                Cancelar
+              </Button>
+            </DialogClose>
+            <form action={signOut}>
+              <Button type="submit" variant="destructive" className="w-full" id="btn-confirmar-saida">
+                Sair
+              </Button>
+            </form>
+          </div>
+        </DialogContent>
+      </Dialog>
     </aside>
   )
 }
