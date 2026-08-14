@@ -24,30 +24,23 @@ export default async function FavoritosPage() {
   const products = await getWishlistProducts()
 
   return (
-    <div className="mx-auto max-w-container px-margin-mobile py-16 md:px-margin-desktop">
-      {/* Header */}
-      <div className="mx-auto max-w-2xl text-center">
+    <section>
+      {/* Cabeçalho */}
+      <header className="mb-8">
         <p className="font-label-md text-label-md uppercase tracking-widest text-primary">
-          Lista de desejos
+          Minha conta
         </p>
-        <h1 className="mt-3 font-display-lg text-display-lg-mobile text-on-surface md:text-display-lg">
-          Suas{" "}
-          <span className="italic text-primary">favoritas</span>
-        </h1>
+        <h1 className="mt-2 font-headline-md text-headline-md text-on-surface">Favoritos</h1>
         {products.length > 0 && (
-          <p className="mt-5 font-body-lg text-body-lg text-on-surface-variant">
-            {products.length === 1
-              ? "1 peça salva"
-              : `${products.length} peças salvas`}
+          <p className="mt-2 font-body-md text-body-md text-on-surface-variant">
+            {products.length === 1 ? "1 peça salva" : `${products.length} peças salvas`}
           </p>
         )}
-      </div>
-
-      <Separator className="my-12" />
+      </header>
 
       {products.length === 0 ? (
-        <div className="mx-auto max-w-sm text-center">
-          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary-fixed">
+        <div className="max-w-sm">
+          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary-fixed">
             <Heart className="h-9 w-9 text-primary" />
           </div>
           <h2 className="font-headline-sm text-headline-sm text-on-surface">
@@ -70,21 +63,19 @@ export default async function FavoritosPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-6 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 md:gap-6 lg:grid-cols-3">
             {products.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
 
-          <Separator className="my-12" />
+          <Separator className="my-10" />
 
-          <div className="text-center">
-            <Button asChild variant="outline">
-              <Link href="/">Continuar explorando</Link>
-            </Button>
-          </div>
+          <Button asChild variant="outline">
+            <Link href="/">Continuar explorando</Link>
+          </Button>
         </>
       )}
-    </div>
+    </section>
   )
 }

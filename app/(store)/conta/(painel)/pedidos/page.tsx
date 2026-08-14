@@ -1,10 +1,9 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { ShoppingBag, ChevronRight, ArrowLeft, Package } from "lucide-react"
+import { ShoppingBag, ChevronRight, Package } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
 import { formatPrice } from "@/lib/utils"
 
 export const metadata: Metadata = {
@@ -69,25 +68,14 @@ export default async function PedidosPage() {
   }
 
   return (
-    <div className="mx-auto max-w-container px-margin-mobile py-16 md:px-margin-desktop">
+    <section>
       {/* Cabeçalho */}
-      <div className="mb-8 flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/conta" aria-label="Voltar para minha conta">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-        </Button>
-        <div>
-          <p className="font-label-md text-label-md uppercase tracking-widest text-primary">
-            Minha conta
-          </p>
-          <h1 className="mt-1 font-headline-lg text-on-surface">
-            Meus pedidos
-          </h1>
-        </div>
-      </div>
-
-      <Separator className="mb-8" />
+      <header className="mb-8">
+        <p className="font-label-md text-label-md uppercase tracking-widest text-primary">
+          Minha conta
+        </p>
+        <h1 className="mt-2 font-headline-md text-headline-md text-on-surface">Pedidos</h1>
+      </header>
 
       {/* Lista vazia */}
       {(!orders || orders.length === 0) && (
@@ -207,6 +195,6 @@ export default async function PedidosPage() {
           })}
         </div>
       )}
-    </div>
+    </section>
   )
 }
