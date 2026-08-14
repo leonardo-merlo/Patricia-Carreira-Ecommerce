@@ -136,8 +136,21 @@ export async function addToCart(input: AddToCartInput): Promise<string> {
   return data.id
 }
 
+/**
+ * Paga os fretes já adicionados ao carrinho. É o passo que faltava para a
+ * etiqueta existir: sem ele o frete fica no carrinho do ME e nunca vira envio.
+ *
+ * A rota é `/me/shipment/checkout`. `/me/checkout` existe, mas só aceita GET —
+ * respondia 405 a cada compra, e como a falha de etiqueta é isolada em
+ * try/catch no fulfillment, o pedido seguia "pago" com a etiqueta faltando.
+ *
+ * `orders` vazio faz o ME pagar o carrinho inteiro. Mandar sempre a lista
+ * explícita evita cobrar fretes de outros pedidos por engano.
+ */
 export async function checkoutCart(meOrderIds: string[]): Promise<void> {
-  const res = await fetch(`${baseUrl()}/me/checkout`, {
+  if (meOrderIds.length === 0) return
+
+  const res = await fetch(`${baseUrl()}/me/shipment/checkout`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ orders: meOrderIds }),

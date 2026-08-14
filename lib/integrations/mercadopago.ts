@@ -12,11 +12,22 @@ function notificationUrl(): string | undefined {
 
 const paymentClient = new Payment(mpConfig)
 
+export type MPPayerAddress = {
+  zipCode: string
+  streetName: string
+  streetNumber: string
+  neighborhood: string
+  city: string
+  federalUnit: string
+}
+
 export type MPPayer = {
   email: string
   firstName: string
   lastName: string
   cpf?: string
+  /** Obrigatório no boleto registrado; ignorado no PIX e no cartão. */
+  address?: MPPayerAddress
 }
 
 export type MPPaymentResult = {
@@ -71,6 +82,12 @@ export async function createBoletoPayment(
   amount: number,
   payer: MPPayer
 ): Promise<MPPaymentResult> {
+  // O boleto registrado exige o endereço completo do pagador. Sem ele o MP
+  // recusa a criação inteira com "Offline API Error" listando os campos.
+  if (!payer.address) {
+    throw new Error('Endereço do pagador é obrigatório para gerar boleto')
+  }
+
   const result = await paymentClient.create({
     body: {
       transaction_amount: amount,
@@ -82,6 +99,14 @@ export async function createBoletoPayment(
         identification: {
           type: 'CPF',
           number: payer.cpf!.replace(/\D/g, ''),
+        },
+        address: {
+          zip_code: payer.address.zipCode.replace(/\D/g, ''),
+          street_name: payer.address.streetName,
+          street_number: payer.address.streetNumber,
+          neighborhood: payer.address.neighborhood,
+          city: payer.address.city,
+          federal_unit: payer.address.federalUnit,
         },
       },
       description: 'Pedido Patrícia Carreira',

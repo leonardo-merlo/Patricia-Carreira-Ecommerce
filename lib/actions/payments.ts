@@ -172,11 +172,21 @@ export async function createPayment(
   const firstName = parts[0]
   const lastName = parts.slice(1).join(' ') || firstName
 
+  const endereco = input.orderData.formData.address
   const mpPayer = {
     email: input.payer.email,
     firstName,
     lastName,
     cpf: input.payer.cpf,
+    // Só o boleto usa, mas montar aqui mantém um payer só para os três métodos.
+    address: {
+      zipCode: endereco.zip,
+      streetName: endereco.street,
+      streetNumber: endereco.number,
+      neighborhood: endereco.neighborhood,
+      city: endereco.city,
+      federalUnit: endereco.state,
+    },
   }
 
   // Detect logged-in user here — createPayment is called directly from the client

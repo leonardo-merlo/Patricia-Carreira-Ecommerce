@@ -154,14 +154,18 @@ export async function purchaseShippingLabel(orderId: string): Promise<void> {
     totalValue: Number(rawOrder.total_amount),
   })
 
-  // 2. Checkout (debits ME wallet)
-  await checkoutCart([meOrderId])
-
-  // 3. Save ME order ID
+  // 2. Guarda o vínculo antes de pagar. Se o checkout falhar, o envio já existe
+  // no Melhor Envio e sem este id ele fica órfão: o painel não consegue retomar
+  // e uma nova tentativa criaria um segundo envio para o mesmo pedido.
   await supabase
     .from('orders')
-    .update({ melhor_envio_order_id: meOrderId, status: 'separating' })
+    .update({ melhor_envio_order_id: meOrderId })
     .eq('id', orderId)
+
+  // 3. Checkout (debita a carteira do ME)
+  await checkoutCart([meOrderId])
+
+  await supabase.from('orders').update({ status: 'separating' }).eq('id', orderId)
 
   // 4. Try to generate label right away (works in production; sandbox needs ~5 min approval)
   try {

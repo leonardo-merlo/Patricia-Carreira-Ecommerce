@@ -19,17 +19,30 @@ export async function getFreeShippingThreshold(): Promise<number> {
   return settings?.free_shipping_threshold ?? FREE_SHIPPING_THRESHOLD_FALLBACK
 }
 
+/**
+ * O rótulo salvo em `enabled_carriers` tem a forma "Empresa (Serviço)" —
+ * "Correios (PAC)", "Jadlog (.Package)". Comparar as duas partes separadamente
+ * é o que faz o filtro valer: antes a regra de Correios procurava "correo"
+ * (grafia espanhola) e o ME devolve "Correios", então PAC e SEDEX eram
+ * descartados em silêncio; e a de Jadlog casava só pela empresa, então ".Com"
+ * passava sem estar habilitado.
+ */
 function matchesEnabledCarrier(quote: MEQuoteResult, enabledCarriers: string[]): boolean {
   if (enabledCarriers.length === 0) return true
-  const co = (quote.company?.name ?? '').toLowerCase()
-  const svc = (quote.name ?? '').toLowerCase()
-  return enabledCarriers.some((c) => {
-    const cl = c.toLowerCase()
-    if (cl.startsWith('correios (pac)')) return co.includes('correo') && svc === 'pac'
-    if (cl.startsWith('correios (sedex)')) return co.includes('correo') && svc.startsWith('sedex')
-    if (cl.startsWith('jadlog')) return co.includes('jadlog')
-    if (cl.startsWith('total express')) return co.includes('total express') || svc.includes('total express')
-    return co.includes(cl.split('(')[0].trim()) || svc.includes(cl.split('(')[0].trim())
+
+  const empresa = (quote.company?.name ?? '').trim().toLowerCase()
+  const servico = (quote.name ?? '').trim().toLowerCase()
+
+  return enabledCarriers.some((rotulo) => {
+    const match = rotulo.trim().toLowerCase().match(/^([^(]+?)\s*(?:\(([^)]*)\))?$/)
+    if (!match) return false
+
+    const empresaEsperada = match[1].trim()
+    const servicoEsperado = (match[2] ?? '').trim()
+
+    if (empresa !== empresaEsperada) return false
+    // Rótulo sem parênteses ("Jadlog") libera todos os serviços da empresa.
+    return servicoEsperado === '' || servico === servicoEsperado
   })
 }
 
