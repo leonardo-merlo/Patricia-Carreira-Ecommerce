@@ -101,6 +101,18 @@ export async function saveOrder(
 
     if (existing) {
       customerId = existing.id
+      // Sem isto, o cadastro da primeira compra congela: quem volta com CPF novo
+      // ou mudou de endereço tem os dados descartados em silêncio — e o pedido
+      // sai sem CPF para a NF-e e com o endereço antigo na etiqueta.
+      await supabase
+        .from('customers')
+        .update({
+          name: input.formData.name,
+          phone: input.formData.phone,
+          cpf_cnpj: input.formData.cpf || null,
+          address: input.formData.address,
+        })
+        .eq('id', customerId)
     } else {
       const { data: created, error } = await supabase
         .from('customers')
