@@ -187,6 +187,10 @@ export type RetailOrderRow = {
   id: string
   display_num: string
   date: string
+  /** Hora da compra, HH:MM. Duas vendas no mesmo dia precisam ser distinguíveis. */
+  time: string
+  /** ISO cru, usado pelos filtros de período no painel. */
+  created_at: string
   customer_name: string
   customer_location: string
   item_count: number
@@ -274,6 +278,8 @@ export async function getRetailOrders(limit = 50): Promise<RetailOrderRow[]> {
       id: o.id as string,
       display_num: `V-${shortId}`,
       date: dateStr,
+      time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
+      created_at: o.created_at as string,
       customer_name: customer?.name ?? 'Cliente',
       customer_location: location,
       item_count: items.length,

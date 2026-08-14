@@ -1,6 +1,6 @@
 "use client" // tabs + expanded rows + wholesale creation modal
 
-import { Fragment, useState, useTransition } from 'react'
+import { Fragment, useMemo, useState, useTransition } from 'react'
 import { AdminIcon } from '@/components/admin/admin-icon'
 import { formatPrice } from '@/lib/utils'
 import type {
@@ -74,6 +74,32 @@ function NFeBadge({ status }: { status: string }) {
 
 type LineItem = { variantId: string; qty: number }
 
+type PeriodoFiltro = 'todos' | 'hoje' | '7dias' | 'mes' | 'mesPassado' | 'personalizado'
+
+const PERIODO_OPCOES: Array<{ value: PeriodoFiltro; label: string }> = [
+  { value: 'todos', label: 'Todo o período' },
+  { value: 'hoje', label: 'Hoje' },
+  { value: '7dias', label: 'Últimos 7 dias' },
+  { value: 'mes', label: 'Este mês' },
+  { value: 'mesPassado', label: 'Mês passado' },
+  { value: 'personalizado', label: 'Escolher datas...' },
+]
+
+// Só os status que um pedido de varejo realmente assume.
+const ENTREGA_OPCOES: Array<{ value: string; label: string }> = [
+  { value: 'paid', label: 'A preparar' },
+  { value: 'separating', label: 'Separando' },
+  { value: 'shipped', label: 'Enviado' },
+  { value: 'delivered', label: 'Entregue' },
+  { value: 'cancelled', label: 'Cancelado' },
+]
+
+const PAGAMENTO_OPCOES: Array<{ value: string; label: string }> = [
+  { value: 'pending', label: 'Pendente' },
+  { value: 'paid', label: 'Pago' },
+  { value: 'failed', label: 'Falhou' },
+]
+
 export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVariants }: PedidosClientProps) {
   const [tab, setTab] = useState<'varejo' | 'atacado'>('varejo')
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null)
@@ -82,6 +108,14 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
 
   // Atacado: dropdown de ações por pedido
   const [openActionsFor, setOpenActionsFor] = useState<string | null>(null)
+  const [pagamentoFilter, setPagamentoFilter] = useState('')
+  const [entregaFilter, setEntregaFilter] = useState('')
+  const [periodo, setPeriodo] = useState<PeriodoFiltro>('todos')
+  const [dataDe, setDataDe] = useState('')
+  const [dataAte, setDataAte] = useState('')
+  const [cancelLoading, setCancelLoading] = useState<string | null>(null)
+  const [cancelConfirm, setCancelConfirm] = useState<string | null>(null)
+  const [cancelError, setCancelError] = useState<Record<string, string>>({})
   const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null)
   const [statusLoading, setStatusLoading] = useState<string | null>(null)
 
@@ -107,8 +141,53 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
   const [previewCheck, setPreviewCheck] = useState<ItemCheckResult[]>([])
   const [previewError, setPreviewError] = useState('')
 
+  // Intervalo [início, fim) do período escolhido. Fim exclusivo evita perder as
+  // compras da última hora do dia, que é o erro clássico de comparar só a data.
+  const periodoRange = useMemo((): { de: Date; ate: Date } | null => {
+    const agora = new Date()
+    const inicioDoDia = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+
+    if (periodo === 'hoje') {
+      const de = inicioDoDia(agora)
+      return { de, ate: new Date(de.getTime() + 24 * 60 * 60 * 1000) }
+    }
+    if (periodo === '7dias') {
+      const ate = new Date(inicioDoDia(agora).getTime() + 24 * 60 * 60 * 1000)
+      return { de: new Date(ate.getTime() - 7 * 24 * 60 * 60 * 1000), ate }
+    }
+    if (periodo === 'mes') {
+      return {
+        de: new Date(agora.getFullYear(), agora.getMonth(), 1),
+        ate: new Date(agora.getFullYear(), agora.getMonth() + 1, 1),
+      }
+    }
+    if (periodo === 'mesPassado') {
+      return {
+        de: new Date(agora.getFullYear(), agora.getMonth() - 1, 1),
+        ate: new Date(agora.getFullYear(), agora.getMonth(), 1),
+      }
+    }
+    if (periodo === 'personalizado' && (dataDe || dataAte)) {
+      // Sem uma das pontas o intervalo fica aberto daquele lado.
+      const de = dataDe ? new Date(`${dataDe}T00:00:00`) : new Date(0)
+      const ate = dataAte
+        ? new Date(new Date(`${dataAte}T00:00:00`).getTime() + 24 * 60 * 60 * 1000)
+        : new Date(8640000000000000)
+      return { de, ate }
+    }
+    return null
+  }, [periodo, dataDe, dataAte])
+
   const filteredVarejo = varejo.filter((o) => {
     if (statusFilter && o.status !== statusFilter) return false
+    if (pagamentoFilter && o.payment_status !== pagamentoFilter) return false
+    if (entregaFilter && o.status !== entregaFilter) return false
+
+    if (periodoRange) {
+      const criadoEm = new Date(o.created_at)
+      if (criadoEm < periodoRange.de || criadoEm >= periodoRange.ate) return false
+    }
+
     if (searchFilter.trim()) {
       const q = searchFilter.toLowerCase()
       if (!o.customer_name.toLowerCase().includes(q) && !o.display_num.toLowerCase().includes(q)) return false
@@ -117,6 +196,17 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
   })
 
   const varejoTotal = filteredVarejo.reduce((s, o) => s + o.total, 0)
+  const filtrosAtivos =
+    Boolean(pagamentoFilter) || Boolean(entregaFilter) || periodo !== 'todos' || Boolean(searchFilter.trim())
+
+  function limparFiltros() {
+    setPagamentoFilter('')
+    setEntregaFilter('')
+    setPeriodo('todos')
+    setDataDe('')
+    setDataAte('')
+    setSearchFilter('')
+  }
 
   function addLine() {
     setLineItems((prev) => [...prev, { variantId: wholesaleVariants[0]?.id ?? '', qty: 1 }])
@@ -260,18 +350,96 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
 
       <div className="card">
         <div className="card-header" style={{ gap: 10 }}>
-          <div className="row" style={{ gap: 8, flex: 1 }}>
+          <div className="row" style={{ gap: 8, flex: 1, flexWrap: 'wrap' }}>
             <div className="search-input" style={{ width: 240 }}>
               <AdminIcon name="search" size={13} />
               <input
                 placeholder={tab === 'varejo' ? 'Buscar por cliente ou pedido...' : 'Buscar por cliente...'}
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
+                data-testid="filtro-busca-pedidos"
               />
             </div>
+
+            {tab === 'varejo' && (
+              <>
+                <select
+                  className="select"
+                  id="filtro-periodo"
+                  value={periodo}
+                  onChange={(e) => setPeriodo(e.target.value as PeriodoFiltro)}
+                  style={{ minWidth: 150 }}
+                >
+                  {PERIODO_OPCOES.map((p) => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+
+                {periodo === 'personalizado' && (
+                  <div className="row" style={{ gap: 6, alignItems: 'center' }}>
+                    <input
+                      className="input"
+                      id="filtro-data-de"
+                      type="date"
+                      value={dataDe}
+                      max={dataAte || undefined}
+                      onChange={(e) => setDataDe(e.target.value)}
+                      aria-label="Data inicial"
+                    />
+                    <span className="cust-meta">até</span>
+                    <input
+                      className="input"
+                      id="filtro-data-ate"
+                      type="date"
+                      value={dataAte}
+                      min={dataDe || undefined}
+                      onChange={(e) => setDataAte(e.target.value)}
+                      aria-label="Data final"
+                    />
+                  </div>
+                )}
+
+                <select
+                  className="select"
+                  id="filtro-pagamento"
+                  value={pagamentoFilter}
+                  onChange={(e) => setPagamentoFilter(e.target.value)}
+                  style={{ minWidth: 140 }}
+                >
+                  <option value="">Todo pagamento</option>
+                  {PAGAMENTO_OPCOES.map((p) => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+
+                <select
+                  className="select"
+                  id="filtro-entrega"
+                  value={entregaFilter}
+                  onChange={(e) => setEntregaFilter(e.target.value)}
+                  style={{ minWidth: 140 }}
+                >
+                  <option value="">Toda entrega</option>
+                  {ENTREGA_OPCOES.map((p) => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+
+                {filtrosAtivos && (
+                  <button className="linkish" id="btn-limpar-filtros" onClick={limparFiltros}>
+                    Limpar filtros
+                  </button>
+                )}
+              </>
+            )}
           </div>
           {tab === 'varejo' && (
             <div className="cust-meta">
+              {filtrosAtivos && (
+                <span style={{ marginRight: 10 }}>
+                  {filteredVarejo.length} de {varejo.length}
+                </span>
+              )}
               Total: <b style={{ color: 'var(--text)' }}>{formatPrice(varejoTotal)}</b>
             </div>
           )}
@@ -283,7 +451,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                 {tab === 'varejo' ? (
                   <tr>
                     <th style={{ width: 90 }}>#</th>
-                    <th style={{ width: 70 }}>Data</th>
+                    <th style={{ width: 82 }}>Data</th>
                     <th>Cliente</th>
                     <th style={{ width: 70 }}>Itens</th>
                     <th style={{ width: 110 }}>Total</th>
@@ -316,7 +484,10 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                       <Fragment key={o.id}>
                         <tr style={isExpanded ? { background: 'var(--surface-2)' } : {}}>
                           <td><span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11.5, color: 'var(--text-2)' }}>{o.display_num}</span></td>
-                          <td>{o.date}</td>
+                          <td>
+                            <div>{o.date}</div>
+                            <div className="cust-meta tiny" style={{ fontVariantNumeric: 'tabular-nums' }}>{o.time}</div>
+                          </td>
                           <td>
                             <div className="row" style={{ gap: 8 }}>
                               <div className="thumb" style={{ width: 22, height: 22, fontSize: 9, background: 'linear-gradient(135deg,#c4b98f,#8a7f4a)', color: '#fff' }}>{initials}</div>
@@ -465,6 +636,64 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                                       </button>
                                       {labelError[o.id] && (
                                         <div style={{ fontSize: 11, color: 'var(--red)' }}>{labelError[o.id]}</div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Cancelar existia só no atacado. No varejo é o que
+                                      estorna o estoque e avisa a cliente por email. */}
+                                  {o.status !== 'cancelled' && (
+                                    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--border)' }}>
+                                      {cancelConfirm === o.id ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                          <div style={{ fontSize: 11.5, color: 'var(--text-2)' }}>
+                                            {o.payment_status === 'paid'
+                                              ? 'O estoque dos itens volta e a cliente recebe um email de cancelamento. Não dá para desfazer.'
+                                              : 'O pedido será cancelado. Não dá para desfazer.'}
+                                          </div>
+                                          <div className="row" style={{ gap: 6 }}>
+                                            <button
+                                              className="btn"
+                                              style={{ fontSize: 12, padding: '5px 10px' }}
+                                              disabled={cancelLoading === o.id}
+                                              onClick={() => setCancelConfirm(null)}
+                                            >
+                                              Voltar
+                                            </button>
+                                            <button
+                                              className="btn danger-outline"
+                                              style={{ fontSize: 12, padding: '5px 10px' }}
+                                              disabled={cancelLoading === o.id}
+                                              data-testid="btn-confirmar-cancelamento"
+                                              onClick={async () => {
+                                                setCancelLoading(o.id)
+                                                setCancelError((prev) => ({ ...prev, [o.id]: '' }))
+                                                const res = await updateOrderStatus(o.id, 'cancelled')
+                                                setCancelLoading(null)
+                                                if (res.success) {
+                                                  setCancelConfirm(null)
+                                                  window.location.reload()
+                                                } else {
+                                                  setCancelError((prev) => ({ ...prev, [o.id]: res.error }))
+                                                }
+                                              }}
+                                            >
+                                              {cancelLoading === o.id ? 'Cancelando...' : 'Confirmar cancelamento'}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <button
+                                          className="linkish"
+                                          style={{ fontSize: 12, color: 'var(--red)' }}
+                                          id={`btn-cancelar-pedido-${o.id}`}
+                                          onClick={() => setCancelConfirm(o.id)}
+                                        >
+                                          <AdminIcon name="xCircle" size={11} /> Cancelar pedido
+                                        </button>
+                                      )}
+                                      {cancelError[o.id] && (
+                                        <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 6 }}>{cancelError[o.id]}</div>
                                       )}
                                     </div>
                                   )}
