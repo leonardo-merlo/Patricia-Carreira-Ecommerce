@@ -17,13 +17,27 @@ function fetchSemCache(input: RequestInfo | URL, init?: RequestInit): Promise<Re
   return fetch(input, { ...init, cache: 'no-store' })
 }
 
-export function createServiceClient() {
+/**
+ * Dado que quase não muda pode ser cacheado por alguns segundos. Isso não é
+ * só economia: `no-store` derruba a geração estática da página inteira, e como
+ * o rodapé da loja lê as configurações, o `no-store` cru fazia as 52 páginas
+ * abortarem o prerender e o build passar de 1 para 4 minutos.
+ */
+function fetchComRevalidacao(segundos: number) {
+  return (input: RequestInfo | URL, init?: RequestInit): Promise<Response> =>
+    fetch(input, { ...init, next: { revalidate: segundos } })
+}
+
+export function createServiceClient(opts?: { revalidateSeconds?: number }) {
+  const revalidate = opts?.revalidateSeconds
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
       auth: { persistSession: false },
-      global: { fetch: fetchSemCache },
+      global: {
+        fetch: revalidate === undefined ? fetchSemCache : fetchComRevalidacao(revalidate),
+      },
     }
   )
 }

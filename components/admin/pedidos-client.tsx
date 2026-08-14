@@ -368,7 +368,9 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                   id="filtro-periodo"
                   value={periodo}
                   onChange={(e) => setPeriodo(e.target.value as PeriodoFiltro)}
-                  style={{ minWidth: 150 }}
+                  // .select tem width:100% no admin.css — sem largura inline os
+                  // filtros quebram linha e ocupam a barra inteira.
+                  style={{ width: 152, flex: '0 0 auto' }}
                 >
                   {PERIODO_OPCOES.map((p) => (
                     <option key={p.value} value={p.value}>{p.label}</option>
@@ -385,6 +387,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                       max={dataAte || undefined}
                       onChange={(e) => setDataDe(e.target.value)}
                       aria-label="Data inicial"
+                      style={{ width: 140, flex: '0 0 auto' }}
                     />
                     <span className="cust-meta">até</span>
                     <input
@@ -395,6 +398,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                       min={dataDe || undefined}
                       onChange={(e) => setDataAte(e.target.value)}
                       aria-label="Data final"
+                      style={{ width: 140, flex: '0 0 auto' }}
                     />
                   </div>
                 )}
@@ -404,7 +408,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                   id="filtro-pagamento"
                   value={pagamentoFilter}
                   onChange={(e) => setPagamentoFilter(e.target.value)}
-                  style={{ minWidth: 140 }}
+                  style={{ width: 148, flex: '0 0 auto' }}
                 >
                   <option value="">Todo pagamento</option>
                   {PAGAMENTO_OPCOES.map((p) => (
@@ -417,7 +421,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                   id="filtro-entrega"
                   value={entregaFilter}
                   onChange={(e) => setEntregaFilter(e.target.value)}
-                  style={{ minWidth: 140 }}
+                  style={{ width: 148, flex: '0 0 auto' }}
                 >
                   <option value="">Toda entrega</option>
                   {ENTREGA_OPCOES.map((p) => (

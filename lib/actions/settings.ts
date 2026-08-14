@@ -49,5 +49,8 @@ export async function updateStoreSettings(
   }
 
   revalidatePath('/admin/config')
+  // As configurações são lidas pelo rodapé de toda a loja, com cache de 60s.
+  // Sem isto, mudar frete grátis ou contato demoraria até um minuto para valer.
+  revalidatePath('/', 'layout')
   return { ok: true }
 }

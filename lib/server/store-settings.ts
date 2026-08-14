@@ -36,8 +36,13 @@ export type StoreSettings = {
 
 export type SettingsUpdate = Partial<Omit<StoreSettings, 'id' | 'updated_at'>>
 
+/**
+ * Lido pelo rodapé, ou seja, por toda página da loja. Cacheado por 60s de
+ * propósito: com leitura sem cache aqui, nenhuma página consegue ser estática.
+ * Quem salva a configuração revalida na hora, então o painel não fica atrasado.
+ */
 export async function getStoreSettings(): Promise<StoreSettings | null> {
-  const supabase = createServiceClient()
+  const supabase = createServiceClient({ revalidateSeconds: 60 })
   const { data, error } = await supabase
     .from('store_settings')
     .select('*')
