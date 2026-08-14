@@ -26,8 +26,8 @@ export function CookieConsent() {
   if (consent !== null) return null
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-outline-variant bg-surface-container px-[var(--spacing-margin-mobile)] py-4 md:px-[var(--spacing-margin-desktop)]">
-      <div className="flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
+    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-outline-variant bg-surface-container px-margin-mobile py-4 md:px-margin-desktop">
+      <div className="mx-auto flex max-w-container flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
         <p className="font-body-md text-body-md text-on-surface-variant">
           Usamos cookies essenciais para o funcionamento do site. Ao continuar navegando, você concorda com nossa{" "}
           <Link href="/privacidade" className="underline underline-offset-2 hover:text-on-surface">

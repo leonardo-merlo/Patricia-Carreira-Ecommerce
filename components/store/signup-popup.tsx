@@ -9,7 +9,10 @@ import { Input } from "@/components/ui/input"
 import { X } from "lucide-react"
 
 const POPUP_KEY = "pc_popup_dismissed"
-const COUPON_CODE = "PRIMEIRACOMPRA10"
+// Precisa existir em coupons.code — o mesmo que o banner do topo anuncia.
+// Antes era "PRIMEIRACOMPRA10", que nunca foi cadastrado: quem se cadastrava
+// pelo popup recebia um código que o carrinho recusava.
+const COUPON_CODE = "BEMVINDA10"
 const DELAY_MS = 3000
 
 export function SignupPopup() {

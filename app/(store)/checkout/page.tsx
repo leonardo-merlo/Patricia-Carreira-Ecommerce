@@ -127,7 +127,9 @@ function validate(
   if (!a.state.trim()) e.state = "Estado obrigatório"
   if (!shipping) e.shipping = "Selecione uma opção de frete"
   if (!method) e.method = "Selecione a forma de pagamento"
-  if (method === "boleto" && !p.cpf.trim()) e.cpf = "CPF obrigatório para boleto"
+  // Toda venda de varejo emite NF-e, e a nota exige o CPF do destinatário —
+  // sem ele a SEFAZ rejeita depois do pagamento, com o cliente já fora da loja.
+  if (p.cpf.replace(/\D/g, "").length !== 11) e.cpf = "CPF obrigatório"
   if (method === "credit_card") {
     if (card.number.replace(/\s/g, "").length < 16) e.card_number = "Número inválido"
     if (!card.holder.trim()) e.card_holder = "Nome obrigatório"
@@ -410,12 +412,8 @@ export default function CheckoutPage() {
                   </div>
                   <div>
                     <Label htmlFor="cpf">
-                      CPF{" "}
-                      {method === "boleto" ? (
-                        <span className="text-error">*</span>
-                      ) : (
-                        <span className="text-on-surface-variant/60">(opcional)</span>
-                      )}
+                      CPF <span className="text-error">*</span>{" "}
+                      <span className="text-on-surface-variant/60">(para a nota fiscal)</span>
                     </Label>
                     <Input
                       id="cpf"
