@@ -1,5 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/service'
-import { categoryLabel, categoryColor } from '@/lib/categories'
+import { categoryLabel, assignCategoryColors } from '@/lib/categories'
 
 /** `custom:YYYY-MM-DD:YYYY-MM-DD` — intervalo escolhido à mão. */
 export function isCustomPeriod(period: string): boolean {
@@ -221,6 +221,9 @@ export async function getReportData(period: string): Promise<ReportData> {
     }
 
     const totalCat = Array.from(catMap.values()).reduce((s, v) => s + v.value, 0)
+    // Cores atribuídas de uma vez para o conjunto, não uma a uma: é o que impede
+    // duas categorias do mesmo gráfico de saírem com a mesma cor.
+    const colors = assignCategoryColors(Array.from(catMap.keys()))
     by_category = Array.from(catMap.entries())
       .sort((a, b) => b[1].value - a[1].value)
       .map(([cat, s]) => ({
@@ -228,7 +231,7 @@ export async function getReportData(period: string): Promise<ReportData> {
         value: s.value,
         units: s.units,
         pct: totalCat > 0 ? Math.round((s.value / totalCat) * 1000) / 10 : 0,
-        color: categoryColor(cat),
+        color: colors.get(cat) ?? '#9ca3af',
       }))
 
     top_products = Array.from(prodMap.entries())

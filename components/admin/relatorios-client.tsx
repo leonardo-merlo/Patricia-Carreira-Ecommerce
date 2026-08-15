@@ -243,19 +243,22 @@ export function RelatoriosClient({ data, period }: RelatoriosClientProps) {
         </div>
 
         {/* Donut — revenue by category */}
-        <div className="card">
+        <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
           <div className="card-header">
             <h3 className="ttl">Receita por categoria</h3>
             <span style={{ color: 'var(--text-3)', fontSize: 11.5 }}>{data.period_label}</span>
           </div>
-          <div className="card-body">
+          {/* flex:1 + centralização: o card acompanha a altura do gráfico de
+              receita mensal ao lado, e o conteúdo ocupa esse espaço em vez de
+              ficar grudado no topo com um vazio embaixo. */}
+          <div className="card-body" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             {by_category.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-3)', fontSize: 12 }}>
                 Sem vendas no período
               </div>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-                <svg width="168" height="168" viewBox="0 0 36 36" style={{ flexShrink: 0 }}>
+                <svg width="192" height="192" viewBox="0 0 36 36" style={{ flexShrink: 0 }}>
                   {donutArcs.map((c, i) => (
                     <circle
                       key={i}
