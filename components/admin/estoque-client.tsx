@@ -335,9 +335,17 @@ export function EstoqueClient({
                   return (
                     <Fragment key={p.id}>
                       {/* Product row */}
-                      <tr className={isExpanded ? 'expanded' : ''}>
+                      <tr
+                        className={`row-clickable ${isExpanded ? 'expanded' : ''}`}
+                        onClick={() => toggle(p.id)}
+                      >
                         <td>
-                          <button className="icon-btn" onClick={() => toggle(p.id)} aria-label="Expandir variantes">
+                          <button
+                            className="icon-btn"
+                            onClick={(e) => { e.stopPropagation(); toggle(p.id) }}
+                            aria-label={isExpanded ? 'Recolher variantes' : 'Expandir variantes'}
+                            aria-expanded={isExpanded}
+                          >
                             <AdminIcon name={isExpanded ? 'chevDown' : 'chevRight'} size={12} />
                           </button>
                         </td>
@@ -364,14 +372,14 @@ export function EstoqueClient({
                         <td>
                           <button
                             type="button"
-                            onClick={() => handleToggle(p.id, isActive)}
+                            onClick={(e) => { e.stopPropagation(); handleToggle(p.id, isActive) }}
                             className={`switch ${isActive ? 'on' : ''}`}
                             title={isActive ? 'Ativo — clique para arquivar' : 'Inativo — clique para ativar'}
                           />
                         </td>
                         <td>
                           <div className="row" style={{ justifyContent: 'flex-end', gap: 4 }}>
-                            <button className="icon-btn" title="Editar" onClick={() => setEditProduct(p)}>
+                            <button className="icon-btn" title="Editar" onClick={(e) => { e.stopPropagation(); setEditProduct(p) }}>
                               <AdminIcon name="edit" size={13} />
                             </button>
                             <button
@@ -379,7 +387,7 @@ export function EstoqueClient({
                               id={`btn-apagar-produto-${p.id}`}
                               data-testid={`btn-apagar-produto-${p.id}`}
                               title="Apagar produto"
-                              onClick={() => { setDeleteTarget(p); setDeleteError(null) }}
+                              onClick={(e) => { e.stopPropagation(); setDeleteTarget(p); setDeleteError(null) }}
                             >
                               <AdminIcon name="x" size={13} />
                             </button>

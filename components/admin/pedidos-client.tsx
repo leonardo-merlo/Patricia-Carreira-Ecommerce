@@ -1,6 +1,7 @@
 "use client" // tabs + expanded rows + wholesale creation modal
 
 import { Fragment, useMemo, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { AdminIcon } from '@/components/admin/admin-icon'
 import { formatPrice } from '@/lib/utils'
 import type {
@@ -72,6 +73,24 @@ const NFE_STATUS_MAP: Record<string, { cls: string; txt: string }> = {
 function NFeBadge({ status }: { status: string }) {
   const s = NFE_STATUS_MAP[status] ?? { cls: 'neutral', txt: status }
   return <span className={`badge ${s.cls}`}><span className="dot" />{s.txt}</span>
+}
+
+/**
+ * Nome do cliente na linha do pedido, levando para a ficha dele. O stopPropagation
+ * é o que impede o clique no link de também abrir o card do pedido.
+ */
+function CustomerLink({ customerId, name }: { customerId: string | null; name: string }) {
+  if (!customerId) return <div style={{ fontWeight: 500 }}>{name}</div>
+  return (
+    <Link
+      href={`/admin/clientes?cliente=${customerId}`}
+      onClick={(e) => e.stopPropagation()}
+      className="customer-link"
+      title={`Ver ${name} em Clientes`}
+    >
+      {name}
+    </Link>
+  )
 }
 
 type LineItem = { variantId: string; qty: number }
@@ -455,6 +474,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
               <thead>
                 {tab === 'varejo' ? (
                   <tr>
+                    <th style={{ width: 32 }}></th>
                     <th style={{ width: 90 }}>#</th>
                     <th style={{ width: 82 }}>Data</th>
                     <th>Cliente</th>
@@ -462,10 +482,10 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                     <th style={{ width: 110 }}>Total</th>
                     <th style={{ width: 110 }}>Pagamento</th>
                     <th style={{ width: 110 }}>Entrega</th>
-                    <th style={{ width: 50 }}>Ações</th>
                   </tr>
                 ) : (
                   <tr>
+                    <th style={{ width: 32 }}></th>
                     <th style={{ width: 90 }}>#</th>
                     <th style={{ width: 70 }}>Data</th>
                     <th>Cliente</th>
@@ -479,7 +499,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
               <tbody>
                 {tab === 'varejo' && (
                   filteredVarejo.length === 0 ? (
-                    <tr><td colSpan={9} style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--text-3)' }}>Nenhum pedido encontrado.</td></tr>
+                    <tr><td colSpan={8} style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--text-3)' }}>Nenhum pedido encontrado.</td></tr>
                   ) : filteredVarejo.map((o) => {
                     const isExpanded = expandedOrder === o.id
                     const initials = o.customer_name.split(' ').map((s) => s[0]).slice(0, 2).join('')
@@ -487,7 +507,20 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                     const entrega = ENTREGA_MAP[o.status] ?? { cls: 'neutral', txt: '—' }
                     return (
                       <Fragment key={o.id}>
-                        <tr style={isExpanded ? { background: 'var(--surface-2)' } : {}}>
+                        <tr
+                          className={`row-clickable ${isExpanded ? 'expanded' : ''}`}
+                          onClick={() => setExpandedOrder(isExpanded ? null : o.id)}
+                        >
+                          <td>
+                            <button
+                              className="icon-btn"
+                              aria-label={isExpanded ? 'Fechar detalhes do pedido' : 'Ver detalhes do pedido'}
+                              aria-expanded={isExpanded}
+                              onClick={(e) => { e.stopPropagation(); setExpandedOrder(isExpanded ? null : o.id) }}
+                            >
+                              <AdminIcon name={isExpanded ? 'chevDown' : 'chevRight'} size={12} />
+                            </button>
+                          </td>
                           <td><span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11.5, color: 'var(--text-2)' }}>{o.display_num}</span></td>
                           <td>
                             <div>{o.date}</div>
@@ -497,7 +530,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                             <div className="row" style={{ gap: 8 }}>
                               <div className="thumb" style={{ width: 22, height: 22, fontSize: 9, background: 'linear-gradient(135deg,#c4b98f,#8a7f4a)', color: '#fff' }}>{initials}</div>
                               <div>
-                                <div style={{ fontWeight: 500 }}>{o.customer_name}</div>
+                                <CustomerLink customerId={o.customer_id} name={o.customer_name} />
                                 <div className="cust-meta">{o.customer_location}</div>
                               </div>
                             </div>
@@ -506,17 +539,10 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                           <td className="num" style={{ fontWeight: 500 }}>{formatPrice(o.total)}</td>
                           <td><span className={`badge ${payBadge.cls}`}><span className="dot" />{payBadge.txt}</span></td>
                           <td>{entrega.txt === '—' ? <span className="cust-meta">—</span> : <span className={`badge ${entrega.cls}`}><span className="dot" />{entrega.txt}</span>}</td>
-                          <td>
-                            <div className="row" style={{ justifyContent: 'flex-end', gap: 4 }}>
-                              <button className="icon-btn" title={isExpanded ? 'Fechar detalhes' : 'Ver detalhes'} onClick={() => setExpandedOrder(isExpanded ? null : o.id)}>
-                                <AdminIcon name="edit" size={12} />
-                              </button>
-                            </div>
-                          </td>
                         </tr>
                         {isExpanded && (
                           <tr>
-                            <td colSpan={9} style={{ padding: 0, borderBottom: 'none' }}>
+                            <td colSpan={8} style={{ padding: 0, borderBottom: 'none' }}>
                               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', background: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
                                 <div style={{ padding: 16, borderRight: '1px solid var(--border)' }}>
                                   <div className="cust-meta" style={{ marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 500 }}>Itens</div>
@@ -681,7 +707,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
 
                 {tab === 'atacado' && (
                   atacado.length === 0 ? (
-                    <tr><td colSpan={7} style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--text-3)' }}>Nenhum pedido atacado. Clique em &quot;Novo pedido atacado&quot; para criar.</td></tr>
+                    <tr><td colSpan={8} style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--text-3)' }}>Nenhum pedido atacado. Clique em &quot;Novo pedido atacado&quot; para criar.</td></tr>
                   ) : atacado.map((o) => {
                     const s = ATACADO_STATUS[o.status] ?? { cls: 'neutral', txt: o.status }
                     const initials = o.customer_name.split(' ').map((x) => x[0]).slice(0, 2).join('')
@@ -689,14 +715,28 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                     const isExpanded = expandedOrder === o.id
                     return (
                       <Fragment key={o.id}>
-                        <tr style={isExpanded ? { background: 'var(--surface-2)' } : {}}>
+                        <tr
+                          className={`row-clickable ${isExpanded ? 'expanded' : ''}`}
+                          onClick={() => setExpandedOrder(isExpanded ? null : o.id)}
+                        >
+                          <td>
+                            <button
+                              className="icon-btn"
+                              aria-label={isExpanded ? 'Fechar detalhes do pedido' : 'Ver detalhes do pedido'}
+                              aria-expanded={isExpanded}
+                              data-testid="btn-ver-detalhes-atacado"
+                              onClick={(e) => { e.stopPropagation(); setExpandedOrder(isExpanded ? null : o.id) }}
+                            >
+                              <AdminIcon name={isExpanded ? 'chevDown' : 'chevRight'} size={12} />
+                            </button>
+                          </td>
                           <td><span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11.5, color: 'var(--text-2)' }}>{o.display_num}</span></td>
                           <td>{o.date}</td>
                           <td>
                             <div className="row" style={{ gap: 8 }}>
                               <div className="thumb" style={{ width: 22, height: 22, fontSize: 9, background: 'linear-gradient(135deg,#d8c89a,#a08956)', color: '#fff' }}>{initials}</div>
                               <div>
-                                <div style={{ fontWeight: 500 }}>{o.customer_name}</div>
+                                <CustomerLink customerId={o.customer_id} name={o.customer_name} />
                                 {o.customer_cnpj && <div className="cust-meta">{o.customer_cnpj}</div>}
                               </div>
                             </div>
@@ -714,15 +754,9 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                           <td>
                             <div className="row" style={{ justifyContent: 'flex-end', gap: 4 }}>
                               <button
-                                className="icon-btn"
-                                title={isExpanded ? 'Fechar detalhes' : 'Ver detalhes'}
-                                data-testid="btn-ver-detalhes-atacado"
-                                onClick={() => setExpandedOrder(isExpanded ? null : o.id)}
-                              >
-                                <AdminIcon name={isExpanded ? 'chevDown' : 'chevRight'} size={12} />
-                              </button>
-                              <button
                                 className={`icon-btn ${isOpen ? 'active' : ''}`}
+                                title="Ações do pedido"
+                                aria-label="Ações do pedido"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   if (isOpen) {
@@ -742,7 +776,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                         </tr>
                         {isExpanded && (
                           <tr>
-                            <td colSpan={7} style={{ padding: 0, borderBottom: 'none' }}>
+                            <td colSpan={8} style={{ padding: 0, borderBottom: 'none' }}>
                               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', background: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
                                 <div style={{ padding: 16, borderRight: '1px solid var(--border)' }}>
                                   <div className="cust-meta" style={{ marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 500 }}>Itens</div>

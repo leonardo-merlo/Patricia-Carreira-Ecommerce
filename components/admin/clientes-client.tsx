@@ -111,9 +111,11 @@ function toEditForm(c: CustomerRow): EditForm {
 
 interface ClientesClientProps {
   initialData: CustomerRow[]
+  /** Vem do ?cliente=<id> — abre a ficha direto ao chegar de Pedidos. */
+  initialSelectedId?: string | null
 }
 
-export function ClientesClient({ initialData }: ClientesClientProps) {
+export function ClientesClient({ initialData, initialSelectedId = null }: ClientesClientProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -121,7 +123,9 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
   const [search, setSearch]         = useState('')
   const [cityFilter, setCityFilter] = useState('')
   const [sort, setSort]             = useState<SortKey>('revenue')
-  const [selected, setSelected]     = useState<CustomerRow | null>(null)
+  const [selected, setSelected]     = useState<CustomerRow | null>(
+    () => initialData.find((c) => c.id === initialSelectedId) ?? null,
+  )
   const [drawerMode, setDrawerMode] = useState<'view' | 'edit'>('view')
   const [showNew, setShowNew]       = useState(false)
   const [editForm, setEditForm]     = useState<EditForm | null>(null)
@@ -194,6 +198,8 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
     setSelected(null)
     setEditForm(null)
     setSaveError(null)
+    // Sem limpar o ?cliente=, qualquer refresh reabriria a ficha recém-fechada.
+    if (initialSelectedId) router.replace('/admin/clientes')
   }
 
   function handleSave() {
