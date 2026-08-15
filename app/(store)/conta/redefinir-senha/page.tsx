@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  usePasswordReveal,
+  PasswordRevealButton,
+  PasswordStrength,
+} from "@/components/ui/password-field"
+import { PASSWORD_MIN_LENGTH, passwordError } from "@/lib/password"
 
 export default function RedefinirSenhaPage() {
   const router = useRouter()
@@ -13,10 +19,18 @@ export default function RedefinirSenhaPage() {
   const [confirm, setConfirm] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const reveal = usePasswordReveal()
+  const revealConfirm = usePasswordReveal()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+
+    const weak = passwordError(password)
+    if (weak) {
+      setError(weak)
+      return
+    }
 
     if (password !== confirm) {
       setError("As senhas não coincidem.")
@@ -60,16 +74,21 @@ export default function RedefinirSenhaPage() {
             >
               Nova senha
             </label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              placeholder="mínimo 6 caracteres"
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={reveal.inputType}
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={PASSWORD_MIN_LENGTH}
+                placeholder={`mínimo ${PASSWORD_MIN_LENGTH} caracteres`}
+                className="pr-10"
+              />
+              <PasswordRevealButton {...reveal} />
+            </div>
+            <PasswordStrength password={password} />
           </div>
 
           <div>
@@ -79,16 +98,20 @@ export default function RedefinirSenhaPage() {
             >
               Confirmar nova senha
             </label>
-            <Input
-              id="confirm"
-              type="password"
-              autoComplete="new-password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              required
-              minLength={6}
-              placeholder="repita a senha"
-            />
+            <div className="relative">
+              <Input
+                id="confirm"
+                type={revealConfirm.inputType}
+                autoComplete="new-password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                required
+                minLength={PASSWORD_MIN_LENGTH}
+                placeholder="repita a senha"
+                className="pr-10"
+              />
+              <PasswordRevealButton {...revealConfirm} />
+            </div>
           </div>
 
           {error && (

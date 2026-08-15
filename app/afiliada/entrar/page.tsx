@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { usePasswordReveal, PasswordRevealButton } from '@/components/ui/password-field'
 
 type Mode = 'login' | 'forgot' | 'sent'
 
@@ -69,6 +70,7 @@ export default function AfiliadaEntrarPage() {
   const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const reveal = usePasswordReveal()
   const [forgotEmail, setForgotEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -182,17 +184,20 @@ export default function AfiliadaEntrarPage() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label htmlFor="password" style={labelStyle}>SENHA</label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                style={inputStyle}
-                onFocus={e => { e.currentTarget.style.borderColor = FOCUS_BORDER }}
-                onBlur={e => { e.currentTarget.style.borderColor = IDLE_BORDER }}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="password"
+                  type={reveal.inputType}
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  style={{ ...inputStyle, paddingRight: 38 }}
+                  onFocus={e => { e.currentTarget.style.borderColor = FOCUS_BORDER }}
+                  onBlur={e => { e.currentTarget.style.borderColor = IDLE_BORDER }}
+                />
+                <PasswordRevealButton {...reveal} />
+              </div>
             </div>
 
             {error && <p style={errorStyle}>{error}</p>}

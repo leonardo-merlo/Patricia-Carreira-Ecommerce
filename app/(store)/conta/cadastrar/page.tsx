@@ -6,6 +6,12 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  usePasswordReveal,
+  PasswordRevealButton,
+  PasswordStrength,
+} from "@/components/ui/password-field"
+import { PASSWORD_MIN_LENGTH, passwordError } from "@/lib/password"
 
 export default function CadastrarPage() {
   const router = useRouter()
@@ -16,10 +22,18 @@ export default function CadastrarPage() {
   const [accepted, setAccepted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const reveal = usePasswordReveal()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+
+    const weak = passwordError(password)
+    if (weak) {
+      setError(weak)
+      return
+    }
+
     setLoading(true)
 
     const supabase = createClient()
@@ -119,16 +133,21 @@ export default function CadastrarPage() {
             >
               Senha
             </label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              placeholder="mínimo 6 caracteres"
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={reveal.inputType}
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={PASSWORD_MIN_LENGTH}
+                placeholder={`mínimo ${PASSWORD_MIN_LENGTH} caracteres`}
+                className="pr-10"
+              />
+              <PasswordRevealButton {...reveal} />
+            </div>
+            <PasswordStrength password={password} />
           </div>
 
           {error && (

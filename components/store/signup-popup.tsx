@@ -7,6 +7,12 @@ import { createClient } from "@/lib/supabase/client"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  usePasswordReveal,
+  PasswordRevealButton,
+  PasswordStrength,
+} from "@/components/ui/password-field"
+import { PASSWORD_MIN_LENGTH, passwordError } from "@/lib/password"
 import { X } from "lucide-react"
 
 const POPUP_KEY = "pc_popup_dismissed"
@@ -28,6 +34,7 @@ export function SignupPopup() {
   const [successName, setSuccessName] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const reveal = usePasswordReveal()
 
   useEffect(() => {
     if (localStorage.getItem(POPUP_KEY)) return
@@ -51,6 +58,13 @@ export function SignupPopup() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+
+    const weak = passwordError(password)
+    if (weak) {
+      setError(weak)
+      return
+    }
+
     setLoading(true)
 
     const supabase = createClient()
@@ -164,16 +178,23 @@ export function SignupPopup() {
                   required
                   aria-label="E-mail"
                 />
-                <Input
-                  type="password"
-                  placeholder="Senha (mín. 6 caracteres)"
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  aria-label="Senha"
-                />
+                <div>
+                  <div className="relative">
+                    <Input
+                      type={reveal.inputType}
+                      placeholder={`Senha (mín. ${PASSWORD_MIN_LENGTH} caracteres)`}
+                      autoComplete="new-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      minLength={PASSWORD_MIN_LENGTH}
+                      aria-label="Senha"
+                      className="pr-10"
+                    />
+                    <PasswordRevealButton {...reveal} />
+                  </div>
+                  <PasswordStrength password={password} />
+                </div>
 
                 {error && (
                   <p role="alert" className="text-sm text-error">

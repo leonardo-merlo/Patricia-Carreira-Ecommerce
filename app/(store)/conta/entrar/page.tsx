@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { usePasswordReveal, PasswordRevealButton } from "@/components/ui/password-field"
 
 function EntrarForm() {
   const router = useRouter()
@@ -17,6 +18,7 @@ function EntrarForm() {
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const reveal = usePasswordReveal()
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -73,15 +75,21 @@ function EntrarForm() {
             Esqueci minha senha
           </Link>
         </div>
-        <Input
-          id="password"
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          placeholder="••••••••"
-        />
+        {/* Só o revelar: validar a regra nova aqui trancaria quem se cadastrou
+            antes dela existir. A regra vale na criação e na troca. */}
+        <div className="relative">
+          <Input
+            id="password"
+            type={reveal.inputType}
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            placeholder="••••••••"
+            className="pr-10"
+          />
+          <PasswordRevealButton {...reveal} />
+        </div>
       </div>
 
       {error && (

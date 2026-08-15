@@ -3,6 +3,12 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import {
+  usePasswordReveal,
+  PasswordRevealButton,
+  PasswordStrength,
+} from '@/components/ui/password-field'
+import { PASSWORD_MIN_LENGTH, passwordError } from '@/lib/password'
 
 const inputStyle: React.CSSProperties = {
   padding: '10px 14px',
@@ -27,6 +33,8 @@ export default function TrocarSenhaPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
+  const reveal = usePasswordReveal()
+  const revealConfirm = usePasswordReveal()
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
@@ -38,8 +46,9 @@ export default function TrocarSenhaPage() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
+    const weak = passwordError(password)
+    if (weak) { setError(weak); return }
     if (password !== confirm) { setError('As senhas não coincidem.'); return }
-    if (password.length < 6) { setError('A senha deve ter pelo menos 6 caracteres.'); return }
     setLoading(true)
     const { error: updateError } = await supabase.auth.updateUser({ password })
     if (updateError) {
@@ -134,33 +143,40 @@ export default function TrocarSenhaPage() {
             <label htmlFor="password" style={{ fontSize: 12, fontWeight: 600, color: 'var(--pc-brown)', letterSpacing: '0.3px' }}>
               NOVA SENHA
             </label>
-            <input
-              id="password"
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              style={inputStyle}
-              onFocus={e => { e.currentTarget.style.borderColor = 'var(--pc-clay)' }}
-              onBlur={e => { e.currentTarget.style.borderColor = '#e2d4c4' }}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                id="password"
+                type={reveal.inputType}
+                required
+                minLength={PASSWORD_MIN_LENGTH}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                style={{ ...inputStyle, paddingRight: 38 }}
+                onFocus={e => { e.currentTarget.style.borderColor = 'var(--pc-clay)' }}
+                onBlur={e => { e.currentTarget.style.borderColor = '#e2d4c4' }}
+              />
+              <PasswordRevealButton {...reveal} />
+            </div>
+            <PasswordStrength password={password} />
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <label htmlFor="confirm" style={{ fontSize: 12, fontWeight: 600, color: 'var(--pc-brown)', letterSpacing: '0.3px' }}>
               CONFIRMAR SENHA
             </label>
-            <input
-              id="confirm"
-              type="password"
-              required
-              value={confirm}
-              onChange={e => setConfirm(e.target.value)}
-              style={inputStyle}
-              onFocus={e => { e.currentTarget.style.borderColor = 'var(--pc-clay)' }}
-              onBlur={e => { e.currentTarget.style.borderColor = '#e2d4c4' }}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                id="confirm"
+                type={revealConfirm.inputType}
+                required
+                value={confirm}
+                onChange={e => setConfirm(e.target.value)}
+                style={{ ...inputStyle, paddingRight: 38 }}
+                onFocus={e => { e.currentTarget.style.borderColor = 'var(--pc-clay)' }}
+                onBlur={e => { e.currentTarget.style.borderColor = '#e2d4c4' }}
+              />
+              <PasswordRevealButton {...revealConfirm} />
+            </div>
           </div>
 
           {error && (
