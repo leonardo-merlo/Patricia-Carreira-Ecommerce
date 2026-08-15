@@ -2,13 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-
-type Message = {
-  content: React.ReactNode
-  cta?: { label: string; href: string }
-}
-
-const WHATSAPP_HREF = "https://wa.me/5522988223993?text=Quero%20saber%20sobre%20envios%20internacionais."
+import { parseInlineMarkup, isWhatsAppHref, type MarkupToken } from "@/lib/inline-markup"
 
 const WhatsAppIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="inline h-3.5 w-3.5 align-text-bottom" aria-hidden="true">
@@ -16,83 +10,79 @@ const WhatsAppIcon = () => (
   </svg>
 )
 
-const MESSAGES: Message[] = [
-  {
-    content: "Frete grátis nas compras acima de R$ 599,00",
-  },
-  {
-    content: "Compre no site e retire na loja",
-  },
-  {
-    content: "Parcelamento em até 5x sem juros. Aproveite!",
-  },
-  {
-    content: (
-      <>
-        10% OFF na sua primeira compra usando o cupom:{" "}
-        <strong className="font-semibold tracking-wide">BEMVINDA10</strong>
-      </>
-    ),
-  },
-  {
-    content: "5% OFF pagamento via PIX",
-  },
-  {
-    content: "Descubra a história por trás de cada peça",
-    cta: { label: "Sobre nós", href: "/sobre" },
-  },
-  {
-    content: (
-      <>
-        Envios internacionais —{" "}
-        <a
-          href={WHATSAPP_HREF}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 underline underline-offset-2 hover:opacity-80"
-        >
-          <WhatsAppIcon /> Falar pelo WhatsApp
-        </a>
-      </>
-    ),
-  },
-]
+/** Renderiza os tokens do markup. Nada aqui monta HTML a partir de string. */
+export function AnnouncementContent({ content }: { content: string }) {
+  const tokens = parseInlineMarkup(content)
+
+  return (
+    <>
+      {tokens.map((token: MarkupToken, i: number) => {
+        if (token.type === 'text') return <span key={i}>{token.value}</span>
+
+        if (token.type === 'bold') {
+          return (
+            <strong key={i} className="font-semibold tracking-wide">
+              {token.value}
+            </strong>
+          )
+        }
+
+        const label = isWhatsAppHref(token.href) ? (
+          <>
+            <WhatsAppIcon /> {token.label}
+          </>
+        ) : (
+          token.label
+        )
+
+        const className =
+          "inline-flex items-center gap-1 font-medium underline underline-offset-2 hover:opacity-80"
+
+        // Link externo sai do app: next/link não ajuda e target/rel são obrigatórios.
+        return token.external ? (
+          <a key={i} href={token.href} target="_blank" rel="noopener noreferrer" className={className}>
+            {label}
+          </a>
+        ) : (
+          <Link key={i} href={token.href} className={className}>
+            {label}
+          </Link>
+        )
+      })}
+    </>
+  )
+}
 
 const INTERVAL_MS = 6500
 
-export function AnnouncementBanner() {
+export function AnnouncementBanner({ messages }: { messages: string[] }) {
   const [index, setIndex] = useState(0)
   const [visible, setVisible] = useState(true)
 
   useEffect(() => {
+    // Uma mensagem só não rotaciona — o intervalo apagaria e reacenderia a mesma frase.
+    if (messages.length <= 1) return
+
     const timer = setInterval(() => {
       setVisible(false)
       setTimeout(() => {
-        setIndex((prev) => (prev + 1) % MESSAGES.length)
+        setIndex((prev) => (prev + 1) % messages.length)
         setVisible(true)
       }, 300)
     }, INTERVAL_MS)
 
     return () => clearInterval(timer)
-  }, [])
+  }, [messages.length])
 
-  const message = MESSAGES[index]
+  if (messages.length === 0) return null
+
+  // O índice pode ficar além do fim se a lista encolher entre renders.
+  const message = messages[index] ?? messages[0]
 
   return (
     <div className="w-full bg-[#6B6B2A] py-3 text-center font-caption text-on-secondary text-sm">
       <span className={`transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
-        {message.content}
-        {message.cta && (
-          <>
-            {" — "}
-            <Link
-              href={message.cta.href}
-              className="font-medium underline underline-offset-2 hover:opacity-80"
-            >
-              {message.cta.label}
-            </Link>
-          </>
-        )}
+        <AnnouncementContent content={message} />
       </span>
     </div>
   )

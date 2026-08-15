@@ -165,7 +165,9 @@ async function checkMelhorEnvio(): Promise<ServiceCheck> {
   }
 }
 
-async function checkFocusNfe(): Promise<ServiceCheck> {
+// Exportada para o botão "testar conexão" da tela de Fiscal, que precisa só
+// desta checagem — rodar runDiagnostics inteiro chamaria quatro APIs à toa.
+export async function checkFocusNfe(): Promise<ServiceCheck> {
   const token = env('FOCUS_NFE_TOKEN')
   const homologacao = env('FOCUS_NFE_AMBIENTE') === 'homologacao'
   const environment = homologacao ? 'homologação' : 'PRODUÇÃO'

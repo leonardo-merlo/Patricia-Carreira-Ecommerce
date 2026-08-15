@@ -2,6 +2,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAdmin } from '@/lib/server/auth'
+import { checkFocusNfe } from '@/lib/server/diagnostics'
 import {
   getStoreSettings as getStoreSettingsCore,
   type SettingsUpdate,
@@ -53,4 +54,25 @@ export async function updateStoreSettings(
   // Sem isto, mudar frete grátis ou contato demoraria até um minuto para valer.
   revalidatePath('/', 'layout')
   return { ok: true }
+}
+
+// ─── Teste de conexão com a Focus NFe ────────────────────────────────────────
+
+export type ConnectionTestResult = {
+  ok: boolean
+  environment: string
+  detail: string
+}
+
+/**
+ * Confere se o token da Focus NFe responde, e em que ambiente.
+ *
+ * Não emite nota: uma NF-e, mesmo em homologação, exige um pedido real com NCM
+ * em cada produto. O caminho de emissão de verdade continua sendo o botão no
+ * pedido, em /admin/pedidos.
+ */
+export async function testarConexaoFocusNfe(): Promise<ConnectionTestResult> {
+  await requireAdmin()
+  const result = await checkFocusNfe()
+  return { ok: result.ok, environment: result.environment, detail: result.detail }
 }

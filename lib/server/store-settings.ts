@@ -31,6 +31,13 @@ export type StoreSettings = {
   notif_payment_confirmed: boolean
   notif_low_stock: boolean
   notif_low_material: boolean
+  /** Janela do aviso de conta a pagar: dias antes do vencimento e dias de tolerância. */
+  notif_bill_days_ahead: number
+  notif_bill_grace_days: number
+  bank_name: string | null
+  bank_account_type: string | null
+  bank_agency: string | null
+  bank_account: string | null
   updated_at: string
 }
 

@@ -1,9 +1,12 @@
 "use client"
 
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { AdminIcon } from './admin-icon'
+import { SidebarPopover } from './sidebar-popover'
+import { CONFIG_SECTIONS, configSectionHref } from '@/lib/config-sections'
 
 interface AdminSidebarProps {
   openOrders: number
@@ -32,6 +35,7 @@ export function AdminSidebar({
   onNavigate,
 }: AdminSidebarProps) {
   const pathname = usePathname()
+  const [configOpen, setConfigOpen] = useState(false)
 
   const isActive = (href: string) => {
     if (href === '/admin') return pathname === '/admin'
@@ -127,16 +131,42 @@ export function AdminSidebar({
           <span>Diagnóstico</span>
         </Link>
 
-        <Link
-          href="/admin/config"
-          onClick={onNavigate}
+        <button
+          type="button"
           className={`sidebar-item ${isActive('/admin/config') ? 'active' : ''}`}
           title={collapsed ? 'Configurações' : undefined}
           id="sidebar-nav-config"
+          data-testid="sidebar-nav-config"
+          aria-haspopup="dialog"
+          aria-expanded={configOpen}
+          onClick={() => setConfigOpen((v) => !v)}
         >
           <AdminIcon name="settings" />
           <span>Configurações</span>
-        </Link>
+        </button>
+
+        <SidebarPopover
+          open={configOpen}
+          onClose={() => setConfigOpen(false)}
+          labelledBy="sidebar-nav-config"
+        >
+          <div className="sidebar-popover-title">Configurações</div>
+          {CONFIG_SECTIONS.map((s) => (
+            <Link
+              key={s.id}
+              href={configSectionHref(s.id)}
+              id={`popover-config-${s.id}`}
+              className="sidebar-popover-item"
+              onClick={() => { setConfigOpen(false); onNavigate() }}
+            >
+              <AdminIcon name={s.icon} size={14} />
+              <span>
+                <span className="sidebar-popover-label">{s.label}</span>
+                <span className="sidebar-popover-desc">{s.description}</span>
+              </span>
+            </Link>
+          ))}
+        </SidebarPopover>
 
         <div className="sidebar-user-row">
           <div className="sidebar-avatar">HC</div>
