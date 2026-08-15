@@ -8,6 +8,7 @@ import { AdminIcon } from './admin-icon'
 import { SidebarPopover } from './sidebar-popover'
 import { NotificationsMenu } from './notifications-menu'
 import { CONFIG_SECTIONS, configSectionHref } from '@/lib/config-sections'
+import { signOut } from '@/lib/actions/auth'
 import type { AdminNotification } from '@/lib/actions/notifications'
 
 interface AdminSidebarProps {
@@ -40,6 +41,7 @@ export function AdminSidebar({
 }: AdminSidebarProps) {
   const pathname = usePathname()
   const [configOpen, setConfigOpen] = useState(false)
+  const [confirmLogout, setConfirmLogout] = useState(false)
 
   const isActive = (href: string) => {
     if (href === '/admin') return pathname === '/admin'
@@ -184,11 +186,45 @@ export function AdminSidebar({
             <span className="name">Henrique Carreira</span>
             <span className="role">Proprietário</span>
           </div>
-          <button className="ico-btn" title="Sair" aria-label="Sair" id="btn-logout">
+          {/* Não tinha onClick nenhum: clicar em Sair não fazia nada. Como na
+              loja, um clique só não derruba a sessão — abre confirmação. */}
+          <button
+            className="ico-btn"
+            title="Sair"
+            aria-label="Sair"
+            id="btn-logout"
+            data-testid="btn-logout"
+            onClick={() => setConfirmLogout(true)}
+          >
             <AdminIcon name="logout" size={14} />
           </button>
         </div>
       </div>
+
+      {confirmLogout && (
+        <div className="modal-backdrop" onClick={() => setConfirmLogout(false)}>
+          <div
+            className="modal confirm-modal"
+            id="confirm-sair-admin"
+            data-testid="confirm-sair-admin"
+            role="alertdialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="confirm-modal-icon"><AdminIcon name="logout" size={22} /></div>
+            <h3 className="confirm-modal-title">Sair do painel?</h3>
+            <p className="confirm-modal-text">Você precisará entrar de novo para voltar.</p>
+            <div className="confirm-modal-actions">
+              <button className="btn ghost" onClick={() => setConfirmLogout(false)}>Cancelar</button>
+              <form action={signOut}>
+                <button type="submit" className="btn danger-outline" id="btn-confirmar-saida-admin">
+                  Sair
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   )
 }

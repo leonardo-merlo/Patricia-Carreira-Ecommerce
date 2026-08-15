@@ -4,6 +4,7 @@ import { Fragment, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { AdminIcon } from '@/components/admin/admin-icon'
 import { formatPrice } from '@/lib/utils'
+import { toCsv, downloadCsv } from '@/lib/csv'
 import type {
   RetailOrderRow,
   WholesaleOrderRow,
@@ -91,6 +92,45 @@ function CustomerLink({ customerId, name }: { customerId: string | null; name: s
       {name}
     </Link>
   )
+}
+
+/**
+ * Exporta o que está na tela. Segue o mesmo formato de Clientes e Estoque:
+ * cabeçalho em português e número com vírgula, para abrir no Excel em pt-BR.
+ */
+function exportPedidosCsv(
+  tab: 'varejo' | 'atacado',
+  varejo: RetailOrderRow[],
+  atacado: WholesaleOrderRow[],
+): void {
+  const money = (n: number) => n.toFixed(2).replace('.', ',')
+
+  if (tab === 'varejo') {
+    const headers = ['Pedido', 'Data', 'Hora', 'Cliente', 'Cidade/UF', 'Itens', 'Total (R$)', 'Pagamento', 'Forma', 'Entrega', 'Rastreio', 'NF-e', 'Motivo do cancelamento']
+    const rows = varejo.map((o) => [
+      o.display_num, o.date, o.time, o.customer_name, o.customer_location,
+      o.item_count, money(o.total),
+      PAYMENT_STATUS_MAP[o.payment_status]?.txt ?? o.payment_status,
+      getPaymentMethodLabel(o.payment_method),
+      ENTREGA_MAP[o.status]?.txt ?? o.status,
+      o.tracking_code ?? '',
+      NFE_STATUS_MAP[o.nfe_status]?.txt ?? o.nfe_status,
+      cancellationReasonLabel(o.cancellation_reason) ?? '',
+    ])
+    downloadCsv(`pedidos-varejo-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(headers, rows))
+    return
+  }
+
+  const headers = ['Pedido', 'Data', 'Cliente', 'CNPJ', 'Itens', 'Total (R$)', 'Status', 'NF-e', 'Observações', 'Motivo do cancelamento']
+  const rows = atacado.map((o) => [
+    o.display_num, o.date, o.customer_name, o.customer_cnpj ?? '',
+    o.item_count, money(o.total),
+    ATACADO_STATUS[o.status]?.txt ?? o.status,
+    NFE_STATUS_MAP[o.nfe_status]?.txt ?? o.nfe_status,
+    o.notes ?? '',
+    cancellationReasonLabel(o.cancellation_reason) ?? '',
+  ])
+  downloadCsv(`pedidos-atacado-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(headers, rows))
 }
 
 type LineItem = { variantId: string; qty: number }
@@ -350,7 +390,9 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
           </p>
         </div>
         <div className="page-actions">
-          <button className="btn" onClick={() => alert('Exportar CSV — em breve')}><AdminIcon name="download" /> Exportar</button>
+          <button className="btn" id="btn-exportar-pedidos" onClick={() => exportPedidosCsv(tab, filteredVarejo, atacado)}>
+            <AdminIcon name="download" /> Exportar
+          </button>
           {tab === 'atacado' && (
             <button className="btn primary" id="btn-novo-pedido-atacado" onClick={openCreateModal}>
               <AdminIcon name="plus" /> Novo pedido atacado
