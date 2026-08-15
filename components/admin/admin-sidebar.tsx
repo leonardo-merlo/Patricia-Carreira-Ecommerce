@@ -6,11 +6,14 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { AdminIcon } from './admin-icon'
 import { SidebarPopover } from './sidebar-popover'
+import { NotificationsMenu } from './notifications-menu'
 import { CONFIG_SECTIONS, configSectionHref } from '@/lib/config-sections'
+import type { AdminNotification } from '@/lib/actions/notifications'
 
 interface AdminSidebarProps {
   openOrders: number
   lowStock: number
+  notifications: AdminNotification[]
   mobileOpen: boolean
   collapsed: boolean
   onToggleCollapsed: () => void
@@ -29,6 +32,7 @@ const secondaryNav = [
 export function AdminSidebar({
   openOrders,
   lowStock,
+  notifications,
   mobileOpen,
   collapsed,
   onToggleCollapsed,
@@ -120,6 +124,12 @@ export function AdminSidebar({
       </nav>
 
       <div className="sidebar-footer">
+        <NotificationsMenu
+          notifications={notifications}
+          collapsed={collapsed}
+          onNavigate={onNavigate}
+        />
+
         <Link
           href="/admin/diagnostico"
           onClick={onNavigate}

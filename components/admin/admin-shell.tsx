@@ -5,17 +5,19 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { AdminSidebar } from './admin-sidebar'
 import { AdminIcon } from './admin-icon'
+import type { AdminNotification } from '@/lib/actions/notifications'
 
 const COLLAPSED_KEY = 'pc-admin-sidebar-collapsed'
 
 interface AdminShellProps {
   openOrders: number
   lowStock: number
+  notifications: AdminNotification[]
   fontClassName: string
   children: React.ReactNode
 }
 
-export function AdminShell({ openOrders, lowStock, fontClassName, children }: AdminShellProps) {
+export function AdminShell({ openOrders, lowStock, notifications, fontClassName, children }: AdminShellProps) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -51,6 +53,7 @@ export function AdminShell({ openOrders, lowStock, fontClassName, children }: Ad
       <AdminSidebar
         openOrders={openOrders}
         lowStock={lowStock}
+        notifications={notifications}
         mobileOpen={mobileOpen}
         collapsed={collapsed}
         onToggleCollapsed={toggleCollapsed}
