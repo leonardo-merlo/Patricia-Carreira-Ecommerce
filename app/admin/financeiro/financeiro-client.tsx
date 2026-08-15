@@ -354,9 +354,9 @@ export function FinanceiroClient({
           <p className="page-sub">Contas a pagar e resultado do mês</p>
         </div>
         <div className="page-actions">
-          {/* A análise de venda mora em Relatórios. Duplicá-la aqui criaria dois
+          {/* A análise de receita mora em Vendas. Duplicá-la aqui criaria dois
               lugares calculando receita, que um dia divergem. */}
-          <Link className="btn" id="btn-ver-relatorios" href="/admin/relatorios">
+          <Link className="btn" id="btn-ver-vendas" href="/admin/vendas">
             <AdminIcon name="trendUp" /> Análise de vendas
           </Link>
           <button className="btn" id="btn-gerenciar-lojas" onClick={() => { setStoreForm(emptyStoreForm); setStoreError(null); setShowStores(true) }}>

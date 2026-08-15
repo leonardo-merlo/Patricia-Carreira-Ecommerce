@@ -30,12 +30,12 @@ function fmtDelta(pct: number | null, label: string): { txt: string; up: boolean
   return { txt: `${sign}${pct.toFixed(1)}%`, up: pct >= 0 }
 }
 
-interface RelatoriosClientProps {
+interface VendasClientProps {
   data: ReportData
   period: string
 }
 
-export function RelatoriosClient({ data, period }: RelatoriosClientProps) {
+export function VendasClient({ data, period }: VendasClientProps) {
   const router = useRouter()
   const opts = getPeriodOptions()
   const prevLabel = getPrevPeriodLabel(period)
@@ -52,7 +52,7 @@ export function RelatoriosClient({ data, period }: RelatoriosClientProps) {
     if (!de || !ate) return
     // Datas trocadas dariam um intervalo vazio em silêncio.
     const [inicio, fim] = de <= ate ? [de, ate] : [ate, de]
-    router.push(`/admin/relatorios?period=custom:${inicio}:${fim}`)
+    router.push(`/admin/vendas?period=custom:${inicio}:${fim}`)
   }
 
   const monthlyValues = monthly_revenue.map((m) => m.value)
@@ -116,8 +116,8 @@ export function RelatoriosClient({ data, period }: RelatoriosClientProps) {
     <div className="page">
       <div className="page-header">
         <div>
-          <h2 className="page-title">Relatórios</h2>
-          <p className="page-sub">Performance de vendas, produtos e operação · {data.period_label}</p>
+          <h2 className="page-title">Vendas</h2>
+          <p className="page-sub">Receita, produtos, canais e afiliadas · {data.period_label}</p>
         </div>
         <div className="page-actions" style={{ flexWrap: 'wrap' }}>
           <select
@@ -128,7 +128,7 @@ export function RelatoriosClient({ data, period }: RelatoriosClientProps) {
             onChange={(e) => {
               if (e.target.value === CUSTOM_OPTION) { setShowCustom(true); return }
               setShowCustom(false)
-              router.push(`/admin/relatorios?period=${e.target.value}`)
+              router.push(`/admin/vendas?period=${e.target.value}`)
             }}
           >
             {opts.map((o) => (

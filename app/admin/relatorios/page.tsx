@@ -1,17 +1,13 @@
-import { getReportData } from '@/lib/supabase/report-queries'
-import { RelatoriosClient } from '@/components/admin/relatorios-client'
+import { redirect } from 'next/navigation'
 
-function defaultPeriod(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-}
-
-interface Props {
+// A seção virou /admin/vendas — o conteúdo sempre foi sobre receita e venda, não
+// relatórios em geral. Isto existe só para não quebrar link salvo ou histórico
+// do navegador; pode sair quando ninguém mais chegar por aqui.
+export default function RelatoriosRedirect({
+  searchParams,
+}: {
   searchParams: { period?: string }
-}
-
-export default async function RelatoriosPage({ searchParams }: Props) {
-  const period = searchParams.period ?? defaultPeriod()
-  const data = await getReportData(period)
-  return <RelatoriosClient data={data} period={period} />
+}) {
+  const query = searchParams.period ? `?period=${encodeURIComponent(searchParams.period)}` : ''
+  redirect(`/admin/vendas${query}`)
 }
