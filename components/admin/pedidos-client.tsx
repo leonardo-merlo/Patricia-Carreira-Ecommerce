@@ -933,7 +933,7 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                         setCancelTarget({
                           id: currentOrder.id,
                           num: currentOrder.display_num,
-                          isPaid: false,
+                          isPaid: currentOrder.payment_status === 'paid',
                         })
                       }
                       setOpenActionsFor(null)

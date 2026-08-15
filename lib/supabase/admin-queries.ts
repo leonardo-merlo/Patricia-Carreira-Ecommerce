@@ -773,6 +773,8 @@ export type WholesaleOrderRow = {
   item_count: number
   total: number
   status: string
+  /** Decide se cancelar estorna estoque e dispara e-mail. */
+  payment_status: string
   nfe_status: string
   notes: string | null
   items: WholesaleOrderItemRow[]
@@ -784,7 +786,7 @@ export async function getWholesaleOrders(limit = 50): Promise<WholesaleOrderRow[
   const { data, error } = await supabase
     .from('orders')
     .select(`
-      id, created_at, total_amount, status, nfe_status, notes,
+      id, created_at, total_amount, status, payment_status, nfe_status, notes,
       customer_id, cancellation_reason, cancellation_notes,
       customer:customers(name, cpf_cnpj),
       items:order_items(
@@ -812,7 +814,7 @@ export async function getWholesaleOrders(limit = 50): Promise<WholesaleOrderRow[
 
   type OrderRaw = {
     id: string; created_at: string; total_amount: string
-    status: string; nfe_status: string | null; notes: string | null
+    status: string; payment_status: string | null; nfe_status: string | null; notes: string | null
     customer_id: string | null
     cancellation_reason: string | null; cancellation_notes: string | null
     customer: { name: string; cpf_cnpj: string | null } | null
@@ -849,6 +851,7 @@ export async function getWholesaleOrders(limit = 50): Promise<WholesaleOrderRow[
       item_count: items.length,
       total: Number(o.total_amount),
       status: o.status,
+      payment_status: o.payment_status ?? 'pending',
       nfe_status: o.nfe_status ?? 'pending',
       notes: o.notes,
       items,
