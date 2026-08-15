@@ -429,6 +429,15 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--gap);
 }
+/* Cinco KPIs em quatro colunas deixavam o quinto sozinho numa segunda linha,
+   com um vazio grande ao lado. Com auto-fit eles se distribuem numa linha só
+   enquanto couberem, e quebram sozinhos quando não couberem mais. */
+.admin-root .kpi-grid.cols-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+@media (max-width: 1240px) {
+  .admin-root .kpi-grid.cols-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 .admin-root .kpi {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -880,11 +889,16 @@
 .admin-root .modal-backdrop {
   position: fixed; inset: 0;
   background: rgba(var(--pc-shadow-rgb), 0.42);
-  z-index: 60;
+  /* Acima da barra lateral e dos popovers, que ficam em 60. Empatado com eles,
+     quem ganhava era a ordem no DOM — frágil demais para um diálogo modal. */
+  z-index: 100;
   display: grid;
   place-items: center;
   padding: 40px;
+  /* Arrastar sobre o fundo escuro não pode ir selecionando o texto da tela. */
+  user-select: none;
 }
+.admin-root .modal-backdrop .modal { user-select: text; }
 .admin-root .modal {
   background: var(--surface);
   border-radius: 12px;

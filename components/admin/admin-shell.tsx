@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { AdminSidebar } from './admin-sidebar'
 import { AdminIcon } from './admin-icon'
+import { signOut } from '@/lib/actions/auth'
 import type { AdminNotification } from '@/lib/actions/notifications'
 
 const COLLAPSED_KEY = 'pc-admin-sidebar-collapsed'
@@ -21,6 +22,7 @@ export function AdminShell({ openOrders, lowStock, notifications, fontClassName,
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [confirmLogout, setConfirmLogout] = useState(false)
 
   useEffect(() => {
     setCollapsed(window.localStorage.getItem(COLLAPSED_KEY) === '1')
@@ -58,6 +60,7 @@ export function AdminShell({ openOrders, lowStock, notifications, fontClassName,
         collapsed={collapsed}
         onToggleCollapsed={toggleCollapsed}
         onNavigate={() => setMobileOpen(false)}
+        onLogoutClick={() => { setMobileOpen(false); setConfirmLogout(true) }}
       />
 
       <div
@@ -85,6 +88,33 @@ export function AdminShell({ openOrders, lowStock, notifications, fontClassName,
       </header>
 
       <div className="main">{children}</div>
+
+      {/* Fora do <aside> de propósito: aqui o backdrop cobre a tela inteira em
+          qualquer largura, e nada atrás dele recebe clique. */}
+      {confirmLogout && (
+        <div className="modal-backdrop" onClick={() => setConfirmLogout(false)}>
+          <div
+            className="modal confirm-modal"
+            id="confirm-sair-admin"
+            data-testid="confirm-sair-admin"
+            role="alertdialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="confirm-modal-icon"><AdminIcon name="logout" size={22} /></div>
+            <h3 className="confirm-modal-title">Sair do painel?</h3>
+            <p className="confirm-modal-text">Você precisará entrar de novo para voltar.</p>
+            <div className="confirm-modal-actions">
+              <button className="btn ghost" onClick={() => setConfirmLogout(false)}>Cancelar</button>
+              <form action={signOut}>
+                <button type="submit" className="btn danger-outline" id="btn-confirmar-saida-admin">
+                  Sair
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

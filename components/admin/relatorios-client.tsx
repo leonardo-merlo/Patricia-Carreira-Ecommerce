@@ -166,7 +166,7 @@ export function RelatoriosClient({ data, period }: RelatoriosClientProps) {
         </div>
       </div>
 
-      <div className="kpi-grid">
+      <div className="kpi-grid cols-5">
         {kpiCards.map((k, i) => (
           <div className="kpi" key={i}>
             <div className="kpi-label">
@@ -190,7 +190,9 @@ export function RelatoriosClient({ data, period }: RelatoriosClientProps) {
         ))}
       </div>
 
-      <div className="dash-row" style={{ gridTemplateColumns: '1.5fr 1fr' }}>
+      {/* Meio a meio: com 1.5fr o donut ficava espremido e sobrava vazio ao lado
+          da legenda. */}
+      <div className="dash-row" style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)' }}>
         {/* Bar chart — monthly revenue */}
         <div className="card">
           <div className="card-header">
@@ -252,8 +254,8 @@ export function RelatoriosClient({ data, period }: RelatoriosClientProps) {
                 Sem vendas no período
               </div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-                <svg width="120" height="120" viewBox="0 0 36 36">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+                <svg width="168" height="168" viewBox="0 0 36 36" style={{ flexShrink: 0 }}>
                   {donutArcs.map((c, i) => (
                     <circle
                       key={i}

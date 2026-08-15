@@ -8,7 +8,6 @@ import { AdminIcon } from './admin-icon'
 import { SidebarPopover } from './sidebar-popover'
 import { NotificationsMenu } from './notifications-menu'
 import { CONFIG_SECTIONS, configSectionHref } from '@/lib/config-sections'
-import { signOut } from '@/lib/actions/auth'
 import type { AdminNotification } from '@/lib/actions/notifications'
 
 interface AdminSidebarProps {
@@ -19,6 +18,10 @@ interface AdminSidebarProps {
   collapsed: boolean
   onToggleCollapsed: () => void
   onNavigate: () => void
+  /** A confirmação de saída vive no shell: modal com position:fixed dentro do
+   *  <aside> quebra no celular, onde a barra tem transform e passa a ser o
+   *  bloco de contenção do backdrop. */
+  onLogoutClick: () => void
 }
 
 const secondaryNav = [
@@ -38,10 +41,10 @@ export function AdminSidebar({
   collapsed,
   onToggleCollapsed,
   onNavigate,
+  onLogoutClick,
 }: AdminSidebarProps) {
   const pathname = usePathname()
   const [configOpen, setConfigOpen] = useState(false)
-  const [confirmLogout, setConfirmLogout] = useState(false)
 
   const isActive = (href: string) => {
     if (href === '/admin') return pathname === '/admin'
@@ -194,37 +197,12 @@ export function AdminSidebar({
             aria-label="Sair"
             id="btn-logout"
             data-testid="btn-logout"
-            onClick={() => setConfirmLogout(true)}
+            onClick={onLogoutClick}
           >
             <AdminIcon name="logout" size={14} />
           </button>
         </div>
       </div>
-
-      {confirmLogout && (
-        <div className="modal-backdrop" onClick={() => setConfirmLogout(false)}>
-          <div
-            className="modal confirm-modal"
-            id="confirm-sair-admin"
-            data-testid="confirm-sair-admin"
-            role="alertdialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="confirm-modal-icon"><AdminIcon name="logout" size={22} /></div>
-            <h3 className="confirm-modal-title">Sair do painel?</h3>
-            <p className="confirm-modal-text">Você precisará entrar de novo para voltar.</p>
-            <div className="confirm-modal-actions">
-              <button className="btn ghost" onClick={() => setConfirmLogout(false)}>Cancelar</button>
-              <form action={signOut}>
-                <button type="submit" className="btn danger-outline" id="btn-confirmar-saida-admin">
-                  Sair
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
     </aside>
   )
 }
