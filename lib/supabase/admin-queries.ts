@@ -191,8 +191,11 @@ export type RetailOrderRow = {
   time: string
   /** ISO cru, usado pelos filtros de período no painel. */
   created_at: string
+  customer_id: string | null
   customer_name: string
   customer_location: string
+  cancellation_reason: string | null
+  cancellation_notes: string | null
   item_count: number
   total: number
   payment_method: string | null
@@ -223,6 +226,7 @@ export async function getRetailOrders(limit = 50): Promise<RetailOrderRow[]> {
     .from('orders')
     .select(`
       id, created_at, total_amount, status, payment_status, payment_method, tracking_code, melhor_envio_order_id, nfe_url, nfe_number, nfe_status, nfe_access_key,
+      customer_id, cancellation_reason, cancellation_notes,
       customer:customers(name, address),
       items:order_items(
         id, quantity, unit_price,
@@ -280,8 +284,11 @@ export async function getRetailOrders(limit = 50): Promise<RetailOrderRow[]> {
       date: dateStr,
       time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
       created_at: o.created_at as string,
+      customer_id: (o.customer_id as string | null) ?? null,
       customer_name: customer?.name ?? 'Cliente',
       customer_location: location,
+      cancellation_reason: (o.cancellation_reason as string | null) ?? null,
+      cancellation_notes: (o.cancellation_notes as string | null) ?? null,
       item_count: items.length,
       total: Number(o.total_amount),
       payment_method: o.payment_method as string | null,
@@ -758,8 +765,11 @@ export type WholesaleOrderRow = {
   id: string
   display_num: string
   date: string
+  customer_id: string | null
   customer_name: string
   customer_cnpj: string | null
+  cancellation_reason: string | null
+  cancellation_notes: string | null
   item_count: number
   total: number
   status: string
@@ -775,6 +785,7 @@ export async function getWholesaleOrders(limit = 50): Promise<WholesaleOrderRow[
     .from('orders')
     .select(`
       id, created_at, total_amount, status, nfe_status, notes,
+      customer_id, cancellation_reason, cancellation_notes,
       customer:customers(name, cpf_cnpj),
       items:order_items(
         id, quantity, unit_price,
@@ -802,6 +813,8 @@ export async function getWholesaleOrders(limit = 50): Promise<WholesaleOrderRow[
   type OrderRaw = {
     id: string; created_at: string; total_amount: string
     status: string; nfe_status: string | null; notes: string | null
+    customer_id: string | null
+    cancellation_reason: string | null; cancellation_notes: string | null
     customer: { name: string; cpf_cnpj: string | null } | null
     items: ItemRaw[]
   }
@@ -828,8 +841,11 @@ export async function getWholesaleOrders(limit = 50): Promise<WholesaleOrderRow[
       id: o.id,
       display_num: `A-${shortId}`,
       date: dateStr,
+      customer_id: o.customer_id ?? null,
       customer_name: o.customer?.name ?? '—',
       customer_cnpj: o.customer?.cpf_cnpj ?? null,
+      cancellation_reason: o.cancellation_reason ?? null,
+      cancellation_notes: o.cancellation_notes ?? null,
       item_count: items.length,
       total: Number(o.total_amount),
       status: o.status,

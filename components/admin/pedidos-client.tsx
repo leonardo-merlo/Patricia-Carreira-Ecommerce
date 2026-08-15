@@ -14,6 +14,8 @@ import { createPurchaseRequests } from '@/lib/actions/raw-materials'
 import { updateOrderStatus } from '@/lib/actions/orders'
 import { generateShippingLabel, getLabelPrintUrl } from '@/lib/actions/label'
 import { emitirNfe } from '@/lib/actions/nfe'
+import { CancelarPedidoModal } from '@/components/admin/cancelar-pedido-modal'
+import { cancellationReasonLabel } from '@/lib/cancellation-reasons'
 
 interface PedidosClientProps {
   varejo: RetailOrderRow[]
@@ -113,9 +115,8 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
   const [periodo, setPeriodo] = useState<PeriodoFiltro>('todos')
   const [dataDe, setDataDe] = useState('')
   const [dataAte, setDataAte] = useState('')
-  const [cancelLoading, setCancelLoading] = useState<string | null>(null)
-  const [cancelConfirm, setCancelConfirm] = useState<string | null>(null)
-  const [cancelError, setCancelError] = useState<Record<string, string>>({})
+  // Pedido em cancelamento: guarda o que o modal precisa para se explicar.
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; num: string; isPaid: boolean } | null>(null)
   const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null)
   const [statusLoading, setStatusLoading] = useState<string | null>(null)
 
@@ -646,59 +647,26 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
 
                                   {/* Cancelar existia só no atacado. No varejo é o que
                                       estorna o estoque e avisa a cliente por email. */}
-                                  {o.status !== 'cancelled' && (
+                                  {o.status === 'cancelled' ? (
                                     <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--border)' }}>
-                                      {cancelConfirm === o.id ? (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                          <div style={{ fontSize: 11.5, color: 'var(--text-2)' }}>
-                                            {o.payment_status === 'paid'
-                                              ? 'O estoque dos itens volta e a cliente recebe um email de cancelamento. Não dá para desfazer.'
-                                              : 'O pedido será cancelado. Não dá para desfazer.'}
-                                          </div>
-                                          <div className="row" style={{ gap: 6 }}>
-                                            <button
-                                              className="btn"
-                                              style={{ fontSize: 12, padding: '5px 10px' }}
-                                              disabled={cancelLoading === o.id}
-                                              onClick={() => setCancelConfirm(null)}
-                                            >
-                                              Voltar
-                                            </button>
-                                            <button
-                                              className="btn danger-outline"
-                                              style={{ fontSize: 12, padding: '5px 10px' }}
-                                              disabled={cancelLoading === o.id}
-                                              data-testid="btn-confirmar-cancelamento"
-                                              onClick={async () => {
-                                                setCancelLoading(o.id)
-                                                setCancelError((prev) => ({ ...prev, [o.id]: '' }))
-                                                const res = await updateOrderStatus(o.id, 'cancelled')
-                                                setCancelLoading(null)
-                                                if (res.success) {
-                                                  setCancelConfirm(null)
-                                                  window.location.reload()
-                                                } else {
-                                                  setCancelError((prev) => ({ ...prev, [o.id]: res.error }))
-                                                }
-                                              }}
-                                            >
-                                              {cancelLoading === o.id ? 'Cancelando...' : 'Confirmar cancelamento'}
-                                            </button>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <button
-                                          className="linkish"
-                                          style={{ fontSize: 12, color: 'var(--red)' }}
-                                          id={`btn-cancelar-pedido-${o.id}`}
-                                          onClick={() => setCancelConfirm(o.id)}
-                                        >
-                                          <AdminIcon name="xCircle" size={11} /> Cancelar pedido
-                                        </button>
+                                      <div className="cust-meta" style={{ marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 500 }}>Cancelamento</div>
+                                      <div style={{ fontSize: 12.5, fontWeight: 500 }}>
+                                        {cancellationReasonLabel(o.cancellation_reason) ?? 'Motivo não registrado'}
+                                      </div>
+                                      {o.cancellation_notes && (
+                                        <div className="cust-meta" style={{ marginTop: 3, whiteSpace: 'pre-wrap' }}>{o.cancellation_notes}</div>
                                       )}
-                                      {cancelError[o.id] && (
-                                        <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 6 }}>{cancelError[o.id]}</div>
-                                      )}
+                                    </div>
+                                  ) : (
+                                    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--border)' }}>
+                                      <button
+                                        className="linkish"
+                                        style={{ fontSize: 12, color: 'var(--red)' }}
+                                        id={`btn-cancelar-pedido-${o.id}`}
+                                        onClick={() => setCancelTarget({ id: o.id, num: o.display_num, isPaid: o.payment_status === 'paid' })}
+                                      >
+                                        <AdminIcon name="xCircle" size={11} /> Cancelar pedido
+                                      </button>
                                     </div>
                                   )}
                                 </div>
@@ -798,6 +766,18 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                                     <div data-testid="texto-observacoes-atacado" style={{ fontSize: 12.5, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{o.notes}</div>
                                   ) : (
                                     <div className="cust-meta">Nenhuma observação registrada.</div>
+                                  )}
+
+                                  {o.status === 'cancelled' && (
+                                    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--border)' }}>
+                                      <div className="cust-meta" style={{ marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 500 }}>Cancelamento</div>
+                                      <div style={{ fontSize: 12.5, fontWeight: 500 }}>
+                                        {cancellationReasonLabel(o.cancellation_reason) ?? 'Motivo não registrado'}
+                                      </div>
+                                      {o.cancellation_notes && (
+                                        <div className="cust-meta" style={{ marginTop: 3, whiteSpace: 'pre-wrap' }}>{o.cancellation_notes}</div>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                               </div>
@@ -912,10 +892,16 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                     onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-2)')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
                     disabled={statusLoading === openActionsFor}
-                    onClick={async () => {
-                      setStatusLoading(openActionsFor)
-                      await updateOrderStatus(openActionsFor!, 'cancelled')
-                      setStatusLoading(null)
+                    onClick={() => {
+                      // O dropdown é apertado demais para um formulário: o motivo
+                      // é obrigatório, então quem confirma é o modal.
+                      if (currentOrder) {
+                        setCancelTarget({
+                          id: currentOrder.id,
+                          num: currentOrder.display_num,
+                          isPaid: false,
+                        })
+                      }
                       setOpenActionsFor(null)
                       setDropdownPos(null)
                     }}
@@ -928,6 +914,17 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
             })()}
           </div>
         </>
+      )}
+
+      {/* ── Modal: cancelamento com motivo (varejo e atacado) ── */}
+      {cancelTarget && (
+        <CancelarPedidoModal
+          orderId={cancelTarget.id}
+          displayNum={cancelTarget.num}
+          isPaid={cancelTarget.isPaid}
+          onClose={() => setCancelTarget(null)}
+          onCancelled={() => { setCancelTarget(null); window.location.reload() }}
+        />
       )}
 
       {/* ── Modal: Novo Pedido Atacado ── */}

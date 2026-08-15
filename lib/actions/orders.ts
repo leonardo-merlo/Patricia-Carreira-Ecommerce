@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { requireAdmin } from '@/lib/server/auth'
 import { restoreStockByOrderId } from '@/lib/server/orders'
 import { getStoreSettings } from '@/lib/server/store-settings'
+import { isCancellationReason } from '@/lib/cancellation-reasons'
 import { revalidatePath } from 'next/cache'
 import {
   sendOrderShipped,
@@ -59,12 +60,28 @@ export type UpdateOrderStatusResult =
   | { success: true }
   | { success: false; error: string }
 
+/** Motivo e observação do cancelamento. Obrigatório na transição para 'cancelled'. */
+export type CancellationInput = {
+  reason: string
+  notes?: string
+}
+
 export async function updateOrderStatus(
   orderId: string,
   status: string,
+  cancellation?: CancellationInput,
 ): Promise<UpdateOrderStatusResult> {
   await requireAdmin()
   const supabase = createServiceClient()
+
+  // A tela já valida, mas quem decide é o servidor: sem isto, uma chamada direta
+  // da action gravaria cancelamento sem motivo e o CHECK do banco recusaria o
+  // update inteiro depois do estorno de estoque já ter acontecido.
+  if (status === 'cancelled') {
+    if (!cancellation || !isCancellationReason(cancellation.reason)) {
+      return { success: false, error: 'Informe um motivo de cancelamento válido.' }
+    }
+  }
 
   const { data: current } = await supabase
     .from('orders')
@@ -86,9 +103,15 @@ export async function updateOrderStatus(
     }
   }
 
+  const patch: Record<string, unknown> = { status, updated_at: new Date().toISOString() }
+  if (status === 'cancelled' && cancellation) {
+    patch.cancellation_reason = cancellation.reason
+    patch.cancellation_notes = cancellation.notes?.trim() || null
+  }
+
   const { error } = await supabase
     .from('orders')
-    .update({ status, updated_at: new Date().toISOString() })
+    .update(patch)
     .eq('id', orderId)
 
   if (error) return { success: false, error: error.message }
