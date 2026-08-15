@@ -8,6 +8,7 @@ import { toggleProductStatus, deleteProduct } from '@/lib/actions/products'
 import { ProdutoModal, AdjustStockModal, type AdjustStockTarget } from '@/components/admin/produto-modal'
 import { CsvImportModal } from '@/components/admin/csv-import-modal'
 import { toCsv, downloadCsv } from '@/lib/csv'
+import { categoryLabel } from '@/lib/categories'
 import type { ProductVariant, CutCategoryRow, MaterialColor } from '@/lib/types'
 import type {
   ProductWithVariantsAndBom,
@@ -59,9 +60,9 @@ interface EstoqueClientProps {
   recipeMaterials: RecipeMaterialOption[]
 }
 
-function getCategoryLabel(cat: string): string {
-  return { bolsas: 'Bolsas', roupas: 'Roupas', acessorios: 'Acessórios', bazar: 'Bazar' }[cat] ?? cat
-}
+// Rótulo vem de lib/categories: era a segunda lista de categorias no projeto, e
+// as duas já divergiam entre si.
+const getCategoryLabel = categoryLabel
 
 function getThumb(cat: string) {
   if (cat === 'bolsas' || cat === 'bazar') return { cls: 'bag', icon: 'bag' as const }

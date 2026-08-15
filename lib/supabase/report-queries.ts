@@ -1,4 +1,16 @@
 import { createServiceClient } from '@/lib/supabase/service'
+import { categoryLabel, categoryColor } from '@/lib/categories'
+
+/** `custom:YYYY-MM-DD:YYYY-MM-DD` — intervalo escolhido à mão. */
+export function isCustomPeriod(period: string): boolean {
+  return /^custom:\d{4}-\d{2}-\d{2}:\d{4}-\d{2}-\d{2}$/.test(period)
+}
+
+export function parseCustomPeriod(period: string): { de: string; ate: string } | null {
+  if (!isCustomPeriod(period)) return null
+  const [, de, ate] = period.split(':')
+  return { de, ate }
+}
 
 function parsePeriod(period: string): {
   start: Date
@@ -7,6 +19,19 @@ function parsePeriod(period: string): {
   prevEnd: Date
   label: string
 } {
+  const custom = parseCustomPeriod(period)
+  if (custom) {
+    const start = new Date(`${custom.de}T00:00:00`)
+    const end = new Date(`${custom.ate}T23:59:59.999`)
+    // O período anterior tem a mesma duração, colado antes do início — é o que
+    // torna a comparação honesta para um intervalo de tamanho qualquer.
+    const spanMs = end.getTime() - start.getTime()
+    const prevEnd = new Date(start.getTime() - 1)
+    const prevStart = new Date(prevEnd.getTime() - spanMs)
+    const fmt = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    return { start, end, prevStart, prevEnd, label: `${fmt(start)} a ${fmt(end)}` }
+  }
+
   if (period === 'last90') {
     const end = new Date()
     end.setHours(23, 59, 59, 999)
@@ -49,6 +74,7 @@ function parsePeriod(period: string): {
 }
 
 export function getPrevPeriodLabel(period: string): string {
+  if (isCustomPeriod(period)) return 'período anterior'
   if (period === 'last90') return '90 dias antes'
   if (/^\d{4}$/.test(period)) return String(parseInt(period) - 1)
   const [y, m] = period.split('-').map(Number)
@@ -63,11 +89,23 @@ export type ReportKPIs = {
   avg_ticket_delta_pct: number | null
   order_count: number
   order_count_delta_pct: number | null
+  /** Peças vendidas — pedido grande e pedido pequeno contam diferente. */
+  items_sold: number
 }
 
 export type MonthlyPoint = { month: string; value: number }
-export type CategoryItem = { name: string; value: number; pct: number; color: string }
+export type CategoryItem = { name: string; value: number; units: number; pct: number; color: string }
 export type TopProductItem = { name: string; units: number; rev: number }
+
+export type AffiliateItem = {
+  name: string
+  coupon_code: string | null
+  orders: number
+  revenue: number
+  commission_pct: number | null
+  /** Comissão estimada pela receita do período — o valor a pagar de fato vive em contas a pagar. */
+  estimated_commission: number
+}
 
 export type ReportData = {
   period_label: string
@@ -75,20 +113,10 @@ export type ReportData = {
   monthly_revenue: MonthlyPoint[]
   by_category: CategoryItem[]
   top_products: TopProductItem[]
+  by_affiliate: AffiliateItem[]
   channels: { retail: number; wholesale: number }
+  channel_units: { retail: number; wholesale: number }
   client_stats: { retail_unique: number; wholesale_active: number }
-}
-
-const CAT_COLORS: Record<string, string> = {
-  bolsas: '#c97d60',
-  roupas: '#7c3aed',
-  acessorios: '#d8c89a',
-}
-
-const CAT_LABELS: Record<string, string> = {
-  bolsas: 'Bolsas',
-  roupas: 'Roupas',
-  acessorios: 'Acessórios',
 }
 
 export async function getReportData(period: string): Promise<ReportData> {
@@ -98,10 +126,10 @@ export async function getReportData(period: string): Promise<ReportData> {
   // Chart covers the 12 months ending at `end`
   const chartStart = new Date(end.getFullYear(), end.getMonth() - 11, 1)
 
-  const [curRes, prevRes, chartRes] = await Promise.all([
+  const [curRes, prevRes, chartRes, partnersRes] = await Promise.all([
     supabase
       .from('orders')
-      .select('id, total_amount, type, customer_id')
+      .select('id, total_amount, type, customer_id, coupon_id')
       .eq('payment_status', 'paid')
       .gte('created_at', start.toISOString())
       .lte('created_at', end.toISOString()),
@@ -119,6 +147,13 @@ export async function getReportData(period: string): Promise<ReportData> {
       .eq('payment_status', 'paid')
       .gte('created_at', chartStart.toISOString())
       .lte('created_at', end.toISOString()),
+
+    // A afiliada é ligada à venda pelo cupom dela: partners.coupon_id casa com
+    // orders.coupon_id. Sem cupom aplicado não há como atribuir a venda.
+    supabase
+      .from('partners')
+      .select('id, name, commission_pct, coupon_id, coupon:coupons(code)')
+      .not('coupon_id', 'is', null),
   ])
 
   const cur = curRes.data ?? []
@@ -151,14 +186,16 @@ export async function getReportData(period: string): Promise<ReportData> {
   const ids = cur.map((o) => o.id as string)
   let by_category: CategoryItem[] = []
   let top_products: TopProductItem[] = []
+  let items_sold = 0
+  const unitsByOrder = new Map<string, number>()
 
   if (ids.length > 0) {
     const { data: itemsData } = await supabase
       .from('order_items')
-      .select('quantity, unit_price, product_name, product_variant:product_variants(product:products(category))')
+      .select('order_id, quantity, unit_price, product_name, product_variant:product_variants(product:products(category))')
       .in('order_id', ids)
 
-    const catMap = new Map<string, number>()
+    const catMap = new Map<string, { value: number; units: number }>()
     const prodMap = new Map<string, { units: number; rev: number }>()
 
     for (const item of itemsData ?? []) {
@@ -168,28 +205,74 @@ export async function getReportData(period: string): Promise<ReportData> {
       const cat = pv?.product?.category ?? 'outros'
       const name = item.product_name as string
 
-      catMap.set(cat, (catMap.get(cat) ?? 0) + rev)
+      items_sold += qty
+      const orderId = item.order_id as string
+      unitsByOrder.set(orderId, (unitsByOrder.get(orderId) ?? 0) + qty)
+
+      const ce = catMap.get(cat) ?? { value: 0, units: 0 }
+      ce.value += rev
+      ce.units += qty
+      catMap.set(cat, ce)
+
       const pe = prodMap.get(name) ?? { units: 0, rev: 0 }
       pe.units += qty
       pe.rev += rev
       prodMap.set(name, pe)
     }
 
-    const totalCat = Array.from(catMap.values()).reduce((s, v) => s + v, 0)
+    const totalCat = Array.from(catMap.values()).reduce((s, v) => s + v.value, 0)
     by_category = Array.from(catMap.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([cat, value]) => ({
-        name: CAT_LABELS[cat] ?? cat,
-        value,
-        pct: totalCat > 0 ? Math.round((value / totalCat) * 1000) / 10 : 0,
-        color: CAT_COLORS[cat] ?? '#9ca3af',
+      .sort((a, b) => b[1].value - a[1].value)
+      .map(([cat, s]) => ({
+        name: categoryLabel(cat),
+        value: s.value,
+        units: s.units,
+        pct: totalCat > 0 ? Math.round((s.value / totalCat) * 1000) / 10 : 0,
+        color: categoryColor(cat),
       }))
 
     top_products = Array.from(prodMap.entries())
       .sort((a, b) => b[1].rev - a[1].rev)
-      .slice(0, 5)
+      .slice(0, 8)
       .map(([name, s]) => ({ name, units: s.units, rev: s.rev }))
   }
+
+  // ── Receita por afiliada ───────────────────────────────────────────────────
+  type PartnerRaw = {
+    id: string
+    name: string
+    commission_pct: number | null
+    coupon_id: string
+    coupon: { code: string } | { code: string }[] | null
+  }
+  const partners = (partnersRes.data ?? []) as unknown as PartnerRaw[]
+  const partnerByCoupon = new Map(partners.map((p) => [p.coupon_id, p]))
+
+  const affiliateMap = new Map<string, { orders: number; revenue: number }>()
+  for (const o of cur) {
+    const couponId = o.coupon_id as string | null
+    if (!couponId || !partnerByCoupon.has(couponId)) continue
+    const entry = affiliateMap.get(couponId) ?? { orders: 0, revenue: 0 }
+    entry.orders += 1
+    entry.revenue += Number(o.total_amount)
+    affiliateMap.set(couponId, entry)
+  }
+
+  const by_affiliate: AffiliateItem[] = Array.from(affiliateMap.entries())
+    .map(([couponId, s]) => {
+      const p = partnerByCoupon.get(couponId)!
+      const coupon = Array.isArray(p.coupon) ? p.coupon[0] : p.coupon
+      const pct = p.commission_pct != null ? Number(p.commission_pct) : null
+      return {
+        name: p.name,
+        coupon_code: coupon?.code ?? null,
+        orders: s.orders,
+        revenue: s.revenue,
+        commission_pct: pct,
+        estimated_commission: pct != null ? (s.revenue * pct) / 100 : 0,
+      }
+    })
+    .sort((a, b) => b.revenue - a.revenue)
 
   const retailRev = cur
     .filter((o) => (o.type as string) === 'retail')
@@ -197,6 +280,13 @@ export async function getReportData(period: string): Promise<ReportData> {
   const wholesaleRev = cur
     .filter((o) => (o.type as string) === 'wholesale')
     .reduce((s, o) => s + Number(o.total_amount), 0)
+
+  const retailUnits = cur
+    .filter((o) => (o.type as string) === 'retail')
+    .reduce((s, o) => s + (unitsByOrder.get(o.id as string) ?? 0), 0)
+  const wholesaleUnits = cur
+    .filter((o) => (o.type as string) === 'wholesale')
+    .reduce((s, o) => s + (unitsByOrder.get(o.id as string) ?? 0), 0)
 
   const retailSet = new Set(
     cur
@@ -219,11 +309,14 @@ export async function getReportData(period: string): Promise<ReportData> {
       order_count: orderCount,
       order_count_delta_pct:
         prevOrderCount > 0 ? ((orderCount - prevOrderCount) / prevOrderCount) * 100 : null,
+      items_sold,
     },
     monthly_revenue,
     by_category,
     top_products,
+    by_affiliate,
     channels: { retail: retailRev, wholesale: wholesaleRev },
+    channel_units: { retail: retailUnits, wholesale: wholesaleUnits },
     client_stats: { retail_unique: retailSet.size, wholesale_active: wholesaleSet.size },
   }
 }

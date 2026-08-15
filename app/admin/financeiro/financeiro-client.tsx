@@ -2,12 +2,14 @@
 // Client component: state, transitions, browser interactions
 
 import { useState, useTransition, useMemo } from 'react'
+import Link from 'next/link'
 import { AdminIcon } from '@/components/admin/admin-icon'
 import {
   createAccountPayable,
   updateAccountPayable,
   deleteAccountPayable,
   markAccountAsPaid,
+  revertAccountToPending,
   fetchMonthlyRevenue,
 } from '@/lib/actions/financeiro'
 import { getStores, createStore, updateStore, deleteStore } from '@/lib/actions/stores'
@@ -137,6 +139,8 @@ export function FinanceiroClient({
   const [form, setForm] = useState<FormState>(emptyForm)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [markPaid, setMarkPaid] = useState<MarkPaidState | null>(null)
+  const [revertTarget, setRevertTarget] = useState<AccountPayable | null>(null)
+  const [revertNotice, setRevertNotice] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -164,11 +168,6 @@ export function FinanceiroClient({
       resultado: displayRevenue - totalPaidThisMonth,
     }
   }, [accounts, todayStr, in7daysStr, selectedPeriod, displayRevenue])
-
-  const pendingAffiliateAccounts = useMemo(
-    () => accounts.filter(a => a.partner_id && !a.paid_at).sort((a, b) => a.due_date.localeCompare(b.due_date)),
-    [accounts],
-  )
 
   const filtered = useMemo(() => {
     return accounts.filter(a => {
@@ -289,6 +288,25 @@ export function FinanceiroClient({
     })
   }
 
+  function handleRevert() {
+    if (!revertTarget) return
+    const target = revertTarget
+    startTransition(async () => {
+      const result = await revertAccountToPending(target.id)
+      if (!result.success) return
+      setAccounts(prev =>
+        prev.map(a => (a.id === target.id ? { ...a, paid_at: null } : a)),
+      )
+      setRevertTarget(null)
+      setRevertNotice(
+        result.recurringWarning
+          ? 'Conta de volta para pendente. A ocorrência do próximo período, criada quando ela foi paga, continua na lista — apague-a se não fizer mais sentido.'
+          : 'Conta de volta para pendente.',
+      )
+      setTimeout(() => setRevertNotice(null), 8000)
+    })
+  }
+
   function handleMarkPaid() {
     if (!markPaid || !markPaid.paymentMethod) return
     startTransition(async () => {
@@ -336,6 +354,11 @@ export function FinanceiroClient({
           <p className="page-sub">Contas a pagar e resultado do mês</p>
         </div>
         <div className="page-actions">
+          {/* A análise de venda mora em Relatórios. Duplicá-la aqui criaria dois
+              lugares calculando receita, que um dia divergem. */}
+          <Link className="btn" id="btn-ver-relatorios" href="/admin/relatorios">
+            <AdminIcon name="trendUp" /> Análise de vendas
+          </Link>
           <button className="btn" id="btn-gerenciar-lojas" onClick={() => { setStoreForm(emptyStoreForm); setStoreError(null); setShowStores(true) }}>
             <AdminIcon name="store" /> Lojas
           </button>
@@ -344,6 +367,12 @@ export function FinanceiroClient({
           </button>
         </div>
       </div>
+
+      {revertNotice && (
+        <div className="alert alert-success" style={{ marginBottom: 16, fontSize: 12.5 }} data-testid="aviso-reversao">
+          {revertNotice}
+        </div>
+      )}
 
       {/* Resultado do mês — 3 colunas */}
       <div className="kpi-grid cols-2-mobile" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 16 }}>
@@ -406,54 +435,6 @@ export function FinanceiroClient({
           <div className="kpi-trend"><span className="subtle">contas próximas</span></div>
         </div>
       </div>
-
-      {/* Comissões de afiliadas pendentes */}
-      {pendingAffiliateAccounts.length > 0 && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <div className="card-header">
-            <div>
-              <h3 className="ttl">Comissões de afiliadas a pagar</h3>
-              <div className="cust-meta" style={{ marginTop: 2, fontSize: 11.5 }}>
-                {pendingAffiliateAccounts.length} pendente{pendingAffiliateAccounts.length !== 1 ? 's' : ''} ·{' '}
-                {fmtCurrency(pendingAffiliateAccounts.reduce((s, a) => s + a.amount, 0))} no total
-              </div>
-            </div>
-          </div>
-          <div className="card-body flush">
-            <div className="table-wrap">
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>Afiliada</th>
-                    <th>Referência</th>
-                    <th style={{ width: 130 }}>Vencimento</th>
-                    <th style={{ width: 120 }}>Valor</th>
-                    <th style={{ width: 100 }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingAffiliateAccounts.map(a => (
-                    <tr key={a.id}>
-                      <td style={{ fontWeight: 500 }}>{a.creditor ?? '—'}</td>
-                      <td className="cust-meta">{a.reference_month}</td>
-                      <td className="cust-meta">{fmtDate(a.due_date)}</td>
-                      <td className="num" style={{ fontWeight: 600 }}>{fmtCurrency(a.amount)}</td>
-                      <td>
-                        <button
-                          className="btn sm primary"
-                          onClick={() => setMarkPaid({ account: a, paidAt: todayStr, paymentMethod: '' })}
-                        >
-                          Dar baixa
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Tabs + seletor de período */}
       <div style={{ display: 'flex', alignItems: 'flex-end', borderBottom: '1px solid var(--border)', marginTop: 24, marginBottom: 18 }}>
@@ -541,15 +522,30 @@ export function FinanceiroClient({
                         <td><span className={cls}>{label}</span></td>
                         <td>
                           <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                            {status !== 'paid' && (
+                            {/* "Pagar" é a ação; "Pago" é o que o status já diz.
+                                Com o rótulo antigo os dois liam igual e o botão
+                                parecia um selo em vez de um comando. */}
+                            {status !== 'paid' ? (
                               <button
                                 className="btn sm"
-                                style={{ background: 'var(--green-soft)', color: 'var(--green)', borderColor: 'transparent' }}
+                                style={{ background: 'var(--accent)', color: '#fff', borderColor: 'transparent', fontWeight: 500 }}
                                 id={`btn-pagar-${account.id}`}
+                                data-testid="btn-pagar-conta"
                                 onClick={() => setMarkPaid({ account, paidAt: todayStr, paymentMethod: '' })}
-                                title="Marcar como pago"
+                                title="Registrar pagamento desta conta"
                               >
-                                Pago
+                                Pagar
+                              </button>
+                            ) : (
+                              <button
+                                className="btn sm ghost"
+                                id={`btn-reverter-${account.id}`}
+                                data-testid="btn-reverter-conta"
+                                disabled={isPending}
+                                onClick={() => setRevertTarget(account)}
+                                title="Voltar esta conta para pendente"
+                              >
+                                Voltar p/ pendente
                               </button>
                             )}
                             <button
@@ -788,6 +784,45 @@ export function FinanceiroClient({
                 disabled={isPending}
               >
                 {isPending ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Modal: Voltar conta paga para pendente */}
+      {revertTarget && (
+        <>
+          <div className="drawer-backdrop open" style={{ zIndex: 200 }} onClick={() => setRevertTarget(null)} />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'var(--bg)', border: '1px solid var(--border)',
+            borderRadius: 12, padding: 24, zIndex: 201, width: 360,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+          }} data-testid="revert-modal">
+            <h4 style={{ marginBottom: 8, fontSize: 15, fontWeight: 600 }}>Voltar para pendente?</h4>
+            <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 8 }}>
+              <b>{revertTarget.description}</b> deixa de constar como paga e volta a
+              contar entre as contas em aberto.
+            </p>
+            {revertTarget.is_recurring && (
+              <p style={{ fontSize: 12.5, color: 'var(--text-2)', marginBottom: 20, padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 6 }}>
+                Esta conta é recorrente: a do período seguinte foi criada quando ela
+                foi paga e <b>continua na lista</b>. Apague-a manualmente se não fizer
+                mais sentido.
+              </p>
+            )}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
+              <button className="btn ghost" onClick={() => setRevertTarget(null)}>Cancelar</button>
+              <button
+                id="btn-confirmar-reverter-conta"
+                data-testid="btn-confirmar-reverter-conta"
+                className="btn primary"
+                onClick={handleRevert}
+                disabled={isPending}
+              >
+                {isPending ? 'Voltando...' : 'Voltar para pendente'}
               </button>
             </div>
           </div>

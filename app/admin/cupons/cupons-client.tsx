@@ -252,7 +252,10 @@ export function CuponsClient({ initialCoupons }: Props) {
                     return (
                       <tr key={c.id}>
                         <td>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {/* alignItems: flex-start é o que impede o chip do código
+                              de esticar até o fim da coluna — item de flex column
+                              estica por padrão, e o inline-block do span não vence isso. */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
                             <span style={{
                               fontFamily: 'ui-monospace, monospace',
                               fontSize: 12,

@@ -39,6 +39,10 @@
   --blue-soft: var(--pc-cobalt-soft);
   --purple: var(--pc-gold);
   --purple-soft: var(--pc-gold-soft);
+  /* Já era referenciada no aviso de BOM sem receita e nunca tinha sido definida:
+     o ícone de alerta saía com a cor herdada do texto. */
+  --orange: var(--pc-amber);
+  --orange-soft: var(--pc-amber-soft);
   --red: var(--pc-red);
   --red-soft: var(--pc-red-soft);
 

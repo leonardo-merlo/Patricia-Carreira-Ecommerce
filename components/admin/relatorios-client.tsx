@@ -1,10 +1,13 @@
 "use client" // period selector navigates with router.push; charts need client state
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AdminIcon } from '@/components/admin/admin-icon'
 import { formatPrice } from '@/lib/utils'
 import type { ReportData } from '@/lib/supabase/report-queries'
-import { getPrevPeriodLabel } from '@/lib/supabase/report-queries'
+import { getPrevPeriodLabel, parseCustomPeriod } from '@/lib/supabase/report-queries'
+
+const CUSTOM_OPTION = 'custom'
 
 function getPeriodOptions(): Array<{ value: string; label: string }> {
   const now = new Date()
@@ -17,6 +20,7 @@ function getPeriodOptions(): Array<{ value: string; label: string }> {
   }
   opts.push({ value: 'last90', label: 'Últimos 90 dias' })
   opts.push({ value: String(now.getFullYear()), label: `Ano de ${now.getFullYear()}` })
+  opts.push({ value: CUSTOM_OPTION, label: 'Escolher datas...' })
   return opts
 }
 
@@ -36,7 +40,20 @@ export function RelatoriosClient({ data, period }: RelatoriosClientProps) {
   const opts = getPeriodOptions()
   const prevLabel = getPrevPeriodLabel(period)
 
-  const { kpis, monthly_revenue, by_category, top_products, channels, client_stats } = data
+  const { kpis, monthly_revenue, by_category, top_products, by_affiliate, channels, channel_units, client_stats } = data
+
+  // Intervalo personalizado: os campos de data só aparecem quando ele é escolhido.
+  const custom = parseCustomPeriod(period)
+  const [customDe, setCustomDe] = useState(custom?.de ?? '')
+  const [customAte, setCustomAte] = useState(custom?.ate ?? '')
+  const [showCustom, setShowCustom] = useState(Boolean(custom))
+
+  function applyCustom(de: string, ate: string) {
+    if (!de || !ate) return
+    // Datas trocadas dariam um intervalo vazio em silêncio.
+    const [inicio, fim] = de <= ate ? [de, ate] : [ate, de]
+    router.push(`/admin/relatorios?period=custom:${inicio}:${fim}`)
+  }
 
   const monthlyValues = monthly_revenue.map((m) => m.value)
   const maxV = Math.max(...monthlyValues, 1)
@@ -80,6 +97,13 @@ export function RelatoriosClient({ data, period }: RelatoriosClientProps) {
       dot: 'var(--purple)',
     },
     {
+      label: 'Peças vendidas',
+      value: String(kpis.items_sold),
+      raw: null,
+      delta: null,
+      dot: 'var(--orange)',
+    },
+    {
       label: 'Clientes ativos',
       value: String(client_stats.retail_unique + client_stats.wholesale_active),
       raw: null,
@@ -95,17 +119,47 @@ export function RelatoriosClient({ data, period }: RelatoriosClientProps) {
           <h2 className="page-title">Relatórios</h2>
           <p className="page-sub">Performance de vendas, produtos e operação · {data.period_label}</p>
         </div>
-        <div className="page-actions">
+        <div className="page-actions" style={{ flexWrap: 'wrap' }}>
           <select
             className="select"
+            id="filtro-periodo-relatorio"
             style={{ width: 'auto' }}
-            value={period}
-            onChange={(e) => router.push(`/admin/relatorios?period=${e.target.value}`)}
+            value={showCustom ? CUSTOM_OPTION : period}
+            onChange={(e) => {
+              if (e.target.value === CUSTOM_OPTION) { setShowCustom(true); return }
+              setShowCustom(false)
+              router.push(`/admin/relatorios?period=${e.target.value}`)
+            }}
           >
             {opts.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
+
+          {showCustom && (
+            <div className="row" style={{ gap: 6, alignItems: 'center' }}>
+              <input
+                className="input"
+                type="date"
+                id="relatorio-data-de"
+                aria-label="Data inicial"
+                style={{ width: 145, flex: '0 0 auto' }}
+                value={customDe}
+                onChange={(e) => { setCustomDe(e.target.value); applyCustom(e.target.value, customAte) }}
+              />
+              <span className="cust-meta">até</span>
+              <input
+                className="input"
+                type="date"
+                id="relatorio-data-ate"
+                aria-label="Data final"
+                style={{ width: 145, flex: '0 0 auto' }}
+                value={customAte}
+                onChange={(e) => { setCustomAte(e.target.value); applyCustom(customDe, e.target.value) }}
+              />
+            </div>
+          )}
+
           <button className="btn" onClick={() => window.print()}>
             <AdminIcon name="download" /> Exportar PDF
           </button>
@@ -227,7 +281,7 @@ export function RelatoriosClient({ data, period }: RelatoriosClientProps) {
                         <span className="num" style={{ fontWeight: 500 }}>{c.pct}%</span>
                       </div>
                       <div style={{ paddingLeft: 14, color: 'var(--text-3)', fontSize: 11 }}>
-                        {formatPrice(c.value)}
+                        {formatPrice(c.value)} · {c.units} {c.units === 1 ? 'peça' : 'peças'}
                       </div>
                     </div>
                   ))}
@@ -295,8 +349,8 @@ export function RelatoriosClient({ data, period }: RelatoriosClientProps) {
           <div className="card-header"><h3 className="ttl">Canais de venda</h3></div>
           <div className="card-body" style={{ display: 'grid', gap: 14 }}>
             {[
-              { label: 'E-commerce (Varejo)', val: channels.retail, pct: retailPct, color: 'var(--accent)' },
-              { label: 'Atacado (Manual)', val: channels.wholesale, pct: wholesalePct, color: 'var(--purple)' },
+              { label: 'E-commerce (Varejo)', val: channels.retail, units: channel_units.retail, pct: retailPct, color: 'var(--accent)' },
+              { label: 'Atacado (Manual)', val: channels.wholesale, units: channel_units.wholesale, pct: wholesalePct, color: 'var(--purple)' },
             ].map((c, i) => (
               <div key={i}>
                 <div className="row between" style={{ marginBottom: 6 }}>
@@ -306,7 +360,9 @@ export function RelatoriosClient({ data, period }: RelatoriosClientProps) {
                 <div style={{ height: 8, background: 'var(--surface-2)', borderRadius: 4, overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: `${c.pct}%`, background: c.color }} />
                 </div>
-                <div style={{ marginTop: 3, color: 'var(--text-3)', fontSize: 11 }}>{c.pct.toFixed(1)}% da receita</div>
+                <div style={{ marginTop: 3, color: 'var(--text-3)', fontSize: 11 }}>
+                  {c.pct.toFixed(1)}% da receita · {c.units} {c.units === 1 ? 'peça' : 'peças'}
+                </div>
               </div>
             ))}
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, display: 'grid', gap: 6, fontSize: 12, color: 'var(--text-2)' }}>
@@ -325,6 +381,63 @@ export function RelatoriosClient({ data, period }: RelatoriosClientProps) {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Receita por afiliada */}
+      <div className="card" style={{ marginTop: 'var(--gap)' }}>
+        <div className="card-header">
+          <div>
+            <h3 className="ttl">Receita por afiliada</h3>
+            <div style={{ color: 'var(--text-3)', fontSize: 11.5, marginTop: 2 }}>
+              Vendas atribuídas pelo cupom da afiliada · {data.period_label}
+            </div>
+          </div>
+        </div>
+        {by_affiliate.length === 0 ? (
+          <div className="card-body" style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-3)', fontSize: 12 }}>
+            Nenhuma venda com cupom de afiliada neste período.
+          </div>
+        ) : (
+          <div className="card-body flush">
+            <div className="table-wrap">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Afiliada</th>
+                    <th style={{ width: 130 }}>Cupom</th>
+                    <th style={{ width: 90 }}>Pedidos</th>
+                    <th style={{ width: 130 }}>Receita</th>
+                    <th style={{ width: 100 }}>Comissão</th>
+                    <th style={{ width: 130 }}>A pagar (estim.)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {by_affiliate.map((a) => (
+                    <tr key={`${a.name}-${a.coupon_code ?? ''}`}>
+                      <td style={{ fontWeight: 500 }}>{a.name}</td>
+                      <td>
+                        {a.coupon_code ? (
+                          <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11.5, color: 'var(--text-2)' }}>
+                            {a.coupon_code}
+                          </span>
+                        ) : <span className="cust-meta">—</span>}
+                      </td>
+                      <td className="num">{a.orders}</td>
+                      <td className="num" style={{ fontWeight: 500 }}>{formatPrice(a.revenue)}</td>
+                      <td className="num subtle">{a.commission_pct != null ? `${a.commission_pct}%` : '—'}</td>
+                      <td className="num">{a.commission_pct != null ? formatPrice(a.estimated_commission) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="cust-meta" style={{ padding: '10px 16px', borderTop: '1px solid var(--border)' }}>
+              A comissão aqui é estimativa sobre a receita do período. O valor que
+              será realmente pago vive em{' '}
+              <a href="/admin/financeiro" style={{ color: 'var(--accent)' }}>Financeiro</a>, como conta a pagar.
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

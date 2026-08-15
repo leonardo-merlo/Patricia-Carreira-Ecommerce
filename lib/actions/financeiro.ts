@@ -160,3 +160,42 @@ export async function markAccountAsPaid(
   revalidatePath('/admin')
   return { success: true }
 }
+
+/**
+ * Desfaz a baixa: a conta volta a Pendente.
+ *
+ * Não mexe na ocorrência seguinte que markAccountAsPaid pode ter criado, no caso
+ * de conta recorrente — apagá-la aqui seria destruir um registro que o Henrique
+ * talvez já tenha editado. Em vez disso, devolvemos `recurringWarning` para a
+ * tela avisar que ela continua lá.
+ */
+export async function revertAccountToPending(
+  accountId: string
+): Promise<{ success: boolean; error?: string; recurringWarning?: boolean }> {
+  await requireAdmin()
+  const supabase = createServiceClient()
+
+  const { data: accountRow, error: fetchError } = await supabase
+    .from('accounts_payable')
+    .select('id, paid_at, is_recurring')
+    .eq('id', accountId)
+    .maybeSingle()
+
+  if (fetchError || !accountRow) {
+    return { success: false, error: 'Conta não encontrada' }
+  }
+  if (!accountRow.paid_at) {
+    return { success: false, error: 'Esta conta já está pendente' }
+  }
+
+  const { error } = await supabase
+    .from('accounts_payable')
+    .update({ paid_at: null, updated_at: new Date().toISOString() })
+    .eq('id', accountId)
+
+  if (error) return { success: false, error: error.message }
+
+  revalidatePath('/admin/financeiro')
+  revalidatePath('/admin')
+  return { success: true, recurringWarning: Boolean(accountRow.is_recurring) }
+}
