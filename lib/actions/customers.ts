@@ -3,6 +3,10 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/server/auth'
+import {
+  getCustomerPurchaseDetail,
+  type CustomerPurchaseDetail,
+} from '@/lib/supabase/customer-queries'
 import { revalidatePath } from 'next/cache'
 
 export type CheckoutPrefill = {
@@ -130,4 +134,14 @@ export async function createCustomer(data: {
   if (error) return { error: error.message }
   revalidatePath('/admin/clientes')
   return { error: null }
+}
+
+/**
+ * Histórico de compras de um cliente, carregado quando a ficha abre no painel.
+ * Passa por requireAdmin porque recebe um id por parâmetro — sem isso, qualquer
+ * sessão autenticada leria o que a cliente ao lado comprou.
+ */
+export async function getCustomerPurchases(customerId: string): Promise<CustomerPurchaseDetail> {
+  await requireAdmin()
+  return getCustomerPurchaseDetail(customerId)
 }

@@ -1,12 +1,12 @@
 "use client" // tabs, search, sort, filter, drawer, modal state
 
-import { useState, useMemo, useTransition } from 'react'
+import { useState, useMemo, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { AdminIcon } from '@/components/admin/admin-icon'
 import { formatPrice } from '@/lib/utils'
 import { toCsv, downloadCsv } from '@/lib/csv'
-import type { CustomerRow } from '@/lib/supabase/customer-queries'
-import { updateCustomer, createCustomer } from '@/lib/actions/customers'
+import type { CustomerRow, CustomerPurchaseDetail } from '@/lib/supabase/customer-queries'
+import { updateCustomer, createCustomer, getCustomerPurchases } from '@/lib/actions/customers'
 
 type Tab = 'todos' | 'varejo' | 'atacado'
 type SortKey = 'revenue' | 'name' | 'orders' | 'last_order'
@@ -35,6 +35,14 @@ function fmtShort(iso: string | null): string {
 function cityLabel(c: CustomerRow): string {
   if (!c.address?.city) return '—'
   return c.address.state ? `${c.address.city}/${c.address.state}` : c.address.city
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500, color: 'var(--text-3)', marginBottom: 8 }}>
+      {children}
+    </div>
+  )
 }
 
 function initials(name: string): string {
@@ -131,6 +139,32 @@ export function ClientesClient({ initialData, initialSelectedId = null }: Client
   const [editForm, setEditForm]     = useState<EditForm | null>(null)
   const [newForm, setNewForm]       = useState<NewForm>({ name: '', email: '', phone: '', cpf_cnpj: '', instagram: '', type: 'retail' })
   const [saveError, setSaveError]   = useState<string | null>(null)
+
+  // Histórico de compras: carregado só quando a ficha abre.
+  const [detail, setDetail]                 = useState<CustomerPurchaseDetail | null>(null)
+  const [detailLoading, setDetailLoading]   = useState(false)
+  const [detailError, setDetailError]       = useState(false)
+  const [openOrderId, setOpenOrderId]       = useState<string | null>(null)
+
+  const selectedId = selected?.id ?? null
+
+  useEffect(() => {
+    setOpenOrderId(null)
+    setDetail(null)
+    setDetailError(false)
+    if (!selectedId) return
+
+    // A ficha pode ser trocada antes da resposta chegar; sem isto o histórico de
+    // um cliente apareceria na ficha de outro.
+    let cancelled = false
+    setDetailLoading(true)
+    getCustomerPurchases(selectedId)
+      .then((d) => { if (!cancelled) setDetail(d) })
+      .catch(() => { if (!cancelled) setDetailError(true) })
+      .finally(() => { if (!cancelled) setDetailLoading(false) })
+
+    return () => { cancelled = true }
+  }, [selectedId])
 
   const cities = useMemo(() => {
     const set = new Set<string>()
@@ -486,27 +520,83 @@ export function ClientesClient({ initialData, initialSelectedId = null }: Client
                     )}
                   </div>
 
-                  {selected.recent_orders.length > 0 && (
-                    <div>
-                      <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500, color: 'var(--text-3)', marginBottom: 8 }}>
-                        Últimos pedidos
-                      </div>
+                  <div>
+                    <SectionLabel>Últimos pedidos</SectionLabel>
+                    {detailLoading ? (
+                      <div className="cust-meta">Carregando histórico…</div>
+                    ) : detailError ? (
+                      <div className="cust-meta">Não foi possível carregar o histórico.</div>
+                    ) : !detail || detail.orders.length === 0 ? (
+                      <div className="cust-meta">Nenhum pedido registrado.</div>
+                    ) : (
                       <div style={{ display: 'grid', gap: 6 }}>
-                        {selected.recent_orders.map((o, i) => {
+                        {detail.orders.map((o) => {
                           const st = ORDER_STATUS[o.status] ?? { cls: 'neutral', txt: o.status }
+                          const isOpen = openOrderId === o.id
                           return (
-                            <div key={i} className="row between" style={{ padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 6, fontSize: 12.5 }}>
-                              <div className="row" style={{ gap: 8 }}>
-                                <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11.5, color: 'var(--text-2)' }}>{o.num}</span>
-                                <span style={{ color: 'var(--text-3)', fontSize: 11 }}>{o.date}</span>
-                              </div>
-                              <div className="row" style={{ gap: 8 }}>
-                                <span style={{ fontWeight: 500 }}>{formatPrice(o.total)}</span>
-                                <span className={`badge ${st.cls}`}>{st.txt}</span>
-                              </div>
+                            <div key={o.id} style={{ background: 'var(--surface-2)', borderRadius: 6, overflow: 'hidden' }}>
+                              <button
+                                type="button"
+                                className="pedido-toggle"
+                                aria-expanded={isOpen}
+                                data-testid="btn-pedido-cliente"
+                                onClick={() => setOpenOrderId(isOpen ? null : o.id)}
+                              >
+                                <span className="row" style={{ gap: 8 }}>
+                                  <AdminIcon name={isOpen ? 'chevDown' : 'chevRight'} size={11} />
+                                  <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11.5, color: 'var(--text-2)' }}>{o.num}</span>
+                                  <span style={{ color: 'var(--text-3)', fontSize: 11 }}>{o.date}</span>
+                                </span>
+                                <span className="row" style={{ gap: 8 }}>
+                                  <span style={{ fontWeight: 500 }}>{formatPrice(o.total)}</span>
+                                  <span className={`badge ${st.cls}`}>{st.txt}</span>
+                                </span>
+                              </button>
+
+                              {isOpen && (
+                                <div style={{ padding: '2px 12px 10px 12px', borderTop: '1px dashed var(--border)' }}>
+                                  {o.items.length === 0 ? (
+                                    <div className="cust-meta" style={{ paddingTop: 8 }}>Sem itens registrados.</div>
+                                  ) : o.items.map((it) => (
+                                    <div key={it.id} className="row between" style={{ padding: '6px 0', fontSize: 12 }}>
+                                      <div style={{ minWidth: 0 }}>
+                                        <div style={{ fontWeight: 500 }}>{it.name}</div>
+                                        <div className="cust-meta tiny">{it.sku} · Qtd. {it.quantity}</div>
+                                      </div>
+                                      <div className="num" style={{ flexShrink: 0 }}>{formatPrice(it.unit_price)}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )
                         })}
+                      </div>
+                    )}
+                  </div>
+
+                  {detail && detail.top_products.length > 0 && (
+                    <div style={{ marginTop: 18 }}>
+                      <SectionLabel>Produtos mais comprados</SectionLabel>
+                      <div style={{ display: 'grid', gap: 6 }}>
+                        {detail.top_products.map((p, i) => (
+                          <div key={p.variant_id} className="row between" style={{ padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 6, fontSize: 12.5, gap: 10 }}>
+                            <div className="row" style={{ gap: 8, minWidth: 0 }}>
+                              <span className="rank-badge">{i + 1}</span>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontWeight: 500 }}>{p.name}</div>
+                                <div className="cust-meta tiny">{p.sku}</div>
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                              <div style={{ fontWeight: 500 }}>{p.quantity} {p.quantity === 1 ? 'peça' : 'peças'}</div>
+                              <div className="cust-meta tiny">{formatPrice(p.total_spent)}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="cust-meta tiny" style={{ marginTop: 6 }}>
+                        Considera apenas pedidos pagos.
                       </div>
                     </div>
                   )}

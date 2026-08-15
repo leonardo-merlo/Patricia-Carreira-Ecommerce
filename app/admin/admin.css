@@ -520,6 +520,36 @@
   text-decoration: none;
 }
 .admin-root .customer-link:hover { color: var(--accent); text-decoration: underline; }
+
+/* Pedido dentro da ficha do cliente: a linha inteira abre os itens. */
+.admin-root .pedido-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 10px;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  text-align: left;
+  color: inherit;
+  font-size: 12.5px;
+}
+.admin-root .pedido-toggle:hover { background: var(--surface-hover); }
+
+.admin-root .rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 600;
+}
 .admin-root table.tbl tr.child td {
   background: var(--surface-2);
   font-size: 12px;
