@@ -377,8 +377,9 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
     return sum + (v ? v.wholesale_price * it.qty : 0)
   }, 0)
 
-  const allScenariosOk = checkResult.every((r) => r.scenario === 'A' || r.scenario === 'B' || r.scenario === 'C')
   const hasItemsToPurchase = checkResult.some((r) => r.items_to_purchase.length > 0)
+  const hasMaterialsToRegister = checkResult.some((r) => r.materials_to_register.length > 0)
+  const needsAnyMaterial = checkResult.some((r) => r.bom_check.some((b) => !b.is_sufficient))
 
   return (
     <div className="page">
@@ -1119,6 +1120,18 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                             </div>
                           </div>
 
+                          {/* Insumos que faltam cadastrar */}
+                          {r.materials_to_register.length > 0 && (
+                            <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+                              <div className="cust-meta" style={{ fontSize: 11, fontWeight: 500, marginBottom: 4, color: 'var(--orange)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cadastrar antes de produzir</div>
+                              {r.materials_to_register.map((m) => (
+                                <div key={`${m.material_name}-${m.required_color ?? ''}`} style={{ fontSize: 12, color: 'var(--text-2)' }}>
+                                  {[m.material_name, m.required_color].filter(Boolean).join(' · ')}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
                           {/* Compras necessárias */}
                           {r.items_to_purchase.length > 0 && (
                             <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border)', background: 'var(--red-soft)' }}>
@@ -1196,16 +1209,22 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                           {r.bom_check.length > 0 && (
                             <div style={{ padding: '8px 14px' }}>
                               {r.bom_check.map((b) => (
-                                <div key={b.material_id}>
+                                <div key={b.material_id ?? `${b.material_name}-${b.required_color ?? ''}`}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 12 }}>
                                     {b.is_sufficient
                                       ? <AdminIcon name="checkCircle" size={12} style={{ color: 'var(--green)', flexShrink: 0 }} />
                                       : <AdminIcon name="xCircle" size={12} style={{ color: 'var(--red)', flexShrink: 0 }} />}
                                     <span style={{ flex: 1, fontWeight: b.is_sufficient ? 400 : 500 }}>{b.material_name}</span>
                                     <span className="cust-meta" style={{ fontSize: 11 }}>
-                                      necessário {b.needed_total.toLocaleString('pt-BR', { maximumFractionDigits: 3 })} {b.unit} · estoque {b.available.toLocaleString('pt-BR', { maximumFractionDigits: 3 })}
+                                      necessário {b.needed_total.toLocaleString('pt-BR', { maximumFractionDigits: 3 })} {b.unit}
+                                      {b.resolved && ` · estoque ${b.available.toLocaleString('pt-BR', { maximumFractionDigits: 3 })}`}
                                     </span>
-                                    {!b.is_sufficient && (
+                                    {!b.resolved && (
+                                      <span style={{ color: 'var(--orange)', fontWeight: 600, fontSize: 11 }}>
+                                        não cadastrado{b.required_color ? ` na cor ${b.required_color}` : ''}
+                                      </span>
+                                    )}
+                                    {b.resolved && !b.is_sufficient && (
                                       <span style={{ color: 'var(--red)', fontWeight: 600, fontSize: 11 }}>
                                         faltam {b.missing.toLocaleString('pt-BR', { maximumFractionDigits: 3 })} {b.unit}
                                       </span>
@@ -1223,6 +1242,19 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                                       ))}
                                     </div>
                                   )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* O que precisa cadastrar — pendência de cadastro, não de compra */}
+                          {r.materials_to_register.length > 0 && (
+                            <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+                              <div className="cust-meta" style={{ fontSize: 11, fontWeight: 500, marginBottom: 4, color: 'var(--orange)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cadastrar</div>
+                              {r.materials_to_register.map((m) => (
+                                <div key={`${m.material_name}-${m.required_color ?? ''}`} style={{ fontSize: 12, color: 'var(--text-2)' }}>
+                                  {[m.material_name, m.required_color].filter(Boolean).join(' · ')} — sem linha de estoque em{' '}
+                                  <a href="/admin/materias" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>Matérias-Primas</a>
                                 </div>
                               ))}
                             </div>
@@ -1259,6 +1291,17 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                     </div>
                   )}
                   {purchaseError && <div style={{ marginTop: 10, color: 'var(--red)', fontSize: 12 }}>{purchaseError}</div>}
+
+                  {!hasItemsToPurchase && !purchasesCreated && (
+                    <div style={{ marginTop: 14, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, padding: '10px 14px', fontSize: 12.5, color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: 8 }} id="aviso-sem-compras" data-testid="aviso-sem-compras">
+                      <AdminIcon name="info" size={14} />
+                      {hasMaterialsToRegister
+                        ? 'Nada a comprar por enquanto: os insumos que faltam ainda não estão cadastrados na cor desta variante. Cadastre em Matérias-Primas e verifique de novo.'
+                        : needsAnyMaterial
+                          ? 'Nada a comprar: os insumos em falta não têm cadastro válido.'
+                          : 'Nada a comprar — o estoque de matéria-prima cobre este pedido.'}
+                    </div>
+                  )}
                 </div>
                 <div className="modal-footer">
                   <button className="btn ghost" onClick={() => setShowCreateModal(false)}>Fechar</button>

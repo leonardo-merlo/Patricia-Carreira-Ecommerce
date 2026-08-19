@@ -16,7 +16,8 @@ export type WholesaleOrderLineItem = {
 }
 
 export type BomItemCheck = {
-  material_id: string
+  /** null quando o insumo nessa cor ainda não existe em raw_materials. */
+  material_id: string | null
   material_name: string
   material_type: 'bruta' | 'intermediaria'
   unit: string
@@ -33,10 +34,19 @@ export type BomItemCheck = {
 }
 
 export type PurchaseItem = {
+  /** Sempre um uuid real — item sem cadastro nunca entra aqui. */
   material_id: string
   material_name: string
   quantity_to_buy: number
   unit: string
+}
+
+/** Insumo que a receita pede mas que ainda não existe na cor da variante. */
+export type MaterialToRegister = {
+  material_name: string
+  required_color: string | null
+  unit: string
+  needed_total: number
 }
 
 export type ItemCheckResult = {
@@ -51,7 +61,10 @@ export type ItemCheckResult = {
   scenario: 'A' | 'B' | 'C' | 'D'
   scenario_label: string
   bom_check: BomItemCheck[]
+  /** O que falta comprar. Independe de haver insumo por cadastrar. */
   items_to_purchase: PurchaseItem[]
+  /** O que falta cadastrar na cor da variante. Bloqueia a conclusão da OP. */
+  materials_to_register: MaterialToRegister[]
 }
 
 type CreateWholesaleOrderInput = {
@@ -232,6 +245,7 @@ async function checkItemAvailability(
       scenario_label: 'Estoque disponível',
       bom_check: [],
       items_to_purchase: [],
+      materials_to_register: [],
     }
   }
 
@@ -252,6 +266,7 @@ async function checkItemAvailability(
       scenario_label: 'Sem receita cadastrada — não é possível produzir',
       bom_check: [],
       items_to_purchase: [],
+      materials_to_register: [],
     }
   }
 
@@ -259,7 +274,7 @@ async function checkItemAvailability(
     const needed = line.quantity_needed * deficit
     const available = line.resolved ? line.stock_quantity : 0
     return {
-      material_id: line.raw_material_id ?? '',
+      material_id: line.raw_material_id,
       material_name: line.material_name,
       material_type: 'bruta' as const,
       unit: line.unit,
@@ -277,31 +292,51 @@ async function checkItemAvailability(
   const unresolved = bomCheck.filter((b) => !b.resolved)
   const allBomSufficient = bomCheck.every((b) => b.is_sufficient)
 
+  // Duas perguntas independentes. Antes estavam amarradas num if/else, e um único
+  // insumo por cadastrar apagava em silêncio toda a lista de compras do item.
+
+  // 1. O que falta cadastrar na cor desta variante.
+  const materialsToRegister: MaterialToRegister[] = unresolved.map((b) => ({
+    material_name: b.material_name,
+    required_color: b.required_color,
+    unit: b.unit,
+    needed_total: b.needed_total,
+  }))
+
+  // 2. O que falta comprar. Só insumo já cadastrado entra: PurchaseItem.material_id
+  // vira raw_material_id no insert e precisa ser uuid de verdade.
+  const itemsToPurchase: PurchaseItem[] = []
+  for (const b of bomCheck) {
+    if (!b.resolved || b.is_sufficient || !b.material_id) continue
+    itemsToPurchase.push({
+      material_id: b.material_id,
+      material_name: [b.material_name, b.required_color].filter(Boolean).join(' · '),
+      quantity_to_buy: b.missing,
+      unit: b.unit,
+    })
+  }
+
   let scenario: 'A' | 'B' | 'C' | 'D'
   let scenarioLabel: string
-  const itemsToPurchase: PurchaseItem[] = []
 
   if (allBomSufficient) {
     scenario = 'B'
     scenarioLabel = 'Materiais disponíveis — produção possível'
   } else if (unresolved.length > 0) {
     // Cadastro incompleto, não falta de material: o corte existe na receita mas
-    // não há linha de estoque na cor desta variante.
+    // não há linha de estoque na cor desta variante. O rótulo sinaliza o cadastro
+    // pendente; a lista de compras acima continua valendo.
     scenario = 'C'
-    scenarioLabel = `Insumo não cadastrado na cor desta variante (${unresolved
+    const pendentes = unresolved
       .map((b) => [b.material_name, b.required_color].filter(Boolean).join(' · '))
-      .join(', ')})`
+      .join(', ')
+    scenarioLabel =
+      itemsToPurchase.length > 0
+        ? `Insumo não cadastrado na cor desta variante (${pendentes}) — e há material a comprar`
+        : `Insumo não cadastrado na cor desta variante (${pendentes})`
   } else {
     scenario = 'D'
     scenarioLabel = 'Materiais insuficientes — compra necessária'
-    for (const b of bomCheck.filter((x) => !x.is_sufficient)) {
-      itemsToPurchase.push({
-        material_id: b.material_id,
-        material_name: [b.material_name, b.required_color].filter(Boolean).join(' · '),
-        quantity_to_buy: b.missing,
-        unit: b.unit,
-      })
-    }
   }
 
   return {
@@ -317,6 +352,7 @@ async function checkItemAvailability(
     scenario_label: scenarioLabel,
     bom_check: bomCheck,
     items_to_purchase: itemsToPurchase,
+    materials_to_register: materialsToRegister,
   }
 }
 
@@ -334,5 +370,6 @@ function makeErrorResult(variantId: string, qty: number): ItemCheckResult {
     scenario_label: 'Erro ao verificar variante',
     bom_check: [],
     items_to_purchase: [],
+    materials_to_register: [],
   }
 }
