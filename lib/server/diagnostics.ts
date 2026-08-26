@@ -4,7 +4,8 @@
 // segredo. Só presença, prefixo público (TEST-/APP_USR-) e o que a própria API do
 // parceiro responde. O que sai daqui vai para a tela.
 
-import { isValidCep, meDocumentFields, onlyDigits } from '@/lib/documento'
+import { isValidCep, isValidCnpj, meDocumentFields, onlyDigits } from '@/lib/documento'
+import { readEnv, readEnvOption } from '@/lib/env'
 
 export type EnvCheck = {
   name: string
@@ -52,8 +53,11 @@ export type Diagnostics = {
   missingRequired: string[]
 }
 
+// Corta o comentário inline: um valor colado do .env com `# comentário` junto
+// tem length > 0 e aparecia como preenchido, deixando a tela verde enquanto a
+// integração falhava com a variável vazia na prática.
 function env(name: string): string {
-  return (process.env[name] ?? '').trim()
+  return readEnv(name)
 }
 
 function has(name: string): boolean {
@@ -169,9 +173,12 @@ async function checkMelhorEnvio(): Promise<ServiceCheck> {
 // desta checagem — rodar runDiagnostics inteiro chamaria quatro APIs à toa.
 export async function checkFocusNfe(): Promise<ServiceCheck> {
   const token = env('FOCUS_NFE_TOKEN')
-  const homologacao = env('FOCUS_NFE_AMBIENTE') === 'homologacao'
-  const environment = homologacao ? 'homologação' : 'PRODUÇÃO'
-  const base = homologacao ? 'https://homologacao.focusnfe.com.br/v2' : 'https://api.focusnfe.com.br/v2'
+  const homologacao = readEnvOption('FOCUS_NFE_AMBIENTE') === 'homologacao'
+  const host = homologacao ? 'homologacao.focusnfe.com.br' : 'api.focusnfe.com.br'
+  // O host entra no rótulo: era a informação que faltava para enxergar de um olhar
+  // que a requisição estava saindo para o ambiente errado.
+  const environment = `${homologacao ? 'homologação' : 'PRODUÇÃO'} · ${host}`
+  const base = `https://${host}/v2`
 
   if (!token) {
     return { service: 'Focus NFe', ok: false, environment, detail: 'FOCUS_NFE_TOKEN não definido' }
@@ -189,11 +196,19 @@ export async function checkFocusNfe(): Promise<ServiceCheck> {
     const body = (await probe.json().catch(() => ({}))) as { codigo?: string; mensagem?: string }
 
     if (probe.status === 404 || probe.ok) {
+      // "token aceito" não é "autorizado a emitir": o Focus só confere o CNPJ do
+      // emitente na emissão, e responde 422 "CNPJ do emitente não autorizado" quando
+      // o CNPJ do corpo não é o da empresa dona do token. Por isso o CNPJ configurado
+      // entra aqui — foi o que deixou esta tela verde enquanto a emissão falhava.
+      const cnpjEmitente = onlyDigits(env('STORE_CNPJ'))
+      const cnpjOk = isValidCnpj(cnpjEmitente)
       return {
         service: 'Focus NFe',
-        ok: true,
+        ok: cnpjOk,
         environment,
-        detail: 'token aceito pela API — pronto para tentar emitir',
+        detail: cnpjOk
+          ? `token aceito · emitente CNPJ ${cnpjEmitente} — a autorização deste CNPJ só é conferida na emissão`
+          : `token aceito, mas STORE_CNPJ ${cnpjEmitente ? `é inválido (${cnpjEmitente})` : 'está vazio'} — a emissão falha com "CNPJ do emitente não autorizado"`,
       }
     }
 
@@ -378,10 +393,10 @@ function buildWebhooks(appUrl: string | null, appUrlIsPublic: boolean): WebhookU
 // e formato de CEP, e devolve 422 com o pedido inteiro barrado. Mostrar o valor
 // resolvido aqui (dado público da loja, não credencial) evita adivinhação.
 function buildSender(): SenderField[] {
-  const cnpj = onlyDigits(process.env.STORE_CNPJ)
-  const documento = onlyDigits(process.env.STORE_DOCUMENTO)
-  const cep = onlyDigits(process.env.STORE_CEP_ORIGEM)
-  const uf = (process.env.STORE_ESTADO ?? '').trim().toUpperCase()
+  const cnpj = onlyDigits(env('STORE_CNPJ'))
+  const documento = onlyDigits(env('STORE_DOCUMENTO'))
+  const cep = onlyDigits(env('STORE_CEP_ORIGEM'))
+  const uf = env('STORE_ESTADO').toUpperCase()
 
   const docFields = meDocumentFields(cnpj || documento)
   const docOk = Boolean(docFields.company_document || docFields.document)
@@ -400,6 +415,14 @@ function buildSender(): SenderField[] {
         : 'nenhum documento válido — o ME recusa o pedido com 422',
     },
     {
+      label: 'CNPJ do emitente da NF-e',
+      value: cnpj || '(vazio)',
+      ok: isValidCnpj(cnpj),
+      note: isValidCnpj(cnpj)
+        ? 'STORE_CNPJ — precisa ser o CNPJ da empresa dona do token Focus'
+        : 'STORE_CNPJ vazio ou inválido — o Focus recusa com "CNPJ do emitente não autorizado"',
+    },
+    {
       label: 'CEP de origem',
       value: cep || '(vazio)',
       ok: isValidCep(cep),
@@ -408,20 +431,20 @@ function buildSender(): SenderField[] {
     { label: 'Estado', value: uf || '(vazio)', ok: uf.length === 2, note: 'sigla de 2 letras' },
     {
       label: 'Cidade',
-      value: process.env.STORE_CIDADE ?? '(vazio)',
-      ok: Boolean((process.env.STORE_CIDADE ?? '').trim()),
+      value: env('STORE_CIDADE') || '(vazio)',
+      ok: Boolean(env('STORE_CIDADE')),
       note: 'obrigatória',
     },
     {
       label: 'Logradouro e número',
-      value: `${process.env.STORE_LOGRADOURO ?? ''} ${process.env.STORE_NUMERO ?? ''}`.trim() || '(vazio)',
-      ok: Boolean((process.env.STORE_LOGRADOURO ?? '').trim() && (process.env.STORE_NUMERO ?? '').trim()),
+      value: `${env('STORE_LOGRADOURO')} ${env('STORE_NUMERO')}`.trim() || '(vazio)',
+      ok: Boolean(env('STORE_LOGRADOURO') && env('STORE_NUMERO')),
       note: 'obrigatórios',
     },
     {
       label: 'Bairro',
-      value: process.env.STORE_BAIRRO ?? '(vazio)',
-      ok: Boolean((process.env.STORE_BAIRRO ?? '').trim()),
+      value: env('STORE_BAIRRO') || '(vazio)',
+      ok: Boolean(env('STORE_BAIRRO')),
       note: 'obrigatório',
     },
   ]

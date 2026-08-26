@@ -1,3 +1,5 @@
+import { isValidCnpj, onlyDigits } from '@/lib/documento'
+import { readEnv, readEnvNumber, readEnvOption } from '@/lib/env'
 import type { Customer, NfeStatus, Order, OrderItem, PaymentMethod, Product, ProductVariant } from '@/lib/types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -92,14 +94,19 @@ export type FocusNfePayload = {
 // HELPERS INTERNOS
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Comparação tolerante a comentário inline e caixa: o campo da Vercel não corta
+// o `# comentário` que o dotenv corta, e qualquer sujeira no valor mandava a
+// emissão para o host de produção em silêncio.
 function isHomologacao(): boolean {
-  return (process.env.FOCUS_NFE_AMBIENTE ?? 'producao').trim() === 'homologacao'
+  return readEnvOption('FOCUS_NFE_AMBIENTE') === 'homologacao'
+}
+
+export function getFocusHost(): string {
+  return isHomologacao() ? 'homologacao.focusnfe.com.br' : 'api.focusnfe.com.br'
 }
 
 function getBaseUrl(): string {
-  return isHomologacao()
-    ? 'https://homologacao.focusnfe.com.br/v2'
-    : 'https://api.focusnfe.com.br/v2'
+  return `https://${getFocusHost()}/v2`
 }
 
 // A SEFAZ exige este nome exato no destinatário de qualquer NF-e de homologação —
@@ -107,12 +114,8 @@ function getBaseUrl(): string {
 const NOME_DESTINATARIO_HOMOLOGACAO =
   'NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL'
 
-function onlyDigits(value: string | undefined | null): string {
-  return (value ?? '').replace(/\D/g, '')
-}
-
 function getAuthHeader(): string {
-  const token = process.env.FOCUS_NFE_TOKEN
+  const token = readEnv('FOCUS_NFE_TOKEN')
   if (!token) {
     throw new Error(
       '[Focus NFe] FOCUS_NFE_TOKEN não configurado. Defina a variável de ambiente antes de emitir NF-e.'
@@ -123,7 +126,7 @@ function getAuthHeader(): string {
 
 // Determina CFOP baseado no estado do destinatário vs estado do emitente
 function determineCfop(destinatarioUf: string): string {
-  const emitenteUf = (process.env.STORE_ESTADO ?? '').trim()
+  const emitenteUf = readEnv('STORE_ESTADO')
   return destinatarioUf.trim().toUpperCase() === emitenteUf.toUpperCase() ? '5102' : '6102'
 }
 
@@ -155,20 +158,22 @@ function mapPaymentMethod(method: PaymentMethod | null): string {
 }
 
 // Interpreta a resposta HTTP da API Focus NFe e normaliza para FocusNfeResponse
-async function parseResponse(res: Response): Promise<FocusNfeResponse> {
+async function parseResponse(res: Response, host: string): Promise<FocusNfeResponse> {
   let body: unknown
   try {
     body = await res.json()
   } catch {
     throw new Error(
-      `[Focus NFe] Resposta inválida da API (HTTP ${res.status}): corpo não é JSON`
+      `[Focus NFe] Resposta inválida da API (HTTP ${res.status}, host: ${host}): corpo não é JSON`
     )
   }
 
   if (!res.ok) {
     const data = body as Record<string, unknown>
     const msg = (data['mensagem'] as string | null) ?? `HTTP ${res.status}`
-    throw new Error(`[Focus NFe] Erro da API: ${msg}`)
+    // O host vai junto porque uma recusa de credencial ou de CNPJ costuma ser a
+    // requisição ter saído para o ambiente errado — sem ele o log não responde sozinho.
+    throw new Error(`[Focus NFe] Erro da API (HTTP ${res.status}, host: ${host}): ${msg}`)
   }
 
   // A API Focus NFe retorna campos em snake_case na raiz do objeto
@@ -219,7 +224,7 @@ export async function emitirNfe(ref: string, payload: FocusNfePayload): Promise<
     body: JSON.stringify(payload),
   })
 
-  return parseResponse(res)
+  return parseResponse(res, getFocusHost())
 }
 
 /**
@@ -236,7 +241,7 @@ export async function consultarNfe(ref: string): Promise<FocusNfeResponse> {
     },
   })
 
-  return parseResponse(res)
+  return parseResponse(res, getFocusHost())
 }
 
 /**
@@ -257,7 +262,7 @@ export async function cancelarNfe(ref: string, justificativa: string): Promise<F
     body: JSON.stringify({ justificativa }),
   })
 
-  return parseResponse(res)
+  return parseResponse(res, getFocusHost())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -298,6 +303,18 @@ export function buildNfePayload(
     }
   }
 
+  // O Focus recusa com "CNPJ do emitente não autorizado" quando o CNPJ do corpo
+  // não é o da empresa dona do token — e um STORE_CNPJ vazio, ou com o comentário
+  // colado junto, vira string vazia aqui e produz exatamente essa mensagem, que não
+  // aponta para a variável. Conferir antes devolve o nome do problema.
+  const emitenteCnpj = onlyDigits(readEnv('STORE_CNPJ'))
+  if (!isValidCnpj(emitenteCnpj)) {
+    throw new Error(
+      `[Focus NFe] STORE_CNPJ ausente ou inválido (valor lido: "${emitenteCnpj || '(vazio)'}"). ` +
+        'Defina o CNPJ do emitente na Vercel e no .env.local: só dígitos, sem comentário no valor.'
+    )
+  }
+
   // Total fiscal calculado a partir dos itens para garantir coerência com SEFAZ.
   const fiscalTotal =
     items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0) +
@@ -314,20 +331,18 @@ export function buildNfePayload(
     presenca_comprador: 2,   // operação não presencial / internet
     modalidade_frete: 1,     // CIF (por conta do emitente)
     emitente: {
-      cnpj: onlyDigits(process.env.STORE_CNPJ),
+      cnpj: emitenteCnpj,
       // IE aceita 'ISENTO', então só tira espaço — não pode virar só dígitos
-      inscricao_estadual: (process.env.STORE_IE ?? '').trim(),
-      nome: process.env.STORE_NOME ?? '',
-      logradouro: process.env.STORE_LOGRADOURO ?? '',
-      numero: process.env.STORE_NUMERO ?? '',
-      complemento: process.env.STORE_COMPLEMENTO ?? '',
-      bairro: process.env.STORE_BAIRRO ?? '',
-      municipio: process.env.STORE_CIDADE ?? '',
-      uf: (process.env.STORE_ESTADO ?? '').trim(),
-      cep: onlyDigits(process.env.STORE_CEP_ORIGEM),
-      codigo_regime_tributario: Number(
-        (process.env.FOCUS_NFE_REGIME_TRIBUTARIO ?? '1').trim() || '1'
-      ),
+      inscricao_estadual: readEnv('STORE_IE'),
+      nome: readEnv('STORE_NOME'),
+      logradouro: readEnv('STORE_LOGRADOURO'),
+      numero: readEnv('STORE_NUMERO'),
+      complemento: readEnv('STORE_COMPLEMENTO'),
+      bairro: readEnv('STORE_BAIRRO'),
+      municipio: readEnv('STORE_CIDADE'),
+      uf: readEnv('STORE_ESTADO'),
+      cep: onlyDigits(readEnv('STORE_CEP_ORIGEM')),
+      codigo_regime_tributario: readEnvNumber('FOCUS_NFE_REGIME_TRIBUTARIO', 1),
     },
     destinatario: {
       cpf_cnpj: onlyDigits(customer.cpf_cnpj),

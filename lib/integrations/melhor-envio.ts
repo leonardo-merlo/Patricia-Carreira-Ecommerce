@@ -1,13 +1,16 @@
+import { readEnv } from '@/lib/env'
 function baseUrl() {
-  return process.env.MELHOR_ENVIO_BASE_URL ?? 'https://melhorenvio.com.br/api/v2'
+  // readEnv e não process.env cru: comentário inline colado no valor viraria
+  // parte da URL e toda chamada ao ME sairia para um host inexistente.
+  return readEnv('MELHOR_ENVIO_BASE_URL') || 'https://melhorenvio.com.br/api/v2'
 }
 
 function authHeaders() {
   return {
-    Authorization: `Bearer ${process.env.MELHOR_ENVIO_TOKEN}`,
+    Authorization: `Bearer ${readEnv('MELHOR_ENVIO_TOKEN')}`,
     'Content-Type': 'application/json',
     Accept: 'application/json',
-    'User-Agent': `${process.env.MELHOR_ENVIO_APP_NAME ?? 'App'} (${process.env.MELHOR_ENVIO_CONTACT_EMAIL ?? 'dev@app.com'})`,
+    'User-Agent': `${readEnv('MELHOR_ENVIO_APP_NAME') || 'App'} (${readEnv('MELHOR_ENVIO_CONTACT_EMAIL') || 'dev@app.com'})`,
   }
 }
 
@@ -138,7 +141,7 @@ export async function addToCart(input: AddToCartInput): Promise<string> {
         own_hand: false,
         reverse: false,
         non_commercial: false,
-        platform: process.env.MELHOR_ENVIO_APP_NAME ?? 'App',
+        platform: readEnv('MELHOR_ENVIO_APP_NAME') || 'App',
         tags: [{ tag: input.orderId, url: null }],
       },
     }),

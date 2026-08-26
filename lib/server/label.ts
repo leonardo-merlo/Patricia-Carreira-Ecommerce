@@ -9,25 +9,26 @@ import {
   type MEVolume,
 } from '@/lib/integrations/melhor-envio'
 import { meDocumentFields, onlyDigits } from '@/lib/documento'
+import { readEnv } from '@/lib/env'
 
 export function buildStoreAddress(): MEAddress {
   // A loja é PJ: o CNPJ é o documento que identifica o remetente. STORE_DOCUMENTO
   // fica como alternativa para quando só houver CPF cadastrado.
-  const documento = meDocumentFields(process.env.STORE_CNPJ)
-  const fallback = meDocumentFields(process.env.STORE_DOCUMENTO)
+  const documento = meDocumentFields(readEnv('STORE_CNPJ'))
+  const fallback = meDocumentFields(readEnv('STORE_DOCUMENTO'))
 
   return {
-    name: process.env.STORE_NOME ?? 'Patricia Carreira',
-    phone: onlyDigits(process.env.STORE_TELEFONE),
-    email: process.env.STORE_EMAIL ?? '',
+    name: readEnv('STORE_NOME') || 'Patricia Carreira',
+    phone: onlyDigits(readEnv('STORE_TELEFONE')),
+    email: readEnv('STORE_EMAIL'),
     ...(documento.company_document || documento.document ? documento : fallback),
-    address: process.env.STORE_LOGRADOURO ?? '',
-    number: process.env.STORE_NUMERO ?? '',
-    complement: process.env.STORE_COMPLEMENTO ?? '',
-    district: process.env.STORE_BAIRRO ?? '',
-    city: process.env.STORE_CIDADE ?? '',
-    state_abbr: (process.env.STORE_ESTADO ?? '').trim().toUpperCase(),
-    postal_code: onlyDigits(process.env.STORE_CEP_ORIGEM),
+    address: readEnv('STORE_LOGRADOURO'),
+    number: readEnv('STORE_NUMERO'),
+    complement: readEnv('STORE_COMPLEMENTO'),
+    district: readEnv('STORE_BAIRRO'),
+    city: readEnv('STORE_CIDADE'),
+    state_abbr: (readEnv('STORE_ESTADO')).trim().toUpperCase(),
+    postal_code: onlyDigits(readEnv('STORE_CEP_ORIGEM')),
     country_id: 'BR',
   }
 }
