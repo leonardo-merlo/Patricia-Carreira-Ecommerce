@@ -41,6 +41,17 @@ const ENTREGA_MAP: Record<string, { cls: string; txt: string }> = {
   cancelled: { cls: 'cancelado', txt: 'Cancelado' },
 }
 
+/**
+ * Pedido pago que ainda não tem etiqueta. A compra do Melhor Envio é isolada em
+ * try/catch no fulfillment — quando ela falha o pedido segue pago e normal, e
+ * some no meio da lista. Sem este marcador a cliente espera indefinidamente e
+ * ninguém percebe. "Enviado" e "Entregue" ficam de fora: se chegaram lá, ou têm
+ * código ou foram despachados por fora do sistema.
+ */
+function precisaEtiqueta(o: { payment_status: string; status: string; tracking_code?: string | null }): boolean {
+  return o.payment_status === 'paid' && !o.tracking_code && (o.status === 'paid' || o.status === 'separating')
+}
+
 const ATACADO_STATUS: Record<string, { cls: string; txt: string }> = {
   pending: { cls: 'pendente', txt: 'Pendente' },
   confirmed: { cls: 'varejo', txt: 'Confirmado' },
@@ -153,6 +164,8 @@ const ENTREGA_OPCOES: Array<{ value: string; label: string }> = [
   { value: 'shipped', label: 'Enviado' },
   { value: 'delivered', label: 'Entregue' },
   { value: 'cancelled', label: 'Cancelado' },
+  // Não é status: é o recorte de quem precisa de ação agora.
+  { value: 'sem-etiqueta', label: 'Sem etiqueta' },
 ]
 
 const PAGAMENTO_OPCOES: Array<{ value: string; label: string }> = [
@@ -241,7 +254,9 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
   const filteredVarejo = varejo.filter((o) => {
     if (statusFilter && o.status !== statusFilter) return false
     if (pagamentoFilter && o.payment_status !== pagamentoFilter) return false
-    if (entregaFilter && o.status !== entregaFilter) return false
+    if (entregaFilter === 'sem-etiqueta') {
+      if (!precisaEtiqueta(o)) return false
+    } else if (entregaFilter && o.status !== entregaFilter) return false
 
     if (periodoRange) {
       const criadoEm = new Date(o.created_at)
@@ -256,6 +271,9 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
   })
 
   const varejoTotal = filteredVarejo.reduce((s, o) => s + o.total, 0)
+  // Conta sobre a lista inteira, não sobre a filtrada: o aviso precisa aparecer
+  // mesmo quando o filtro atual esconde os pedidos em questão.
+  const semEtiqueta = varejo.filter(precisaEtiqueta).length
   const filtrosAtivos =
     Boolean(pagamentoFilter) || Boolean(entregaFilter) || periodo !== 'todos' || Boolean(searchFilter.trim())
 
@@ -502,6 +520,20 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
           </div>
           {tab === 'varejo' && (
             <div className="cust-meta">
+              {semEtiqueta > 0 && entregaFilter !== 'sem-etiqueta' && (
+                <button
+                  id="btn-ver-sem-etiqueta"
+                  data-testid="contador-sem-etiqueta"
+                  onClick={() => setEntregaFilter('sem-etiqueta')}
+                  style={{
+                    marginRight: 12, background: 'none', border: 'none', padding: 0,
+                    cursor: 'pointer', font: 'inherit', fontWeight: 600, color: 'var(--red)',
+                    textDecoration: 'underline', textUnderlineOffset: 2,
+                  }}
+                >
+                  ⚠ {semEtiqueta} pago{semEtiqueta > 1 ? 's' : ''} sem etiqueta
+                </button>
+              )}
               {filtrosAtivos && (
                 <span style={{ marginRight: 10 }}>
                   {filteredVarejo.length} de {varejo.length}
@@ -581,7 +613,18 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                           <td className="num">{o.item_count}</td>
                           <td className="num" style={{ fontWeight: 500 }}>{formatPrice(o.total)}</td>
                           <td><span className={`badge ${payBadge.cls}`}><span className="dot" />{payBadge.txt}</span></td>
-                          <td>{entrega.txt === '—' ? <span className="cust-meta">—</span> : <span className={`badge ${entrega.cls}`}><span className="dot" />{entrega.txt}</span>}</td>
+                          <td>
+                            {entrega.txt === '—' ? <span className="cust-meta">—</span> : <span className={`badge ${entrega.cls}`}><span className="dot" />{entrega.txt}</span>}
+                            {precisaEtiqueta(o) && (
+                              <div
+                                data-testid="aviso-sem-etiqueta"
+                                title="Pedido pago sem etiqueta. Abra o pedido e clique em Gerar Etiqueta."
+                                style={{ marginTop: 4, fontSize: 10.5, fontWeight: 600, color: 'var(--red)', whiteSpace: 'nowrap' }}
+                              >
+                                ⚠ Sem etiqueta
+                              </div>
+                            )}
+                          </td>
                         </tr>
                         {isExpanded && (
                           <tr>
