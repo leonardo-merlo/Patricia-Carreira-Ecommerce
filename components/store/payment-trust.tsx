@@ -92,11 +92,11 @@ export function PaymentTrust() {
         Formas de pagamento aceitas
       </p>
 
-      <ul className="flex flex-wrap items-stretch justify-center gap-2">
+      <ul className="grid grid-cols-3 items-stretch gap-2">
         {PAYMENT_MARKS.map((m) => (
           <li
             key={m.id}
-            className="flex min-w-[92px] flex-1 flex-col items-center gap-1 rounded-md border border-outline-variant bg-surface-container-lowest px-2.5 py-2 text-on-surface"
+            className="flex flex-col items-center gap-1 rounded-md border border-outline-variant bg-surface-container-lowest px-2 py-2 text-on-surface"
           >
             {m.officialSrc ? (
               <Image src={m.officialSrc} alt={m.label} width={MARK_SIZE.width} height={MARK_SIZE.height} />
