@@ -21,6 +21,9 @@ export type OrderConfirmationInput = {
   customerName: string
   orderId: string
   totalAmount: number
+  /** Sem estas duas linhas o total não fecha com a soma dos itens e parece erro de cobrança. */
+  discountAmount: number
+  shippingAmount: number
   paymentMethod: string
   items: { product_name: string; quantity: number; unit_price: number }[]
 }
@@ -47,6 +50,26 @@ export async function sendOrderConfirmation(input: OrderConfirmationInput): Prom
         </tr>`
     )
     .join('')
+
+  // O subtotal é derivado dos itens, não recebido: assim ele nunca discorda da
+  // tabela logo acima, que é o que a pessoa confere primeiro.
+  const subtotal = input.items.reduce((sum, i) => sum + i.unit_price * i.quantity, 0)
+  const brl = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`
+  const linha = (label: string, value: string) =>
+    `<tr>
+      <td style="padding:3px 0;color:#666">${label}</td>
+      <td style="padding:3px 0;text-align:right">${value}</td>
+    </tr>`
+
+  const resumoHtml = [
+    linha('Subtotal', brl(subtotal)),
+    input.discountAmount > 0 ? linha('Desconto', `− ${brl(input.discountAmount)}`) : '',
+    linha('Frete', input.shippingAmount > 0 ? brl(input.shippingAmount) : 'Grátis'),
+    `<tr>
+      <td style="padding:8px 0 0;border-top:1px solid #e0e0e0"><strong>Total</strong></td>
+      <td style="padding:8px 0 0;border-top:1px solid #e0e0e0;text-align:right"><strong>${brl(input.totalAmount)}</strong></td>
+    </tr>`,
+  ].join('')
 
   const from = process.env.RESEND_FROM || 'onboarding@resend.dev'
 
@@ -76,7 +99,10 @@ export async function sendOrderConfirmation(input: OrderConfirmationInput): Prom
           ${itemsHtml}
         </table>
 
-        <p><strong>Total:</strong> R$ ${total}</p>
+        <table width="100%" style="margin:0 0 16px;border-collapse:collapse;font-size:14px">
+          ${resumoHtml}
+        </table>
+
         <p><strong>Pagamento:</strong> ${method}</p>
         <p><strong>Pedido:</strong> #${shortId}</p>
 
@@ -87,8 +113,10 @@ export async function sendOrderConfirmation(input: OrderConfirmationInput): Prom
         </p>
 
         <p style="margin-top:32px;font-size:13px;color:#999">
-          Qualquer dúvida, entre em contato pelo Instagram
-          <a href="https://instagram.com/patriciacarreira" style="color:#999">@patriciacarreira</a>.
+          Precisa de ajuda? Fale com a gente no
+          <a href="https://wa.me/5522988223993" style="color:#999">WhatsApp (22) 98822-3993</a>
+          ou pelo Instagram
+          <a href="https://instagram.com/patriciacarreira_" style="color:#999">@patriciacarreira_</a>.
         </p>
       </body>
       </html>
@@ -145,8 +173,10 @@ export async function sendOrderShipped(input: OrderShippedInput): Promise<void> 
         </p>
 
         <p style="margin-top:32px;font-size:13px;color:#999">
-          Qualquer dúvida, entre em contato pelo Instagram
-          <a href="https://instagram.com/patriciacarreira" style="color:#999">@patriciacarreira</a>.
+          Precisa de ajuda? Fale com a gente no
+          <a href="https://wa.me/5522988223993" style="color:#999">WhatsApp (22) 98822-3993</a>
+          ou pelo Instagram
+          <a href="https://instagram.com/patriciacarreira_" style="color:#999">@patriciacarreira_</a>.
         </p>
       </body>
       </html>
@@ -195,8 +225,10 @@ export async function sendOrderDelivered(input: OrderDeliveredInput): Promise<vo
         </p>
 
         <p style="margin-top:32px;font-size:13px;color:#999">
-          Qualquer dúvida, entre em contato pelo Instagram
-          <a href="https://instagram.com/patriciacarreira" style="color:#999">@patriciacarreira</a>.
+          Precisa de ajuda? Fale com a gente no
+          <a href="https://wa.me/5522988223993" style="color:#999">WhatsApp (22) 98822-3993</a>
+          ou pelo Instagram
+          <a href="https://instagram.com/patriciacarreira_" style="color:#999">@patriciacarreira_</a>.
         </p>
       </body>
       </html>
@@ -235,8 +267,10 @@ export async function sendOrderCancelled(input: OrderCancelledInput): Promise<vo
         <h2 style="color:#1c1c1e">Seu pedido foi cancelado</h2>
         <p>Olá, ${escapeHtml(input.customerName)}. Seu pedido <strong>#${shortId}</strong> foi cancelado.</p>
         <p>Se o pagamento já foi processado, o estorno será realizado conforme a política da forma de pagamento utilizada.</p>
-        <p>Qualquer dúvida, entre em contato pelo Instagram
-           <a href="https://instagram.com/patriciacarreira">@patriciacarreira</a>.</p>
+        <p>Precisa de ajuda? Fale com a gente no
+           <a href="https://wa.me/5522988223993" style="color:#999">WhatsApp (22) 98822-3993</a>
+           ou pelo Instagram
+           <a href="https://instagram.com/patriciacarreira_">@patriciacarreira_</a>.</p>
       </body>
       </html>
     `,
@@ -282,8 +316,10 @@ export async function sendNfeEmail(input: NfeEmailInput): Promise<void> {
         </p>
 
         <p style="margin-top:32px;font-size:13px;color:#999">
-          Qualquer dúvida, entre em contato pelo Instagram
-          <a href="https://instagram.com/patriciacarreira" style="color:#999">@patriciacarreira</a>.
+          Precisa de ajuda? Fale com a gente no
+          <a href="https://wa.me/5522988223993" style="color:#999">WhatsApp (22) 98822-3993</a>
+          ou pelo Instagram
+          <a href="https://instagram.com/patriciacarreira_" style="color:#999">@patriciacarreira_</a>.
         </p>
       </body>
       </html>

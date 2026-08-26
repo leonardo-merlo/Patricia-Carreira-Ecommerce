@@ -106,7 +106,7 @@ async function sendConfirmationEmail(
   const supabase = createServiceClient()
   const { data: orderDetails } = await supabase
     .from('orders')
-    .select('total_amount, payment_method, items:order_items(quantity, unit_price, product_name)')
+    .select('total_amount, discount_amount, shipping_amount, payment_method, items:order_items(quantity, unit_price, product_name)')
     .eq('id', orderId)
     .maybeSingle()
 
@@ -117,6 +117,8 @@ async function sendConfirmationEmail(
     customerName: customer.name,
     orderId,
     totalAmount: Number(orderDetails?.total_amount ?? 0),
+    discountAmount: Number(orderDetails?.discount_amount ?? 0),
+    shippingAmount: Number(orderDetails?.shipping_amount ?? 0),
     paymentMethod: (orderDetails?.payment_method as string) ?? 'pix',
     items: items.map((i) => ({
       product_name: i.product_name,

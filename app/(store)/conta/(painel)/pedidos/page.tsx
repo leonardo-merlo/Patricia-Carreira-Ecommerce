@@ -183,7 +183,6 @@ export default async function PedidosPage() {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="shrink-0 rounded-lg border border-outline-variant px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
-                        onClick={(e) => e.stopPropagation()}
                       >
                         Rastrear
                       </a>
