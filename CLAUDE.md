@@ -244,13 +244,15 @@ material_colors (
   UNIQUE (category, name)
 )
 
--- A cor que a variante usa em cada categoria de corte.
+-- A cor que a variante usa em cada PEÇA de corte. Uma linha por item de corte da
+-- receita — não uma por categoria.
 variant_cut_colors (
-  variant_id uuid REFERENCES product_variants(id) ON DELETE CASCADE,
-  category   text,
-  color      text,
-  PRIMARY KEY (variant_id, category),
-  FOREIGN KEY (category, color) REFERENCES material_colors(category, name)
+  variant_id    uuid REFERENCES product_variants(id) ON DELETE CASCADE,
+  category      text,
+  material_type text,   -- a peça: 'Frente', 'Alça', 'Boca de palhaço'...
+  color         text NOT NULL,
+  PRIMARY KEY (variant_id, category, material_type),
+  FOREIGN KEY (category, color) REFERENCES material_colors(category, name) ON UPDATE CASCADE
 )
 ```
 
@@ -258,23 +260,38 @@ variant_cut_colors (
 > eram três colunas de texto livre na variante (`color_lona/forro/couro`), e um
 > espaço a mais quebrava a receita em silêncio. Removidas na migration 035.
 
-**Obrigatoriedade.** A variante precisa declarar cor em toda categoria de corte que
+> ⚠️ **A cor é por peça, não por categoria** (migration 037). A chave primária
+> inclui `material_type`. Uma variante da Bolsa Lyra tem **9 linhas** — quatro de
+> Corte Lona, quatro de Corte Forro e uma de Corte Couro —, não 3. Na prática as
+> peças de uma mesma categoria costumam repetir a cor, mas o schema não obriga:
+> dá para ter a alça de uma cor e a frente de outra.
+
+**Obrigatoriedade.** A variante precisa declarar cor em **cada peça de corte** que
 a receita do produto usa — o modal bloqueia e `saveVariantCutColors` revalida no
 servidor. A cor `"Indefinida"` (`is_placeholder`) existe só para o backfill dos
 dados legados: não é oferecida no dropdown para variante nova, e
 `complete_production_order` recusa OP que ainda esteja nela.
 
 **Como a receita vira lista de insumos.** A receita é cadastrada uma vez por
-produto e herdada por todas as variantes. Os itens de corte guardam só o tipo; a
-cor vem da variante. A função `resolve_variant_bom(variant_id)` faz a tradução e
+produto e herdada por todas as variantes. Os itens de corte guardam só categoria e
+tipo; a cor vem da variante, casada por `(category, material_type)`. O insumo é
+então encontrado por `raw_materials.category + type_specific + color`. A função `resolve_variant_bom(variant_id)` faz a tradução e
 é o único caminho para ler a receita de uma variante (wrapper TS em
 `lib/supabase/bom.ts`). Ela devolve `resolved = false` quando o insumo naquela
 cor ainda não existe — pendência de cadastro, que bloqueia a conclusão da OP.
 
 ```
-Bolsa Flora  ── receita única (34 itens)
-   └─ Mostarda  → Lona Mostarda · Forro Cru · Couro Caramelo
-   └─ Marinho   → Lona Marinho  · Forro Cru · Couro Preto
+Bolsa Lyra ── receita única do produto (17 itens: 9 cortes + 8 de cor fixa)
+   │
+   ├─ variante Mostarda ── 9 linhas em variant_cut_colors, uma por peça:
+   │     Corte Lona  › Frente · Costas · Lateral · Alça          → Mostarda
+   │     Corte Forro › Frente · Costas · Bolso canguru · Bolso de dentro → Cru
+   │     Corte Couro › Boca de palhaço                            → Caramelo
+   │
+   └─ variante Marinho  ── outras 9 linhas:
+         Corte Lona  › as mesmas 4 peças                          → Marinho
+         Corte Forro › as mesmas 4 peças                          → Cru
+         Corte Couro › Boca de palhaço                            → Preto
 ```
 
 > `product_variants.color` ("Mostarda") é a **cor comercial**, a que o cliente vê
@@ -341,27 +358,41 @@ order_items (
 ### 6.5 Ordens de Produção
 
 ```sql
+-- ⚠ Uma OP é de UMA variante. Não existe production_order_items: a variante e a
+-- quantidade vivem na própria linha da OP.
 production_orders (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id    uuid REFERENCES orders(id),    -- nullable: OP pode ser avulsa
-  status      text NOT NULL DEFAULT 'draft',
-  -- draft → materials_checked → approved → in_progress → completed | cancelled
-  notes       text,
-  created_by  text DEFAULT 'henrique',
-  created_at  timestamptz DEFAULT now(),
-  updated_at  timestamptz DEFAULT now()
-)
-
-production_order_items (
-  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  production_order_id uuid REFERENCES production_orders(id) ON DELETE CASCADE,
-  product_variant_id  uuid REFERENCES product_variants(id),
-  quantity_requested  integer NOT NULL,
-  quantity_produced   integer DEFAULT 0,
+  id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id             uuid REFERENCES orders(id),    -- nullable: OP pode ser avulsa
+  product_variant_id   uuid REFERENCES product_variants(id),
+  quantity_requested   integer NOT NULL DEFAULT 1,
+  quantity_produced    integer NOT NULL DEFAULT 0,
+  status               text NOT NULL DEFAULT 'draft',
+  -- draft → approved → in_progress → completed | cancelled
   materials_sufficient boolean,
-  missing_materials   jsonb    -- [{material_id, material_name, needed, available, missing, unit}]
+  missing_materials    jsonb NOT NULL DEFAULT '[]',
+  -- [{material_id, material_name, category, needed, available, missing, unit,
+  --   required_color, resolved}]
+  material_checks      jsonb NOT NULL DEFAULT '{}',   -- marcações do Henrique no card
+  notes                text,
+  created_by           text NOT NULL DEFAULT 'henrique',
+  created_at           timestamptz DEFAULT now(),
+  updated_at           timestamptz DEFAULT now()
 )
 ```
+
+**Quem move o estoque são duas funções, e o par é exato:**
+
+- `complete_production_order(op_id)` — valida em ordem: cor de corte definida (recusa
+  `is_placeholder`), insumo resolvido, saldo suficiente. Só então baixa a MP e sobe o
+  produto acabado, em transação única.
+- `revert_production_order(op_id, target_status)` — `target_status` só aceita `draft`,
+  `approved` ou `in_progress`. Devolve cada linha ao valor anterior e recusa o estorno
+  se o produto acabado já tiver saído do estoque.
+
+Ambas escrevem a auditoria com `created_by = 'henrique'` fixo no corpo da função.
+Criar OP fora do painel exige espelhar `checkAndSetMaterials()`
+(`lib/actions/production.ts`) para preencher `materials_sufficient` e
+`missing_materials` — sem isso o card aparece sem o check de material.
 
 ### 6.6 Cupons de Desconto
 
