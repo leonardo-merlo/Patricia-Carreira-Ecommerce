@@ -15,6 +15,7 @@ import { fetchAddressByCEP } from "@/lib/integrations/viacep"
 import { createPayment } from "@/lib/actions/payments"
 import { getShippingOptions } from "@/lib/actions/shipping"
 import { getCheckoutPrefill } from "@/lib/actions/customers"
+import { PaymentTrust } from "@/components/store/payment-trust"
 import type { PaymentMethod } from "@/lib/actions/payments"
 import type { ShippingOption } from "@/lib/types"
 
@@ -937,14 +938,7 @@ export default function CheckoutPage() {
                 )}
               </Button>
 
-              <div className="mt-3 flex items-center justify-center gap-1.5 font-caption text-caption text-on-surface-variant">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M12 2L4 5v6c0 5.25 3.5 10.15 8 11.5C16.5 21.15 20 16.25 20 11V5l-8-3z" fill="currentColor" opacity="0.3"/>
-                  <path d="M12 2L4 5v6c0 5.25 3.5 10.15 8 11.5C16.5 21.15 20 16.25 20 11V5l-8-3z" stroke="currentColor" strokeWidth="1.5"/>
-                  <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                Pagamento seguro via Mercado Pago
-              </div>
+              <PaymentTrust />
             </div>
           </div>
         </form>
