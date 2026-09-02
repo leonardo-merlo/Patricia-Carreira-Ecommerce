@@ -474,3 +474,45 @@ código.
 Nome de campo de API externa é verificável em trinta segundos e não se deduz de
 um tipo TypeScript escrito à mão. Toda a estrutura estava tipada, compilada e
 errada.
+---
+
+## 15. Dados fiscais preenchidos e correção no ar (02/09/2026)
+
+Deploy do commit `52fe2bb` em produção. Confirmação pública de que o código novo
+está servindo: o rodapé da loja passou a exibir `CNPJ: 38.142.237/0001-80`
+**formatado**, o que só acontece pelo caminho novo — `formatCnpj` lendo
+`store_settings.cnpj`. Home, categorias, carrinho, institucionais e sitemap em
+200; `/admin/diagnostico` redirecionando para o login.
+
+O Henrique enviou os dados que faltavam, e o endereço fiscal fechou:
+
+| Campo | Valor |
+| --- | --- |
+| CNPJ | 38.142.237/0001-80 |
+| Razão social | H M T CARREIRA MODAS |
+| Inscrição Estadual | 0042608620043 |
+| Endereço fiscal | Rua Desembargador Canedo, 215 B — Centro, **Muriaé/MG**, 36880-078 |
+| Origem do frete | Arraial d'Ajuda — Porto Seguro/BA, 45816-000 |
+
+**A inconsistência da seção 11 estava certa e agora está resolvida.** A IE tem 13
+dígitos, formato de Minas Gerais, e o endereço fiscal é mineiro: os dois batem, que
+é o que a SEFAZ exige. O emitente estava configurado como Porto Seguro/BA porque
+aquela variável guardava, ao mesmo tempo, o endereço da empresa e o de onde o
+pacote sai — e para o frete ela estava certa.
+
+Rodando os dados reais pelo código, o emitente resolve e o CFOP sai como deve:
+
+| Cliente em | CFOP | |
+| --- | --- | --- |
+| BA | 6102 | interestadual — era 5102 antes, e é o mercado da loja física |
+| MG | 5102 | interno, mesma UF do emitente |
+| SP | 6102 | interestadual |
+
+Falta só a prova real: um pedido pago disparando a emissão. O 403 não pode mais
+acontecer pelo motivo antigo — `cnpj_emitente` agora existe no corpo —, mas isso
+só a SEFAZ responde.
+
+Duas perguntas seguem abertas e são do contador, não do sistema: o **local de
+retirada** (grupo G), agora que emitente e origem estão comprovadamente em estados
+diferentes, e o **DIFAL** nas vendas para a Bahia, que passaram todas a ser
+interestaduais.

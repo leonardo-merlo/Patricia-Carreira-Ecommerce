@@ -811,8 +811,9 @@ Para que o OpenClaw funcione de forma confiável, o painel admin deve:
 | NF-e                     | ✅ Focus NFe      | R$80/mês + R$0,10/nota                   |
 | Portal atacado           | ✅ Tudo via admin | Sem portal próprio para atacadistas      |
 | Pedido mínimo atacado    | ❓ Pendente       | Alinhar com Henrique                     |
-| Endereço fiscal (cartão CNPJ) | ⚠️ Pendente | Estrutura pronta (migration 045). Falta o cartão CNPJ para preencher /admin/config/fiscal: CNPJ, razão social, IE do mesmo estado do endereço, e o endereço em si. Sem isso a NF-e não é emitida — por desenho |
-| Local de retirada na NF-e | ❓ Pendente | Se o fiscal for MG e a mercadoria sair da BA, a nota provavelmente precisa declarar o local de retirada (grupo G do layout). Confirmar com o contador e os nomes dos campos na doc do Focus |
+| Endereço fiscal (cartão CNPJ) | ✅ Preenchido | Rua Desembargador Canedo, 215 B — Centro, **Muriaé/MG**, 36880-078. CNPJ 38.142.237/0001-80, IE 0042608620043 (13 dígitos, formato MG — bate com a UF), razão social H M T CARREIRA MODAS. A origem do frete continua em Arraial d'Ajuda/BA |
+| Local de retirada na NF-e | ⚠️ Pendente | Confirmado que se aplica: emitente em Muriaé/MG e mercadoria saindo de Arraial d'Ajuda/BA. A nota provavelmente precisa declarar o local de retirada (grupo G do layout) — o payload ainda não monta esse grupo. Confirmar com o contador antes da primeira nota real |
+| DIFAL nas vendas interestaduais | ❓ Pendente | Com o emitente em MG, toda venda para a BA virou 6102. Empresa do Simples Nacional em tese não recolhe DIFAL como remetente, mas é confirmação do contador, não do sistema |
 | Melhor Envio produção    | ⚠️ Sandbox ativo  | Ao migrar para a conta real: trocar `MELHOR_ENVIO_TOKEN`/`MELHOR_ENVIO_BASE_URL` e recadastrar a URL do webhook `/api/webhooks/shipping?token=<MELHOR_ENVIO_WEBHOOK_SECRET>` no painel ME de produção (config do sandbox não migra) |
 | Notificações WhatsApp    | ❓ Pendente       | Fase 2 — Z-API ou Evolution API          |
 | Domínio do site          | ❓ Pendente       | Usar existente ou criar novo             |
