@@ -90,6 +90,17 @@ não corporativa. HTML semântico e IDs estáveis — requisito para automação
 └─────────────────────────────────────────────────────────┘
 ```
 
+> ⚠️ **Focus NFe usa campos PLANOS no corpo da NF-e** — `cnpj_emitente`,
+> `uf_destinatario`, `icms_situacao_tributaria` —, nunca objetos aninhados. Não
+> existe chave `"emitente"` nem `"destinatario"` no schema. Mandar
+> `emitente: { cnpj }` faz `cnpj_emitente` chegar ausente, e a API responde
+> **HTTP 403 "CNPJ do emitente não autorizado"** — mensagem de permissão para um
+> erro de campo faltando. Esse engano travou a emissão por semanas, com token,
+> certificado e cadastro todos corretos. Conferir nome de campo em
+> https://doc.focusnfe.com.br/reference/emitir_nfe.md e
+> https://campos.focusnfe.com.br/nfe/NotaFiscalXML.html — qualquer página da doc
+> aceita `.md` no fim para virar markdown.
+
 ---
 
 ## 4. Autenticação e Perfis de Usuário
@@ -470,6 +481,66 @@ stock_adjustments (
 )
 ```
 
+### 6.10 Identidade e Endereços da Loja
+
+> ⚠️ SEPARAÇÃO (ago/2026 — migration 045). O endereço fiscal e o endereço de
+> origem do frete eram as MESMAS variáveis `STORE_*` na Vercel. Com a sede em
+> Minas Gerais e a loja em Arraial d'Ajuda eles deixaram de coincidir: a nota saía
+> com a UF errada e toda venda para a Bahia com CFOP 5102 em vez de 6102.
+
+São **três** coisas, não duas — a identidade jurídica é uma só, e é o que estava
+duplicado entre `STORE_CNPJ` e `STORE_DOCUMENTO`.
+
+```sql
+store_settings (
+  ...
+  -- 1. Identidade jurídica: emitente da NF-e e remetente da etiqueta são a mesma PJ
+  cnpj                  text,      -- canônico, SÓ DÍGITOS; quem exibe formata
+  legal_name            text,      -- razão social, não o nome da marca
+  state_registration    text,      -- IE ou a palavra 'ISENTO'
+  cnae                  text,
+  tax_regime            smallint NOT NULL DEFAULT 1,   -- 1 = Simples Nacional
+
+  -- 2. Endereço fiscal (cartão CNPJ) — vai impresso na nota e DEFINE O CFOP
+  fiscal_street, fiscal_number, fiscal_complement,
+  fiscal_district, fiscal_city, fiscal_state, fiscal_zip   text,
+
+  -- 3. Origem do frete — de onde a mercadoria sai fisicamente
+  origin_same_as_fiscal boolean NOT NULL DEFAULT true,
+  origin_street, origin_number, origin_complement,
+  origin_district, origin_city, origin_state               text,
+  origin_cep            text,      -- o CEP DESTE bloco; nome antigo, mantido
+  origin_contact_name, origin_phone, origin_email          text
+)
+-- CHECK: fiscal_state e origin_state são '' ou sigla de 2 letras MAIÚSCULAS.
+-- A normalização acontece em updateStoreSettings — 'ba' é rejeitado pelo banco.
+```
+
+**Como se lê.** `lib/server/store-identity.ts` é o único caminho. Nenhum outro
+arquivo lê `STORE_*` para montar endereço.
+
+- `getEmitente()` — **falha fechado.** Sem endereço fiscal completo não existe
+  nota: lança nomeando o campo que falta e a tela onde preencher, e a mensagem vai
+  para `orders.nfe_status = 'erro'`. Não tem fallback para variável de ambiente,
+  de propósito — foi um fallback silencioso que deixou a UF errada passar.
+- `getShippingOrigin()` — **degrada.** Bloco de origem incompleto cai nas
+  variáveis `STORE_*` antigas, porque parar de vender é pior que despachar do
+  endereço de ontem. A fonte usada aparece em `/admin/diagnostico`.
+
+> ⚠️ A cotação do carrinho e a compra da etiqueta chamam **a mesma** função. Antes
+> a cotação lia `store_settings.origin_cep` e a etiqueta lia `STORE_CEP_ORIGEM`:
+> bastava editar o CEP na tela para o cliente ser cotado de um endereço e a coleta
+> ser agendada em outro, sem erro em lugar nenhum.
+
+`origin_same_as_fiscal` ligado faz a origem acompanhar o endereço fiscal — um
+endereço só para manter. Ele existe para impedir a falha por omissão: corrigir o
+fiscal e esquecer o de frete. Para esta loja ele está **desligado**, porque já se
+sabe que os dois diferem.
+
+**As variáveis `STORE_*` viraram rede de segurança.** Não alimentam mais a NF-e.
+Podem sair da Vercel quando `/admin/diagnostico` mostrar "Fonte do endereço:
+painel". `FOCUS_NFE_REGIME_TRIBUTARIO` já não é lida — virou `tax_regime`.
+
 ---
 
 ## 7. Fluxos de Negócio Críticos
@@ -560,6 +631,8 @@ Henrique ou sistema cancela pedido pago
 | 11  | Guest checkout permitido — criação de conta é opcional no checkout                              |
 | 12  | NF-e emitida automaticamente após pagamento confirmado (varejo)                                 |
 | 13  | Peso e dimensões do produto são obrigatórios para calcular frete — bloquear publicação sem eles |
+| 14  | Endereço fiscal incompleto BLOQUEIA a emissão da NF-e. Nunca emitir com endereço parcial ou com fallback |
+| 15  | CFOP sai da UF do endereço FISCAL contra a UF do cliente — nunca da UF de origem do frete |
 
 ---
 
@@ -738,6 +811,8 @@ Para que o OpenClaw funcione de forma confiável, o painel admin deve:
 | NF-e                     | ✅ Focus NFe      | R$80/mês + R$0,10/nota                   |
 | Portal atacado           | ✅ Tudo via admin | Sem portal próprio para atacadistas      |
 | Pedido mínimo atacado    | ❓ Pendente       | Alinhar com Henrique                     |
+| Endereço fiscal (cartão CNPJ) | ⚠️ Pendente | Estrutura pronta (migration 045). Falta o cartão CNPJ para preencher /admin/config/fiscal: CNPJ, razão social, IE do mesmo estado do endereço, e o endereço em si. Sem isso a NF-e não é emitida — por desenho |
+| Local de retirada na NF-e | ❓ Pendente | Se o fiscal for MG e a mercadoria sair da BA, a nota provavelmente precisa declarar o local de retirada (grupo G do layout). Confirmar com o contador e os nomes dos campos na doc do Focus |
 | Melhor Envio produção    | ⚠️ Sandbox ativo  | Ao migrar para a conta real: trocar `MELHOR_ENVIO_TOKEN`/`MELHOR_ENVIO_BASE_URL` e recadastrar a URL do webhook `/api/webhooks/shipping?token=<MELHOR_ENVIO_WEBHOOK_SECRET>` no painel ME de produção (config do sandbox não migra) |
 | Notificações WhatsApp    | ❓ Pendente       | Fase 2 — Z-API ou Evolution API          |
 | Domínio do site          | ❓ Pendente       | Usar existente ou criar novo             |

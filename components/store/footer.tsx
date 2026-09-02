@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Instagram } from "lucide-react"
+import { formatCnpj } from '@/lib/documento'
 import { getStoreSettings } from "@/lib/server/store-settings"
 
 const STORE_LINKS = [
@@ -21,7 +22,7 @@ const INFO_LINKS = [
 
 export async function Footer() {
   const settings = await getStoreSettings().catch(() => null)
-  const cnpj = settings?.cnpj
+  const cnpj = formatCnpj(settings?.cnpj)
   const address = settings?.address_full
 
   return (

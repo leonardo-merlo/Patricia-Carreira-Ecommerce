@@ -1,5 +1,6 @@
-import { isValidCnpj, onlyDigits } from '@/lib/documento'
-import { readEnv, readEnvNumber, readEnvOption } from '@/lib/env'
+import { onlyDigits } from '@/lib/documento'
+import { readEnv, readEnvOption } from '@/lib/env'
+import type { Emitente } from '@/lib/server/store-identity'
 import type { Customer, NfeStatus, Order, OrderItem, PaymentMethod, Product, ProductVariant } from '@/lib/types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -27,7 +28,17 @@ export type OrderItemWithProduct = OrderItem & {
   product_variant?: ProductVariant & { product?: Product }
 }
 
-// Payload enviado à API Focus NFe para emissão de NF-e
+// Payload enviado à API Focus NFe para emissão de NF-e.
+//
+// ⚠️ A API usa CAMPOS PLANOS com sufixo — `cnpj_emitente`, `uf_destinatario` —,
+// nunca objetos aninhados. Não existe chave "emitente" nem "destinatario" no
+// schema. Enviar `emitente: { cnpj }` faz `cnpj_emitente` chegar AUSENTE, e a
+// resposta é HTTP 403 "CNPJ do emitente não autorizado": uma mensagem de
+// permissão para um erro de campo faltando. Foi o que travou a emissão por
+// semanas, com token, certificado e cadastro todos corretos.
+//
+// Referência: https://doc.focusnfe.com.br/reference/emitir_nfe.md e
+// https://campos.focusnfe.com.br/nfe/NotaFiscalXML.html (nomes de campo).
 export type FocusNfePayload = {
   natureza_operacao: string
   data_emissao: string
@@ -37,36 +48,43 @@ export type FocusNfePayload = {
   consumidor_final: number
   presenca_comprador: number
   modalidade_frete: number
-  emitente: {
-    cnpj: string
-    inscricao_estadual: string
-    nome: string
-    logradouro: string
-    numero: string
-    complemento: string
-    bairro: string
-    municipio: string
-    uf: string
-    cep: string
-    codigo_regime_tributario: number
-  }
-  destinatario: {
-    cpf_cnpj: string
-    nome_completo: string
-    email: string
-    endereco: {
-      logradouro: string
-      numero: string
-      complemento: string
-      bairro: string
-      municipio: string
-      uf: string
-      cep: string
-    }
-    indicador_inscricao_estadual: number
-  }
+
+  // Emitente — endereço FISCAL (cartão CNPJ), não o de origem do frete
+  cnpj_emitente: string
+  nome_emitente: string
+  inscricao_estadual_emitente: string
+  logradouro_emitente: string
+  numero_emitente: string
+  complemento_emitente?: string
+  bairro_emitente: string
+  municipio_emitente: string
+  uf_emitente: string
+  cep_emitente: string
+  regime_tributario_emitente: number
+
+  // Destinatário — CPF e CNPJ são campos distintos; vai o que o documento for
+  nome_destinatario: string
+  cpf_destinatario?: string
+  cnpj_destinatario?: string
+  email_destinatario?: string
+  indicador_inscricao_estadual_destinatario: number
+  logradouro_destinatario: string
+  numero_destinatario: string
+  complemento_destinatario?: string
+  bairro_destinatario: string
+  municipio_destinatario: string
+  uf_destinatario: string
+  cep_destinatario: string
+
+  // Totais
+  valor_produtos: number
+  valor_frete: number
+  valor_desconto: number
+  valor_total: number
+
   items: Array<{
     numero_item: number
+    codigo_produto: string
     codigo_ncm: string
     cfop: string
     descricao: string
@@ -78,16 +96,14 @@ export type FocusNfePayload = {
     valor_unitario_tributavel: number
     valor_bruto: number
     icms_origem: number
-    icms_modalidade: string
-    pis_modalidade: string
-    cofins_modalidade: string
+    icms_situacao_tributaria: string
+    pis_situacao_tributaria: string
+    cofins_situacao_tributaria: string
   }>
   formas_pagamento: Array<{
     forma_pagamento: string
     valor_pagamento: number
   }>
-  valor_frete: number
-  valor_desconto: number
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -124,10 +140,14 @@ function getAuthHeader(): string {
   return `Basic ${Buffer.from(`${token}:`).toString('base64')}`
 }
 
-// Determina CFOP baseado no estado do destinatário vs estado do emitente
-function determineCfop(destinatarioUf: string): string {
-  const emitenteUf = readEnv('STORE_ESTADO')
-  return destinatarioUf.trim().toUpperCase() === emitenteUf.toUpperCase() ? '5102' : '6102'
+// Determina CFOP baseado no estado do destinatário vs estado do emitente.
+//
+// A UF do emitente é a do endereço FISCAL — o do cartão CNPJ —, não a de onde o
+// pacote sai. Enquanto as duas eram a mesma variável STORE_ESTADO isso não
+// aparecia; com a sede em MG e a loja na BA, ler a UF errada faria toda venda
+// baiana sair como operação interna quando ela é interestadual.
+function determineCfop(destinatarioUf: string, emitenteUf: string): string {
+  return destinatarioUf.trim().toUpperCase() === emitenteUf.trim().toUpperCase() ? '5102' : '6102'
 }
 
 // 5102 e 6102 são o mesmo par — qual dos dois vale depende do destino da venda,
@@ -135,12 +155,23 @@ function determineCfop(destinatarioUf: string): string {
 // respeitar o cadastro faria toda venda dentro da Bahia sair com o CFOP errado
 // e ser rejeitada pela SEFAZ. Um CFOP fora desse par é escolha deliberada de
 // quem cadastrou (operação especial) e continua valendo.
-function resolveCfop(cfopCadastrado: string | null | undefined, destinatarioUf: string): string {
+function resolveCfop(
+  cfopCadastrado: string | null | undefined,
+  destinatarioUf: string,
+  emitenteUf: string
+): string {
   const configurado = (cfopCadastrado ?? '').trim()
   if (!configurado || configurado === '5102' || configurado === '6102') {
-    return determineCfop(destinatarioUf)
+    return determineCfop(destinatarioUf, emitenteUf)
   }
   return configurado
+}
+
+// Valor monetário com 2 casas. Somar preços em ponto flutuante e mandar o
+// resultado cru punha 415.79999999999995 no corpo da requisição — a SEFAZ compara
+// o total declarado com a soma dos itens e não perdoa a diferença.
+function money(valor: number): number {
+  return Math.round(valor * 100) / 100
 }
 
 // Mapeia método de pagamento do sistema para código Focus NFe
@@ -273,12 +304,18 @@ export async function cancelarNfe(ref: string, justificativa: string): Promise<F
  * Constrói o payload da NF-e a partir dos dados do pedido, itens e cliente.
  * Não faz chamadas HTTP nem acessa o banco de dados.
  *
+ * O emitente chega pronto como argumento, e não é lido aqui dentro. Antes eram
+ * sete variáveis de ambiente invisíveis na assinatura: a função prometia não
+ * tocar em nada externo e dependia da Vercel para produzir o endereço da nota.
+ * Quem monta e valida o emitente é resolveEmitente(), em lib/server/store-identity.
+ *
  * Pré-condição: customer.address não pode ser null (validar antes de chamar).
  */
 export function buildNfePayload(
   order: Order,
   items: OrderItemWithProduct[],
-  customer: Customer
+  customer: Customer,
+  emitente: Emitente
 ): FocusNfePayload {
   if (!customer.address) {
     throw new Error(
@@ -303,23 +340,49 @@ export function buildNfePayload(
     }
   }
 
-  // O Focus recusa com "CNPJ do emitente não autorizado" quando o CNPJ do corpo
-  // não é o da empresa dona do token — e um STORE_CNPJ vazio, ou com o comentário
-  // colado junto, vira string vazia aqui e produz exatamente essa mensagem, que não
-  // aponta para a variável. Conferir antes devolve o nome do problema.
-  const emitenteCnpj = onlyDigits(readEnv('STORE_CNPJ'))
-  if (!isValidCnpj(emitenteCnpj)) {
-    throw new Error(
-      `[Focus NFe] STORE_CNPJ ausente ou inválido (valor lido: "${emitenteCnpj || '(vazio)'}"). ` +
-        'Defina o CNPJ do emitente na Vercel e no .env.local: só dígitos, sem comentário no valor.'
+  const itensNf = items.map((item, index) => {
+    const cfop = resolveCfop(
+      item.product_variant?.product?.cfop,
+      customer.address!.state,
+      emitente.endereco.state
     )
-  }
 
-  // Total fiscal calculado a partir dos itens para garantir coerência com SEFAZ.
-  const fiscalTotal =
-    items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0) +
-    order.shipping_amount -
-    order.discount_amount
+    return {
+      numero_item: index + 1,
+      // Obrigatório. O SKU é o código interno do produto; sem ele a própria doc
+      // manda usar o CFOP no formato CFOP9999.
+      codigo_produto: item.product_variant?.sku || `CFOP${cfop}`,
+      // NCM já validado acima — cast seguro
+      codigo_ncm: item.product_variant!.product!.ncm!,
+      cfop,
+      descricao: item.product_variant?.product?.name ?? 'Produto',
+      quantidade_comercial: item.quantity,
+      quantidade_tributavel: item.quantity,
+      unidade_comercial: 'UN',
+      unidade_tributavel: 'UN',
+      valor_unitario_comercial: money(item.unit_price),
+      valor_unitario_tributavel: money(item.unit_price),
+      valor_bruto: money(item.quantity * item.unit_price),
+      icms_origem: 0,
+      // CSOSN, porque o regime é Simples Nacional. 400 = não tributada pelo
+      // Simples Nacional. O nome do campo é situacao_tributaria — icms_modalidade
+      // não existe no schema e era ignorado.
+      icms_situacao_tributaria: '400',
+      pis_situacao_tributaria: '07',    // operação isenta
+      cofins_situacao_tributaria: '07', // operação isenta
+    }
+  })
+
+  // Totais somados a partir dos itens já arredondados: somar antes de arredondar
+  // produzia 415.79999999999995 no corpo da requisição.
+  const valorProdutos = money(itensNf.reduce((soma, item) => soma + item.valor_bruto, 0))
+  const valorFrete = money(order.shipping_amount)
+  const valorDesconto = money(order.discount_amount)
+  const valorTotal = money(valorProdutos + valorFrete - valorDesconto)
+
+  const documento = onlyDigits(customer.cpf_cnpj)
+  const complementoEmitente = emitente.endereco.complement.trim()
+  const complementoDestinatario = (customer.address.complement ?? '').trim()
 
   return {
     natureza_operacao: 'Venda de mercadoria',
@@ -330,60 +393,44 @@ export function buildNfePayload(
     consumidor_final: 1,
     presenca_comprador: 2,   // operação não presencial / internet
     modalidade_frete: 1,     // CIF (por conta do emitente)
-    emitente: {
-      cnpj: emitenteCnpj,
-      // IE aceita 'ISENTO', então só tira espaço — não pode virar só dígitos
-      inscricao_estadual: readEnv('STORE_IE'),
-      nome: readEnv('STORE_NOME'),
-      logradouro: readEnv('STORE_LOGRADOURO'),
-      numero: readEnv('STORE_NUMERO'),
-      complemento: readEnv('STORE_COMPLEMENTO'),
-      bairro: readEnv('STORE_BAIRRO'),
-      municipio: readEnv('STORE_CIDADE'),
-      uf: readEnv('STORE_ESTADO'),
-      cep: onlyDigits(readEnv('STORE_CEP_ORIGEM')),
-      codigo_regime_tributario: readEnvNumber('FOCUS_NFE_REGIME_TRIBUTARIO', 1),
-    },
-    destinatario: {
-      cpf_cnpj: onlyDigits(customer.cpf_cnpj),
-      nome_completo: isHomologacao() ? NOME_DESTINATARIO_HOMOLOGACAO : customer.name,
-      email: customer.email ?? '',
-      endereco: {
-        logradouro: customer.address.street,
-        numero: customer.address.number,
-        complemento: customer.address.complement ?? '',
-        bairro: customer.address.neighborhood,
-        municipio: customer.address.city,
-        uf: customer.address.state,
-        cep: onlyDigits(customer.address.zip),
-      },
-      indicador_inscricao_estadual: 9, // não contribuinte
-    },
-    items: items.map((item, index) => ({
-      numero_item: index + 1,
-      // NCM já validado acima — cast seguro
-      codigo_ncm: item.product_variant!.product!.ncm!,
-      cfop: resolveCfop(item.product_variant?.product?.cfop, customer.address!.state),
-      descricao: item.product_variant?.product?.name ?? 'Produto',
-      quantidade_comercial: item.quantity,
-      quantidade_tributavel: item.quantity,
-      unidade_comercial: 'UN',
-      unidade_tributavel: 'UN',
-      valor_unitario_comercial: item.unit_price,
-      valor_unitario_tributavel: item.unit_price,
-      valor_bruto: item.quantity * item.unit_price,
-      icms_origem: 0,
-      icms_modalidade: '400',  // Simples Nacional: não tributado
-      pis_modalidade: '07',    // operação isenta
-      cofins_modalidade: '07', // operação isenta
-    })),
+
+    cnpj_emitente: emitente.cnpj,
+    nome_emitente: emitente.nome,
+    // IE aceita 'ISENTO', então vai como texto — não pode virar só dígitos
+    inscricao_estadual_emitente: emitente.inscricaoEstadual,
+    logradouro_emitente: emitente.endereco.street,
+    numero_emitente: emitente.endereco.number,
+    ...(complementoEmitente ? { complemento_emitente: complementoEmitente } : {}),
+    bairro_emitente: emitente.endereco.district,
+    municipio_emitente: emitente.endereco.city,
+    uf_emitente: emitente.endereco.state,
+    cep_emitente: emitente.endereco.zip,
+    regime_tributario_emitente: emitente.regimeTributario,
+
+    nome_destinatario: isHomologacao() ? NOME_DESTINATARIO_HOMOLOGACAO : customer.name,
+    // CPF e CNPJ são campos diferentes: mandar CPF em cnpj_destinatario é rejeição
+    ...(documento.length === 14 ? { cnpj_destinatario: documento } : { cpf_destinatario: documento }),
+    ...(customer.email ? { email_destinatario: customer.email } : {}),
+    indicador_inscricao_estadual_destinatario: 9, // não contribuinte
+    logradouro_destinatario: customer.address.street,
+    numero_destinatario: customer.address.number,
+    ...(complementoDestinatario ? { complemento_destinatario: complementoDestinatario } : {}),
+    bairro_destinatario: customer.address.neighborhood,
+    municipio_destinatario: customer.address.city,
+    uf_destinatario: customer.address.state.trim().toUpperCase(),
+    cep_destinatario: onlyDigits(customer.address.zip),
+
+    valor_produtos: valorProdutos,
+    valor_frete: valorFrete,
+    valor_desconto: valorDesconto,
+    valor_total: valorTotal,
+
+    items: itensNf,
     formas_pagamento: [
       {
         forma_pagamento: mapPaymentMethod(order.payment_method),
-        valor_pagamento: fiscalTotal,
+        valor_pagamento: valorTotal,
       },
     ],
-    valor_frete: order.shipping_amount,
-    valor_desconto: order.discount_amount,
   }
 }

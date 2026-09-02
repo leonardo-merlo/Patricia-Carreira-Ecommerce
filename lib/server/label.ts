@@ -9,26 +9,33 @@ import {
   type MEVolume,
 } from '@/lib/integrations/melhor-envio'
 import { meDocumentFields, onlyDigits } from '@/lib/documento'
-import { readEnv } from '@/lib/env'
+import { getShippingOrigin } from '@/lib/server/store-identity'
 
-export function buildStoreAddress(): MEAddress {
-  // A loja é PJ: o CNPJ é o documento que identifica o remetente. STORE_DOCUMENTO
-  // fica como alternativa para quando só houver CPF cadastrado.
-  const documento = meDocumentFields(readEnv('STORE_CNPJ'))
-  const fallback = meDocumentFields(readEnv('STORE_DOCUMENTO'))
+/**
+ * Remetente da etiqueta: de onde a mercadoria sai.
+ *
+ * Não é o endereço fiscal. Quem resolve a origem é getShippingOrigin(), a mesma
+ * função que a cotação do carrinho usa — antes esta função lia STORE_CEP_ORIGEM
+ * e a cotação lia store_settings.origin_cep, então mudar o CEP na tela fazia o
+ * cliente ser cotado de um endereço e a coleta ser agendada em outro.
+ */
+export async function buildStoreAddress(): Promise<MEAddress> {
+  const origem = await getShippingOrigin()
 
   return {
-    name: readEnv('STORE_NOME') || 'Patricia Carreira',
-    phone: onlyDigits(readEnv('STORE_TELEFONE')),
-    email: readEnv('STORE_EMAIL'),
-    ...(documento.company_document || documento.document ? documento : fallback),
-    address: readEnv('STORE_LOGRADOURO'),
-    number: readEnv('STORE_NUMERO'),
-    complement: readEnv('STORE_COMPLEMENTO'),
-    district: readEnv('STORE_BAIRRO'),
-    city: readEnv('STORE_CIDADE'),
-    state_abbr: (readEnv('STORE_ESTADO')).trim().toUpperCase(),
-    postal_code: onlyDigits(readEnv('STORE_CEP_ORIGEM')),
+    name: origem.name,
+    phone: origem.phone,
+    email: origem.email,
+    // A loja é PJ: o CNPJ é o documento que identifica o remetente. Documento que
+    // não passa no dígito é omitido — o ME recusa o pedido inteiro com 422.
+    ...meDocumentFields(origem.cnpj),
+    address: origem.endereco.street,
+    number: origem.endereco.number,
+    complement: origem.endereco.complement,
+    district: origem.endereco.district,
+    city: origem.endereco.city,
+    state_abbr: origem.endereco.state,
+    postal_code: onlyDigits(origem.endereco.zip),
     country_id: 'BR',
   }
 }
@@ -147,7 +154,7 @@ export async function purchaseShippingLabel(orderId: string): Promise<void> {
   // 1. Add to ME cart
   const meOrderId = await addToCart({
     serviceId: rawOrder.melhor_envio_service_id as number,
-    from: buildStoreAddress(),
+    from: await buildStoreAddress(),
     to,
     products,
     volumes,

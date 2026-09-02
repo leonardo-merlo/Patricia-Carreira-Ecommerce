@@ -63,3 +63,10 @@ export function meDocumentFields(
   if (digits.length === 11 && isValidCpf(digits)) return { document: digits }
   return {}
 }
+
+/** CNPJ formatado para leitura humana. Entrada inválida volta como veio. */
+export function formatCnpj(value: string | null | undefined): string {
+  const cnpj = onlyDigits(value)
+  if (cnpj.length !== 14) return (value ?? '').trim()
+  return `${cnpj.slice(0, 2)}.${cnpj.slice(2, 5)}.${cnpj.slice(5, 8)}/${cnpj.slice(8, 12)}-${cnpj.slice(12)}`
+}

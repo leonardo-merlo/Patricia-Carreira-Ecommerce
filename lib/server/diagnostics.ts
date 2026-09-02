@@ -6,6 +6,8 @@
 
 import { isValidCep, isValidCnpj, meDocumentFields, onlyDigits } from '@/lib/documento'
 import { readEnv, readEnvOption } from '@/lib/env'
+import { resolveShippingOrigin } from '@/lib/server/store-identity'
+import { getStoreSettings, type StoreSettings } from '@/lib/server/store-settings'
 
 export type EnvCheck = {
   name: string
@@ -49,6 +51,9 @@ export type Diagnostics = {
   groups: EnvGroup[]
   services: ServiceCheck[]
   webhooks: WebhookUrl[]
+  /** emitente da NF-e — endereço fiscal, do cartão CNPJ */
+  fiscal: SenderField[]
+  /** remetente da etiqueta — de onde a mercadoria sai */
   sender: SenderField[]
   missingRequired: string[]
 }
@@ -197,10 +202,11 @@ export async function checkFocusNfe(): Promise<ServiceCheck> {
 
     if (probe.status === 404 || probe.ok) {
       // "token aceito" não é "autorizado a emitir": o Focus só confere o CNPJ do
-      // emitente na emissão, e responde 422 "CNPJ do emitente não autorizado" quando
+      // emitente na emissão, e responde 403 "CNPJ do emitente não autorizado" quando
       // o CNPJ do corpo não é o da empresa dona do token. Por isso o CNPJ configurado
       // entra aqui — foi o que deixou esta tela verde enquanto a emissão falhava.
-      const cnpjEmitente = onlyDigits(env('STORE_CNPJ'))
+      const settings = await getStoreSettings()
+      const cnpjEmitente = onlyDigits(settings?.cnpj)
       const cnpjOk = isValidCnpj(cnpjEmitente)
       return {
         service: 'Focus NFe',
@@ -208,7 +214,7 @@ export async function checkFocusNfe(): Promise<ServiceCheck> {
         environment,
         detail: cnpjOk
           ? `token aceito · emitente CNPJ ${cnpjEmitente} — a autorização deste CNPJ só é conferida na emissão`
-          : `token aceito, mas STORE_CNPJ ${cnpjEmitente ? `é inválido (${cnpjEmitente})` : 'está vazio'} — a emissão falha com "CNPJ do emitente não autorizado"`,
+          : `token aceito, mas o CNPJ da empresa ${cnpjEmitente ? `é inválido (${cnpjEmitente})` : 'não está preenchido em /admin/config/fiscal'} — a emissão falha com "CNPJ do emitente não autorizado"`,
       }
     }
 
@@ -318,31 +324,35 @@ function buildGroups(): EnvGroup[] {
         check('FOCUS_NFE_TOKEN', true, 'token do ambiente escolhido'),
         check('FOCUS_NFE_AMBIENTE', true, 'homologacao ou producao'),
         check('FOCUS_NFE_WEBHOOK_SECRET', true, 'vai na query string da URL de callback'),
-        check('FOCUS_NFE_REGIME_TRIBUTARIO', false, '1 = Simples Nacional'),
       ],
     },
     {
-      title: 'Emitente da NF-e',
+      title: 'Email',
       vars: [
-        check('STORE_CNPJ', true, 'sem CNPJ a nota não é emitida'),
-        check('STORE_IE', true, 'inscrição estadual ou ISENTO'),
-        check('STORE_NOME', true, 'razão social no emitente'),
-        check('STORE_LOGRADOURO', true, 'endereço do emitente'),
-        check('STORE_NUMERO', true, 'endereço do emitente'),
-        check('STORE_BAIRRO', true, 'endereço do emitente'),
-        check('STORE_CIDADE', true, 'endereço do emitente'),
-        check('STORE_ESTADO', true, 'define CFOP 5102 (dentro do estado) ou 6102'),
-        check('STORE_CEP_ORIGEM', true, 'origem do frete e CEP do emitente'),
-      ],
-    },
-    {
-      title: 'Remetente do frete e email',
-      vars: [
-        check('STORE_DOCUMENTO', true, 'CPF/CNPJ do remetente no Melhor Envio'),
-        check('STORE_TELEFONE', true, 'telefone do remetente'),
-        check('STORE_EMAIL', true, 'email do remetente'),
         check('RESEND_API_KEY', true, 'emails transacionais'),
         check('RESEND_FROM', true, 'remetente verificado no Resend'),
+      ],
+    },
+    {
+      // Endereço e identidade da empresa deixaram de morar aqui: viraram campos de
+      // /admin/config (fiscal e envio). Estas variáveis continuam sendo lidas só
+      // como rede enquanto o endereço de origem não estiver completo no painel —
+      // nenhuma delas é obrigatória, e o cartão "Remetente do frete" abaixo diz
+      // qual das duas fontes está valendo agora.
+      title: 'Endereço antigo (rede de segurança — pode ser removido)',
+      vars: [
+        check('STORE_NOME', false, 'substituído por Razão social em /admin/config/fiscal'),
+        check('STORE_CNPJ', false, 'substituído pelo CNPJ em /admin/config/fiscal'),
+        check('STORE_DOCUMENTO', false, 'substituído pelo CNPJ em /admin/config/fiscal'),
+        check('STORE_IE', false, 'substituído pela Inscrição Estadual em /admin/config/fiscal'),
+        check('STORE_TELEFONE', false, 'substituído pelo contato em /admin/config/envio'),
+        check('STORE_EMAIL', false, 'substituído pelo contato em /admin/config/envio'),
+        check('STORE_LOGRADOURO', false, 'substituído pelo endereço de origem em /admin/config/envio'),
+        check('STORE_NUMERO', false, 'substituído pelo endereço de origem em /admin/config/envio'),
+        check('STORE_BAIRRO', false, 'substituído pelo endereço de origem em /admin/config/envio'),
+        check('STORE_CIDADE', false, 'substituído pelo endereço de origem em /admin/config/envio'),
+        check('STORE_ESTADO', false, 'não define mais CFOP — quem define é a UF fiscal'),
+        check('STORE_CEP_ORIGEM', false, 'substituído pelo CEP de origem em /admin/config/envio'),
       ],
     },
   ]
@@ -389,65 +399,88 @@ function buildWebhooks(appUrl: string | null, appUrlIsPublic: boolean): WebhookU
   ]
 }
 
-// O remetente é o que o Melhor Envio mais recusa: ele valida dígito de CPF/CNPJ
-// e formato de CEP, e devolve 422 com o pedido inteiro barrado. Mostrar o valor
-// resolvido aqui (dado público da loja, não credencial) evita adivinhação.
-function buildSender(): SenderField[] {
-  const cnpj = onlyDigits(env('STORE_CNPJ'))
-  const documento = onlyDigits(env('STORE_DOCUMENTO'))
-  const cep = onlyDigits(env('STORE_CEP_ORIGEM'))
-  const uf = env('STORE_ESTADO').toUpperCase()
+// As duas identidades da loja, lado a lado. Estão em cartões separados de
+// propósito: enquanto eram os mesmos valores ninguém percebeu que a empresa
+// mudou de estado e a nota continuou saindo com a UF da loja.
+//
+// Nenhum destes campos é credencial — são dados públicos do cartão CNPJ e do
+// endereço de coleta —, então o valor resolvido aparece na tela. Foi a ausência
+// disso que deixou o diagnóstico verde enquanto a emissão falhava.
 
-  const docFields = meDocumentFields(cnpj || documento)
-  const docOk = Boolean(docFields.company_document || docFields.document)
+function campo(label: string, value: string, ok: boolean, note: string): SenderField {
+  return { label, value: value || '(vazio)', ok, note }
+}
+
+/** Emitente da NF-e: o que vai impresso na nota e o que decide o CFOP. */
+function buildFiscal(settings: StoreSettings | null): SenderField[] {
+  const cnpj = onlyDigits(settings?.cnpj)
+  const uf = (settings?.fiscal_state ?? '').trim().toUpperCase()
+  const cep = onlyDigits(settings?.fiscal_zip)
+  const logradouro = `${settings?.fiscal_street ?? ''} ${settings?.fiscal_number ?? ''}`.trim()
+  const ondePreencher = 'preencha em /admin/config/fiscal, com o cartão CNPJ'
 
   return [
-    {
-      label: 'Documento enviado ao ME',
-      value: docFields.company_document
-        ? `CNPJ ${docFields.company_document}`
-        : docFields.document
-          ? `CPF ${docFields.document}`
-          : cnpj || documento || '(vazio)',
-      ok: docOk,
-      note: docOk
-        ? 'dígito verificador confere'
-        : 'nenhum documento válido — o ME recusa o pedido com 422',
-    },
-    {
-      label: 'CNPJ do emitente da NF-e',
-      value: cnpj || '(vazio)',
-      ok: isValidCnpj(cnpj),
-      note: isValidCnpj(cnpj)
-        ? 'STORE_CNPJ — precisa ser o CNPJ da empresa dona do token Focus'
-        : 'STORE_CNPJ vazio ou inválido — o Focus recusa com "CNPJ do emitente não autorizado"',
-    },
-    {
-      label: 'CEP de origem',
-      value: cep || '(vazio)',
-      ok: isValidCep(cep),
-      note: isValidCep(cep) ? '8 dígitos' : 'precisa ter 8 dígitos, só números',
-    },
-    { label: 'Estado', value: uf || '(vazio)', ok: uf.length === 2, note: 'sigla de 2 letras' },
-    {
-      label: 'Cidade',
-      value: env('STORE_CIDADE') || '(vazio)',
-      ok: Boolean(env('STORE_CIDADE')),
-      note: 'obrigatória',
-    },
-    {
-      label: 'Logradouro e número',
-      value: `${env('STORE_LOGRADOURO')} ${env('STORE_NUMERO')}`.trim() || '(vazio)',
-      ok: Boolean(env('STORE_LOGRADOURO') && env('STORE_NUMERO')),
-      note: 'obrigatórios',
-    },
-    {
-      label: 'Bairro',
-      value: env('STORE_BAIRRO') || '(vazio)',
-      ok: Boolean(env('STORE_BAIRRO')),
-      note: 'obrigatório',
-    },
+    campo('CNPJ', cnpj, isValidCnpj(cnpj),
+      isValidCnpj(cnpj)
+        ? 'dígito verificador confere — precisa ser o CNPJ da empresa dona do token Focus'
+        : `CNPJ vazio ou inválido — o Focus recusa com "CNPJ do emitente não autorizado". ${ondePreencher}`),
+    campo('Razão social', (settings?.legal_name ?? '').trim(), Boolean((settings?.legal_name ?? '').trim()),
+      `como a empresa está registrada, não o nome da marca. ${ondePreencher}`),
+    campo('Inscrição Estadual', (settings?.state_registration ?? '').trim(), Boolean((settings?.state_registration ?? '').trim()),
+      `número da IE ou a palavra ISENTO. A SEFAZ exige IE do mesmo estado do endereço fiscal. ${ondePreencher}`),
+    campo('Logradouro e número', logradouro, Boolean((settings?.fiscal_street ?? '').trim() && (settings?.fiscal_number ?? '').trim()),
+      `endereço do cartão CNPJ. ${ondePreencher}`),
+    campo('Bairro', (settings?.fiscal_district ?? '').trim(), Boolean((settings?.fiscal_district ?? '').trim()), ondePreencher),
+    campo('Cidade', (settings?.fiscal_city ?? '').trim(), Boolean((settings?.fiscal_city ?? '').trim()), ondePreencher),
+    campo('Estado (define o CFOP)', uf, uf.length === 2,
+      uf.length === 2
+        ? `venda para ${uf} sai com CFOP 5102 (dentro do estado); para qualquer outra UF, 6102`
+        : `sem a UF fiscal o CFOP não pode ser decidido. ${ondePreencher}`),
+    campo('CEP', cep, isValidCep(cep), isValidCep(cep) ? '8 dígitos' : `precisa ter 8 dígitos. ${ondePreencher}`),
+    campo('Regime tributário', String(settings?.tax_regime ?? 1), true, '1 = Simples Nacional'),
   ]
+}
+
+/** Remetente da etiqueta: o que é enviado ao Melhor Envio, e de qual fonte veio. */
+function buildSender(settings: StoreSettings | null): SenderField[] {
+  const origem = resolveShippingOrigin(settings)
+  const doc = meDocumentFields(origem.cnpj)
+  const docOk = Boolean(doc.company_document || doc.document)
+  const daConfiguracao = origem.source === 'configuracao'
+
+  const linhas: SenderField[] = [
+    campo(
+      'Fonte do endereço',
+      daConfiguracao ? 'painel (/admin/config/envio)' : 'variáveis STORE_* (rede antiga)',
+      true,
+      daConfiguracao
+        ? 'endereço de origem completo no painel — é ele que vale'
+        : 'o endereço de origem no painel ainda está incompleto, então valem as variáveis antigas. Completar em /admin/config/envio tira essa dependência.'
+    ),
+    campo(
+      'Documento enviado ao ME',
+      doc.company_document ? `CNPJ ${doc.company_document}` : doc.document ? `CPF ${doc.document}` : origem.cnpj,
+      docOk,
+      docOk ? 'dígito verificador confere' : 'nenhum documento válido — o ME recusa o pedido com 422'
+    ),
+    campo('CEP de origem', origem.endereco.zip, isValidCep(origem.endereco.zip),
+      isValidCep(origem.endereco.zip)
+        ? 'mesmo CEP usado na cotação do carrinho e na compra da etiqueta'
+        : 'precisa ter 8 dígitos, só números'),
+    campo('Estado', origem.endereco.state, origem.endereco.state.length === 2, 'sigla de 2 letras'),
+    campo('Cidade', origem.endereco.city, Boolean(origem.endereco.city), 'obrigatória'),
+    campo('Logradouro e número', `${origem.endereco.street} ${origem.endereco.number}`.trim(),
+      Boolean(origem.endereco.street && origem.endereco.number), 'obrigatórios'),
+    campo('Bairro', origem.endereco.district, Boolean(origem.endereco.district), 'obrigatório'),
+  ]
+
+  // Divergência entre as duas fontes não pode passar em silêncio: é exatamente
+  // assim que a cotação e a coleta saíam de endereços diferentes.
+  for (const aviso of origem.warnings) {
+    linhas.push(campo('Atenção', 'divergência de configuração', false, aviso))
+  }
+
+  return linhas
 }
 
 export async function runDiagnostics(): Promise<Diagnostics> {
@@ -462,6 +495,8 @@ export async function runDiagnostics(): Promise<Diagnostics> {
     .filter((v) => v.required && !v.present)
     .map((v) => v.name)
 
+  const settings = await getStoreSettings()
+
   const services = await Promise.all([
     checkMercadoPago(),
     checkMelhorEnvio(),
@@ -475,7 +510,8 @@ export async function runDiagnostics(): Promise<Diagnostics> {
     groups,
     services,
     webhooks: buildWebhooks(appUrl, appUrlIsPublic),
-    sender: buildSender(),
+    fiscal: buildFiscal(settings),
+    sender: buildSender(settings),
     missingRequired,
   }
 }

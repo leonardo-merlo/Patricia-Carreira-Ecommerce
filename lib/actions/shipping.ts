@@ -2,6 +2,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { calculateShipping, type MEShippingItem, type MEQuoteResult } from '@/lib/integrations/melhor-envio'
+import { getShippingOrigin } from '@/lib/server/store-identity'
 import { getStoreSettings } from '@/lib/server/store-settings'
 import type { ShippingOption } from '@/lib/types'
 
@@ -52,7 +53,9 @@ export async function getShippingOptions(
 ): Promise<ShippingResult> {
   try {
     const settings = await getStoreSettings()
-    const originCep = settings?.origin_cep?.replace(/\D/g, '') || process.env.STORE_CEP_ORIGEM?.replace(/\D/g, '')
+    // Mesma resolução que a compra da etiqueta usa. Cotar por um CEP e coletar
+    // em outro era possível enquanto cada caminho lia a sua própria fonte.
+    const originCep = (await getShippingOrigin()).endereco.zip
     const freeShippingThreshold = settings?.free_shipping_threshold ?? 599
     const extraDays = settings?.shipping_extra_days ?? 0
     const enabledCarriers = settings?.enabled_carriers ?? []

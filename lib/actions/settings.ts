@@ -1,6 +1,7 @@
 'use server'
 
 import { createServiceClient } from '@/lib/supabase/service'
+import { onlyDigits } from '@/lib/documento'
 import { requireAdmin } from '@/lib/server/auth'
 import { checkFocusNfe } from '@/lib/server/diagnostics'
 import {
@@ -19,6 +20,25 @@ export async function getStoreSettings(): Promise<StoreSettings | null> {
   return getStoreSettingsCore()
 }
 
+/**
+ * Ajusta o que o banco e as integrações exigem, num ponto só.
+ *
+ * A UF tem CHECK de duas letras maiúsculas: "ba" digitado no formulário faria o
+ * save falhar com erro de constraint, que não diz nada a quem está preenchendo.
+ * O CNPJ é guardado só com dígitos, que é a forma em que ele vai para o corpo da
+ * NF-e. Quem lê já normaliza, então isto é higiene do dado — o que ele evita é o
+ * mesmo CNPJ aparecer de duas formas diferentes entre a nota e o rodapé da loja.
+ */
+function normalizar(updates: SettingsUpdate): SettingsUpdate {
+  const out: SettingsUpdate = { ...updates }
+
+  if (typeof out.fiscal_state === 'string') out.fiscal_state = out.fiscal_state.trim().toUpperCase()
+  if (typeof out.origin_state === 'string') out.origin_state = out.origin_state.trim().toUpperCase()
+  if (typeof out.cnpj === 'string') out.cnpj = onlyDigits(out.cnpj)
+
+  return out
+}
+
 export async function updateStoreSettings(
   updates: SettingsUpdate
 ): Promise<{ ok: boolean; error?: string }> {
@@ -34,7 +54,7 @@ export async function updateStoreSettings(
     return { ok: false, error: fetchError.message }
   }
 
-  const payload = { ...updates, updated_at: new Date().toISOString() }
+  const payload = { ...normalizar(updates), updated_at: new Date().toISOString() }
 
   if (existing) {
     const { error } = await supabase

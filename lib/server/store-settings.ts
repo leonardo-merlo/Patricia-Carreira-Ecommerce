@@ -8,8 +8,37 @@ export type StoreSettings = {
   contact_email: string | null
   contact_phone: string | null
   logo_url: string | null
+  /** CNPJ canônico da empresa — emitente da NF-e e remetente no Melhor Envio */
   cnpj: string | null
   address_full: string | null
+
+  // Identidade jurídica (uma só: quem emite a nota é quem assina a etiqueta)
+  legal_name: string | null
+  state_registration: string | null
+  cnae: string | null
+  tax_regime: number
+
+  // Endereço fiscal — cartão CNPJ. Vai impresso na nota e define o CFOP.
+  fiscal_street: string | null
+  fiscal_number: string | null
+  fiscal_complement: string | null
+  fiscal_district: string | null
+  fiscal_city: string | null
+  fiscal_state: string | null
+  fiscal_zip: string | null
+
+  // Origem do frete — de onde a mercadoria sai. origin_cep é o CEP deste bloco;
+  // manteve o nome antigo para não quebrar a tela de envio nem a cotação.
+  origin_same_as_fiscal: boolean
+  origin_street: string | null
+  origin_number: string | null
+  origin_complement: string | null
+  origin_district: string | null
+  origin_city: string | null
+  origin_state: string | null
+  origin_contact_name: string | null
+  origin_phone: string | null
+  origin_email: string | null
   origin_cep: string | null
   shipping_extra_days: number
   free_shipping_threshold: number
@@ -47,9 +76,15 @@ export type SettingsUpdate = Partial<Omit<StoreSettings, 'id' | 'updated_at'>>
  * Lido pelo rodapé, ou seja, por toda página da loja. Cacheado por 60s de
  * propósito: com leitura sem cache aqui, nenhuma página consegue ser estática.
  * Quem salva a configuração revalida na hora, então o painel não fica atrasado.
+ *
+ * `fresh` desliga o cache. Usado só pela emissão de NF-e: dado fiscal de 60
+ * segundos atrás pode ser um endereço que acabou de ser corrigido, e nota
+ * emitida errada não tem desfazer.
  */
-export async function getStoreSettings(): Promise<StoreSettings | null> {
-  const supabase = createServiceClient({ revalidateSeconds: 60 })
+export async function getStoreSettings(
+  opts?: { fresh?: boolean }
+): Promise<StoreSettings | null> {
+  const supabase = createServiceClient(opts?.fresh ? undefined : { revalidateSeconds: 60 })
   const { data, error } = await supabase
     .from('store_settings')
     .select('*')

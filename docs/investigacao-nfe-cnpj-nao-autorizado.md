@@ -321,3 +321,156 @@ Búzios/RJ. Antes de emitir de verdade é preciso saber, pelo **cartão CNPJ**, 
 que estado a empresa está inscrita — e alinhar `STORE_IE`, `STORE_CIDADE` e
 `STORE_ESTADO` a esse estado. `STORE_IE` na Vercel segue vazia: preencher o
 painel do Focus não preenche a variável.
+---
+
+## 13. Endereço fiscal separado da origem do frete (31/08/2026)
+
+A pendência levantada no fim da seção 11 — três estados para a mesma empresa —
+não era só um dado errado a corrigir: era **um campo servindo a duas perguntas
+diferentes**. As mesmas sete variáveis `STORE_*` montavam o emitente da NF-e e o
+remetente da etiqueta no Melhor Envio, e `determineCfop()` comparava a UF do
+cliente com `STORE_ESTADO`. Enquanto a empresa e a loja ficavam no mesmo lugar
+isso passou despercebido.
+
+### O que estava acoplado
+
+| Variável | Emitente NF-e | Origem do frete | Cotação | CFOP |
+| --- | --- | --- | --- | --- |
+| `STORE_LOGRADOURO/NUMERO/COMPLEMENTO/BAIRRO` | sim | sim | — | — |
+| `STORE_CIDADE` | sim | sim | — | — |
+| `STORE_ESTADO` | sim | sim | — | sim |
+| `STORE_CEP_ORIGEM` | sim (CEP do emitente) | sim | fallback | — |
+| `STORE_IE` | sim | — | — | — |
+| `STORE_CNPJ` | sim | sim (documento do remetente) | — | — |
+| `STORE_DOCUMENTO` | — | sim (alternativa) | — | — |
+
+O nome `STORE_CEP_ORIGEM` é o resumo do problema: variável batizada para frete,
+usada como CEP fiscal do emitente.
+
+### Um segundo bug, achado no caminho
+
+A cotação do carrinho (`lib/actions/shipping.ts`) lia `store_settings.origin_cep`
+e caía em `STORE_CEP_ORIGEM` só como fallback. A compra da etiqueta
+(`lib/server/label.ts`) lia `STORE_CEP_ORIGEM` direto, sem olhar o
+`store_settings`. **Bastava editar o CEP em /admin/config/envio para o cliente ser
+cotado a partir de um endereço e a coleta ser agendada em outro** — sem erro, sem
+log, sem nada na tela. Não era hipótese: era o estado do código.
+
+### A separação
+
+São três coisas, não duas. A identidade jurídica é uma só — quem emite a nota é
+quem assina a etiqueta —, e era ela que estava duplicada entre `STORE_CNPJ` e
+`STORE_DOCUMENTO`. Migration 045 criou os três blocos em `store_settings`:
+identidade jurídica, endereço fiscal e origem do frete, mais
+`origin_same_as_fiscal`.
+
+Escolha do lugar: **banco, não variável de ambiente novas**. O endereço fiscal é
+dado público do cartão CNPJ e estava na Vercel como *Secret* write-only — foi
+exatamente essa cegueira, descrita na seção 10, que custou dias de investigação.
+E o dado que falta chega em papel: preencher uma tela é uma ação, editar sete
+campos escondidos e redeployar são sete chances de repetir o acidente do
+comentário inline.
+
+### Regras de falha, deliberadamente diferentes
+
+- **Emitente falha fechado.** Sem endereço fiscal completo não sai nota. A
+  mensagem nomeia o campo e a tela, e vai para `orders.nfe_status = 'erro'`.
+  Nenhum fallback para `STORE_*` — fallback silencioso é como a UF errada entrou.
+- **Origem do frete degrada.** Bloco incompleto cai nas variáveis antigas, e a
+  etiqueta continua saindo. Parar de vender é pior que despachar do endereço de
+  ontem. Qual fonte está valendo aparece em `/admin/diagnostico`.
+
+### O que ainda depende do cartão CNPJ
+
+Os campos fiscais foram criados **vazios de propósito**: chutar Porto Seguro/BA
+ali seria gravar o erro que a migration existe para desfazer. Preencher em
+`/admin/config/fiscal` com o cartão CNPJ — CNPJ, razão social, IE do mesmo estado
+do endereço, e o endereço.
+
+O CNPJ ficou de fora do backfill mesmo já estando medido (`38142237000180`), e a
+razão é uma armadilha que só apareceu ao conferir o efeito da migration antes do
+deploy: **o rodapé da loja exibe `store_settings.cnpj` assim que ele existe**, e a
+formatação para exibição só chega com este código. Gravar o número na migration
+teria posto "CNPJ: 38142237000180" cru no ar durante todo o intervalo entre
+migration e deploy. Migration aditiva não é automaticamente inócua: uma coluna que
+alguma tela já lê muda o que está publicado no instante em que recebe valor.
+
+Vale lembrar que **nada disso destrava o 403 da seção 12**. Aquilo é cadastro do
+lado do Focus e continua sendo chamado no suporte. Esta mudança garante que,
+quando a autorização passar, a nota não seja recusada em seguida por UF e IE
+inconsistentes.
+
+### Pergunta que sobe para o contador
+
+Se o endereço fiscal for MG e a mercadoria sair da BA, a NF-e provavelmente
+precisa declarar o **local de retirada** (grupo G do layout NF-e) além do
+emitente — o payload atual não tem esse grupo. Os dois endereços já estão
+separados e disponíveis para preenchê-lo; falta confirmar a obrigatoriedade com o
+contador e os nomes exatos dos campos na doc do Focus. Some-se a isso o efeito do
+CFOP 6102 em toda venda para a Bahia, que hoje sairia como 5102.
+---
+
+## 14. A causa real do 403: o JSON, não a permissão (02/09/2026)
+
+O suporte do Focus respondeu confirmando o que a seção 12 já suspeitava não ser o
+problema: **cadastro correto, NF-e habilitada, certificado válido, e o período de
+teste não bloqueia emissão em homologação.** E pediu o JSON da requisição.
+
+Ao montar o JSON para enviar, a comparação com a referência da API respondeu
+sozinha.
+
+### O erro
+
+A API do Focus recebe **campos planos com sufixo**. Não existe objeto aninhado:
+
+```json
+{ "cnpj_emitente": "38142237000180", "uf_emitente": "MG", ... }
+```
+
+O sistema enviava:
+
+```json
+{ "emitente": { "cnpj": "38142237000180", "uf": "BA", ... } }
+```
+
+Ou seja, **`cnpj_emitente` chegava ausente**. Sem esse campo a API não consegue
+casar a nota com a empresa dona do token, e responde `403 permissao_negada` —
+"CNPJ do emitente não autorizado".
+
+Nunca foi permissão. Era campo faltando, com uma mensagem de erro que apontava
+para o lugar errado, e foi ela que dirigiu toda a investigação das seções 4 a 12
+para o cadastro no painel.
+
+### Por que demorou
+
+Cada verificação da seção 12 dava resultado positivo e reforçava a hipótese
+errada. O 403 (em vez de 401) provava que o token era válido daquele ambiente — e
+essa prova, correta em si, fechava a porta do lado do código: se o token está
+certo e a empresa está cadastrada, o que sobra é cadastro. A pergunta que faltou
+foi mais simples: **os nomes dos campos que estamos enviando existem?** O tipo
+`FocusNfePayload` era escrito à mão em TypeScript, então tipava perfeitamente uma
+estrutura que a API não conhece. Compilava, passava no lint e estava errado.
+
+### O que mudou no código
+
+Além dos nomes, a conferência com a doc revelou outros três problemas no mesmo
+corpo:
+
+| Antes | Agora | Por quê |
+| --- | --- | --- |
+| `emitente: {...}`, `destinatario: {...}` | campos planos `*_emitente`, `*_destinatario` | é o schema da API |
+| `cpf_cnpj` num campo só | `cpf_destinatario` **ou** `cnpj_destinatario` | são campos distintos; CPF em campo de CNPJ é rejeição |
+| `codigo_produto` ausente | SKU da variante (ou `CFOP9999`) | obrigatório por item |
+| `icms_modalidade`, `pis_modalidade`, `cofins_modalidade` | `icms_situacao_tributaria`, `pis_situacao_tributaria`, `cofins_situacao_tributaria` | os nomes antigos não existem no schema |
+| `valor_pagamento: 415.79999999999995` | `valor_total: 415.8` | soma em ponto flutuante; a SEFAZ compara o total com a soma dos itens |
+| sem `valor_produtos` / `valor_total` | ambos calculados dos itens arredondados | a doc lista os dois |
+
+O valor do CSOSN foi mantido em `400` — só o nome do campo mudou. **Se `400` é o
+código certo para esta operação é pergunta para o contador**, não decisão de
+código.
+
+### Lição
+
+Nome de campo de API externa é verificável em trinta segundos e não se deduz de
+um tipo TypeScript escrito à mão. Toda a estrutura estava tipada, compilada e
+errada.

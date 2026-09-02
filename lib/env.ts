@@ -31,8 +31,3 @@ export function readEnvOption(name: string): string {
   return readEnv(name).toLowerCase()
 }
 
-/** Valor numérico; cai no padrão quando a variável está vazia ou não é número. */
-export function readEnvNumber(name: string, fallback: number): number {
-  const parsed = Number(readEnv(name))
-  return Number.isFinite(parsed) ? parsed : fallback
-}

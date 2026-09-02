@@ -8,6 +8,7 @@ import {
   type OrderItemWithProduct,
 } from '@/lib/integrations/focus-nfe'
 import { sendNfeEmail } from '@/lib/integrations/resend'
+import { getEmitente } from '@/lib/server/store-identity'
 import { getStoreSettings } from '@/lib/server/store-settings'
 import type { Customer, NfeStatus, Order } from '@/lib/types'
 
@@ -95,9 +96,16 @@ export async function emitirNfe(orderId: string): Promise<NfeActionResult> {
     .eq('id', orderId)
 
   try {
-    // 7. Montar payload (pode lançar se NCM ausente)
+    // 7. Montar payload (pode lançar se NCM ausente ou dado fiscal incompleto)
+    //
+    // getEmitente() lança nomeando o campo que falta e a tela onde preencher. Ela
+    // é chamada aqui dentro do try de propósito: o catch abaixo grava a mensagem
+    // no pedido, então o Henrique lê "falta Inscrição Estadual" no lugar de um
+    // "CNPJ do emitente não autorizado" que não diz qual dado está errado.
+    const emitente = await getEmitente()
+
     // order.customer is guaranteed non-null — checked at step 4 above
-    const payload = buildNfePayload(order as unknown as Order, order.items, order.customer!)
+    const payload = buildNfePayload(order as unknown as Order, order.items, order.customer!, emitente)
 
     // 8. Chamar a API Focus NFe
     const response: FocusNfeResponse = await emitirNfeFocus(orderId, payload)

@@ -17,6 +17,7 @@ export default async function DiagnosticoPage() {
     diag.missingRequired.length === 0 &&
     diag.services.every((s) => s.ok) &&
     diag.sender.every((f) => f.ok) &&
+    diag.fiscal.every((f) => f.ok) &&
     diag.appUrlIsPublic
 
   return (
@@ -94,10 +95,47 @@ export default async function DiagnosticoPage() {
         </div>
       </div>
 
+      <div className="card" id="diagnostico-emitente" style={{ marginBottom: 16 }}>
+        <div className="card-header">
+          <h2 className="ttl">Emitente da NF-e</h2>
+          <span className="sub">
+            endereço fiscal da empresa — o que sai impresso na nota e decide o CFOP
+          </span>
+        </div>
+        <div className="card-body flush">
+          <div className="table-wrap">
+            <table className="tbl" data-testid="tabela-emitente">
+              <thead>
+                <tr>
+                  <th>Campo</th>
+                  <th>Valor</th>
+                  <th>Exigência</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {diag.fiscal.map((f) => (
+                  <tr key={f.label} data-testid="linha-emitente" data-campo={f.label}>
+                    <td style={{ fontWeight: 600 }}>{f.label}</td>
+                    <td style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11.5 }}>{f.value}</td>
+                    <td style={{ color: 'var(--text-2)' }}>{f.note}</td>
+                    <td>
+                      <span className={`badge ${f.ok ? 'ok' : 'alert'}`}>{f.ok ? 'válido' : 'pendente'}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <div className="card" id="diagnostico-remetente" style={{ marginBottom: 16 }}>
         <div className="card-header">
           <h2 className="ttl">Remetente do frete</h2>
-          <span className="sub">exatamente o que é enviado ao Melhor Envio ao comprar a etiqueta</span>
+          <span className="sub">
+            de onde a mercadoria sai — é outro endereço, e é o que o Melhor Envio coleta
+          </span>
         </div>
         <div className="card-body flush">
           <div className="table-wrap">
