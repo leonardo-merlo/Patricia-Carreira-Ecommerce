@@ -14,7 +14,7 @@ import type {
 import { createWholesaleOrder, previewOrderCheck, type ItemCheckResult } from '@/lib/actions/wholesale'
 import { createPurchaseRequests } from '@/lib/actions/raw-materials'
 import { updateOrderStatus } from '@/lib/actions/orders'
-import { generateShippingLabel, getLabelPrintUrl } from '@/lib/actions/label'
+import { comprarEtiqueta, generateShippingLabel, getLabelPrintUrl } from '@/lib/actions/label'
 import { emitirNfe } from '@/lib/actions/nfe'
 import { CancelarPedidoModal } from '@/components/admin/cancelar-pedido-modal'
 import { cancellationReasonLabel } from '@/lib/cancellation-reasons'
@@ -723,6 +723,39 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                                       </div>
                                     )}
                                   </div>
+                                  {!o.melhor_envio_order_id && o.payment_status === 'paid' && o.status !== 'cancelled' && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                      <button
+                                        className="btn"
+                                        style={{ fontSize: 12, padding: '5px 10px' }}
+                                        id={`btn-comprar-etiqueta-${o.id}`}
+                                        data-testid="btn-comprar-etiqueta"
+                                        disabled={labelLoading === o.id}
+                                        onClick={async () => {
+                                          setLabelLoading(o.id)
+                                          setLabelError((prev) => ({ ...prev, [o.id]: '' }))
+                                          const res = await comprarEtiqueta(o.id)
+                                          setLabelLoading(null)
+                                          if (!res.ok) {
+                                            setLabelError((prev) => ({ ...prev, [o.id]: res.error }))
+                                          } else {
+                                            window.location.reload()
+                                          }
+                                        }}
+                                      >
+                                        <AdminIcon name="truck" size={11} />
+                                        {labelLoading === o.id ? 'Comprando...' : 'Comprar etiqueta'}
+                                      </button>
+                                      {(labelError[o.id] || o.shipping_error) && (
+                                        <div
+                                          data-testid="motivo-erro-etiqueta-card"
+                                          style={{ fontSize: 11, color: 'var(--red)', maxWidth: 320, lineHeight: 1.4 }}
+                                        >
+                                          {labelError[o.id] || o.shipping_error}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                   {o.melhor_envio_order_id && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                       {!o.tracking_code && (
