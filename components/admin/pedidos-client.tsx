@@ -14,7 +14,8 @@ import type {
 import { createWholesaleOrder, previewOrderCheck, type ItemCheckResult } from '@/lib/actions/wholesale'
 import { createPurchaseRequests } from '@/lib/actions/raw-materials'
 import { updateOrderStatus } from '@/lib/actions/orders'
-import { comprarEtiqueta, generateShippingLabel, getLabelPrintUrl } from '@/lib/actions/label'
+import { comprarEtiqueta, cotarEtiqueta, generateShippingLabel, getLabelPrintUrl } from '@/lib/actions/label'
+import type { OpcaoFretePedido } from '@/lib/server/label'
 import { emitirNfe } from '@/lib/actions/nfe'
 import { CancelarPedidoModal } from '@/components/admin/cancelar-pedido-modal'
 import { cancellationReasonLabel } from '@/lib/cancellation-reasons'
@@ -204,6 +205,11 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
   const [isPending, startTransition] = useTransition()
   const [labelLoading, setLabelLoading] = useState<string | null>(null) // order id being processed
   const [labelError, setLabelError] = useState<Record<string, string>>({}) // orderId → error
+  // Transportadoras que atendem o trecho agora. Só aparecem quando a compra
+  // falhou ou quando o Henrique pede — cotar sempre custaria uma chamada ao ME
+  // a cada pedido aberto na tela.
+  const [labelOptions, setLabelOptions] = useState<Record<string, OpcaoFretePedido[]>>({})
+  const [labelQuoting, setLabelQuoting] = useState<string | null>(null)
   const [nfeLoading, setNfeLoading] = useState<string | null>(null) // orderId em processamento
   const [nfeError, setNfeError] = useState<Record<string, string>>({}) // orderId → mensagem de erro
   const [opCreated, setOpCreated] = useState(false)
@@ -738,6 +744,11 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                                           setLabelLoading(null)
                                           if (!res.ok) {
                                             setLabelError((prev) => ({ ...prev, [o.id]: res.error }))
+                                            // A recusa por trecho já volta com quem atende: mostrar
+                                            // na hora poupa o clique de cotar de novo.
+                                            if (res.alternativas) {
+                                              setLabelOptions((prev) => ({ ...prev, [o.id]: res.alternativas! }))
+                                            }
                                           } else {
                                             window.location.reload()
                                           }
@@ -752,6 +763,70 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                                           style={{ fontSize: 11, color: 'var(--red)', maxWidth: 320, lineHeight: 1.4 }}
                                         >
                                           {labelError[o.id] || o.shipping_error}
+                                        </div>
+                                      )}
+                                      {(labelError[o.id] || o.shipping_error) && !labelOptions[o.id] && (
+                                        <button
+                                          className="btn"
+                                          style={{ fontSize: 12, padding: '5px 10px' }}
+                                          id={`btn-trocar-transportadora-${o.id}`}
+                                          data-testid="btn-trocar-transportadora"
+                                          disabled={labelQuoting === o.id || labelLoading === o.id}
+                                          onClick={async () => {
+                                            setLabelQuoting(o.id)
+                                            const res = await cotarEtiqueta(o.id)
+                                            setLabelQuoting(null)
+                                            if (!res.ok) {
+                                              setLabelError((prev) => ({ ...prev, [o.id]: res.error }))
+                                              return
+                                            }
+                                            setLabelOptions((prev) => ({ ...prev, [o.id]: res.opcoes }))
+                                            if (res.opcoes.length === 0) {
+                                              setLabelError((prev) => ({
+                                                ...prev,
+                                                [o.id]: `Nenhuma transportadora atende o trecho ${res.origem} → ${res.destino} hoje. Confira o endereço de origem em Configurações › Envio.`,
+                                              }))
+                                            }
+                                          }}
+                                        >
+                                          <AdminIcon name="truck" size={11} />
+                                          {labelQuoting === o.id ? 'Cotando...' : 'Escolher outra transportadora'}
+                                        </button>
+                                      )}
+                                      {(labelOptions[o.id]?.length ?? 0) > 0 && (
+                                        <div data-testid="opcoes-transportadora" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                          <div className="cust-meta tiny">
+                                            Atendem este trecho — o cliente pagou {formatPrice(o.shipping_amount)} de frete
+                                          </div>
+                                          {labelOptions[o.id].map((opt) => (
+                                            <button
+                                              key={opt.serviceId}
+                                              className="btn"
+                                              data-testid="btn-comprar-etiqueta-servico"
+                                              data-service-id={opt.serviceId}
+                                              style={{ fontSize: 12, padding: '5px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}
+                                              disabled={labelLoading === o.id}
+                                              onClick={async () => {
+                                                setLabelLoading(o.id)
+                                                setLabelError((prev) => ({ ...prev, [o.id]: '' }))
+                                                const res = await comprarEtiqueta(o.id, opt.serviceId)
+                                                setLabelLoading(null)
+                                                if (!res.ok) {
+                                                  setLabelError((prev) => ({ ...prev, [o.id]: res.error }))
+                                                  if (res.alternativas) {
+                                                    setLabelOptions((prev) => ({ ...prev, [o.id]: res.alternativas! }))
+                                                  }
+                                                } else {
+                                                  window.location.reload()
+                                                }
+                                              }}
+                                            >
+                                              <span>{opt.company} {opt.name}</span>
+                                              <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-2)' }}>
+                                                {formatPrice(opt.price)} · {opt.prazoMax} d
+                                              </span>
+                                            </button>
+                                          ))}
                                         </div>
                                       )}
                                     </div>

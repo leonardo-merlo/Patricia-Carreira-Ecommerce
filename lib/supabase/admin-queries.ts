@@ -206,6 +206,8 @@ export type RetailOrderRow = {
   payment_method: string | null
   payment_status: string
   status: string
+  /** frete que o cliente pagou — referência na hora de trocar de transportadora */
+  shipping_amount: number
   tracking_code: string | null
   melhor_envio_order_id: string | null
   nfe_url: string | null
@@ -234,7 +236,7 @@ export async function getRetailOrders(limit = 50): Promise<RetailOrderRow[]> {
   const { data, error } = await supabase
     .from('orders')
     .select(`
-      id, created_at, total_amount, status, payment_status, payment_method, tracking_code, melhor_envio_order_id, nfe_url, nfe_number, nfe_status, nfe_access_key,
+      id, created_at, total_amount, shipping_amount, status, payment_status, payment_method, tracking_code, melhor_envio_order_id, nfe_url, nfe_number, nfe_status, nfe_access_key,
       nfe_error, shipping_error,
       customer_id, cancellation_reason, cancellation_notes,
       buyer_name, buyer_address,
@@ -307,6 +309,7 @@ export async function getRetailOrders(limit = 50): Promise<RetailOrderRow[]> {
       payment_method: o.payment_method as string | null,
       payment_status: (o.payment_status as string) ?? 'pending',
       status: o.status as string,
+      shipping_amount: Number(o.shipping_amount ?? 0),
       tracking_code: (o.tracking_code as string | null) ?? null,
       melhor_envio_order_id: (o.melhor_envio_order_id as string | null) ?? null,
       nfe_url: (o.nfe_url as string | null) ?? null,

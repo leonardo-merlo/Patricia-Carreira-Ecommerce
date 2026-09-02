@@ -516,3 +516,83 @@ Duas perguntas seguem abertas e são do contador, não do sistema: o **local de
 retirada** (grupo G), agora que emitente e origem estão comprovadamente em estados
 diferentes, e o **DIFAL** nas vendas para a Bahia, que passaram todas a ser
 interestaduais.
+
+---
+
+## 16. Rejeição 245 e a etiqueta que parou de sair (02/09/2026, noite)
+
+O pedido de teste V-F66D falhou nas duas pontas ao mesmo tempo, e são dois
+problemas independentes — um é do sistema, o outro não.
+
+### 16.1 Melhor Envio: a transportadora do checkout deixou de atender o trecho
+
+A suspeita registrada era token OAuth expirado. **Não era.** O token responde 200
+na cotação. A mensagem que o pedido guardou já dizia o que era, embaixo do JSON
+cru do Melhor Envio:
+
+```
+erro ao adicionar ao carrinho (500):
+{"error":"Houve um erro ao verificar o valor do pedido: Transportadora não atende este trecho."}
+```
+
+Cotação real feita no sandbox, com as medidas da Bolsa Briana (420 g, 26×8×20):
+
+| Trecho | Correios PAC | Correios SEDEX | Jadlog .Package | Jadlog .Com |
+| --- | --- | --- | --- | --- |
+| Muriaé 36880-078 → Muriaé 36883-221 | não atende | **R$ 14,22** | não atende | não atende |
+| Arraial 45816-000 → Muriaé 36883-221 | R$ 59,66 | R$ 87,19 | **R$ 26,86** | R$ 53,13 |
+
+O pedido guardou `melhor_envio_service_id = 3` — Jadlog `.Package`. E os horários
+fecham a história:
+
+| Quando (UTC) | O quê |
+| --- | --- |
+| 19:27:07 | pedido criado, cotado saindo de **Arraial d'Ajuda/BA**, cliente escolhe Jadlog |
+| 19:32:27 | `store_settings` salvo: origem passa a ser o endereço fiscal, **Muriaé/MG** |
+| depois | compra da etiqueta pede à Jadlog um trecho dentro de Muriaé, que ela não faz |
+
+Não é um acidente da migration: é a forma do problema. **O serviço escolhido no
+checkout é um retrato do momento da compra**, e entre a compra e a etiqueta a
+origem da loja, o preço ou a cobertura da transportadora podem mudar. Quando isso
+acontece o pedido ficava sem saída — o painel só sabia repetir a escolha que já
+tinha falhado.
+
+**O que mudou no código:** a compra da etiqueta, ao ser recusada, refaz a cotação
+para descobrir se a transportadora ainda atende o trecho. Se não atende, a
+mensagem passa a nomear o trecho ("Muriaé/MG → Muriaé/MG") e o painel oferece as
+transportadoras que atendem, com preço e prazo. Escolher uma delas compra a
+etiqueta e atualiza o pedido; `shipping_amount` não muda, porque é o que o
+cliente pagou — a diferença é da loja. Se a transportadora ainda atende, o erro
+original é preservado inteiro, porque aí a causa é outra (saldo, documento,
+dimensão) e reescrever a mensagem esconderia a causa real.
+
+### 16.2 NF-e: o que está provado e o que falta
+
+```
+Rejeicao: CNPJ [38142237000180] do emitente nao cadastrado na Receita Federal
+```
+
+Tudo que é do sistema foi conferido e está de pé:
+
+| Verificação | Resultado |
+| --- | --- |
+| Dígitos verificadores do CNPJ | conferem |
+| Situação cadastral (consulta pública) | **Ativa** — matriz, Muriaé/MG, CEP 36880078 |
+| Regime | Simples Nacional desde 01/01/2026; MEI encerrado em 31/12/2020 |
+| Dígitos verificadores da IE 0042608620043 | conferem pelo algoritmo de MG |
+| Corpo da NF-e | campos planos, `uf_emitente = MG`, totais fechando |
+| Certificado A1 e token | **funcionando** |
+
+A última linha é a mais importante e é dedução, não suposição: **a resposta veio
+da SEFAZ**. Para chegar lá, a Focus precisou aceitar o corpo, assinar o XML com o
+certificado A1 e transmitir. Se o token estivesse errado a resposta seria 401; se
+o CNPJ não estivesse autorizado na Focus, 403; se o corpo estivesse malformado,
+erro de validação. Nada disso aconteceu.
+
+Sobra o que o sistema não alcança: **a empresa ainda não está credenciada para
+emitir NF-e na SEFAZ-MG**. O credenciamento é feito no SIARE e é separado por
+ambiente — homologação e produção são dois. Empresa que nunca emitiu nota cai
+exatamente aqui, e a redação da rejeição ("não cadastrado na Receita Federal")
+aponta para o lugar errado.
+
+Enquanto isso não for feito, nenhuma alteração de código muda a resposta.
