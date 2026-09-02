@@ -125,16 +125,25 @@ export async function updateOrderStatus(
         getStoreSettings().catch(() => null),
         supabase
           .from('orders')
-          .select('tracking_code, shipping_method, customer:customers(name, email)')
+          .select('tracking_code, shipping_method, buyer_name, buyer_email, customer:customers(name, email)')
           .eq('id', orderId)
           .maybeSingle(),
       ])
 
       type CustomerRow = { name: string; email: string | null }
       const order = orderResult.data
-      const customer = (
+      const cadastro = (
         Array.isArray(order?.customer) ? order?.customer[0] : order?.customer
       ) as CustomerRow | null | undefined
+
+      // Congelados no pedido: o e-mail de rastreio vai para quem comprou, com o
+      // nome que essa pessoa usou na compra.
+      const customer: CustomerRow | null = cadastro
+        ? {
+            name: (order?.buyer_name as string | null) ?? cadastro.name,
+            email: (order?.buyer_email as string | null) ?? cadastro.email,
+          }
+        : null
 
       if (customer?.email) {
         if (status === 'shipped' && (settings === null || settings.notif_order_shipped)) {

@@ -351,10 +351,28 @@ orders (
   coupon_id       uuid REFERENCES coupons(id),
   nfe_number      text,                       -- número da NF-e emitida
   nfe_url         text,                       -- URL do DANFE para download
+  nfe_error       text,                       -- POR QUE a emissão falhou; null quando autorizada
+  shipping_error  text,                       -- POR QUE a etiqueta não foi comprada
+  -- Comprador CONGELADO no momento da compra (migration 046). Imutável.
+  buyer_name      text,
+  buyer_email     text,
+  buyer_phone     text,
+  buyer_cpf_cnpj  text,
+  buyer_address   jsonb,
   notes           text,
   created_at      timestamptz DEFAULT now(),
   updated_at      timestamptz DEFAULT now()
 )
+
+-- ⚠️ O pedido guarda o COMPRADOR, não só um ponteiro para customers.
+-- O checkout atualiza customers a cada compra (a pessoa muda de endereço, corrige
+-- o CPF), então ler o nome pelo join reescrevia o histórico: renomear o cadastro
+-- mudava o nome de todos os pedidos antigos daquela pessoa — inclusive os que já
+-- tinham NF-e emitida com o nome anterior. É a mesma regra do preço em
+-- order_items, aplicada a quem comprou.
+--
+-- Toda leitura faz `buyer_* ?? customer.*`: o cadastro é a rede para os pedidos
+-- anteriores à migration 046. NF-e, etiqueta, e-mails e painel já seguem isso.
 
 order_items (
   id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -640,6 +658,8 @@ Henrique ou sistema cancela pedido pago
 | 13  | Peso e dimensões do produto são obrigatórios para calcular frete — bloquear publicação sem eles |
 | 14  | Endereço fiscal incompleto BLOQUEIA a emissão da NF-e. Nunca emitir com endereço parcial ou com fallback |
 | 15  | CFOP sai da UF do endereço FISCAL contra a UF do cliente — nunca da UF de origem do frete |
+| 16  | Nome, CPF e endereço do pedido são snapshot imutável. Ler sempre `orders.buyer_*`, nunca o join com `customers` |
+| 17  | Falha de NF-e ou de etiqueta grava o motivo em `nfe_error`/`shipping_error`. Status de erro sem mensagem é bug |
 
 ---
 

@@ -624,6 +624,14 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                                 ⚠ Sem etiqueta
                               </div>
                             )}
+                            {o.shipping_error && (
+                              <div
+                                data-testid="motivo-erro-etiqueta"
+                                style={{ marginTop: 4, fontSize: 10.5, color: 'var(--red)', maxWidth: 260, lineHeight: 1.4 }}
+                              >
+                                {o.shipping_error}
+                              </div>
+                            )}
                           </td>
                         </tr>
                         {isExpanded && (
@@ -706,8 +714,13 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                                         {nfeLoading === o.id ? 'Emitindo...' : o.nfe_status === 'erro' ? 'Tentar novamente' : 'Emitir NF-e'}
                                       </button>
                                     )}
-                                    {nfeError[o.id] && (
-                                      <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>{nfeError[o.id]}</div>
+                                    {(nfeError[o.id] || o.nfe_error) && (
+                                      <div
+                                        data-testid="motivo-erro-nfe"
+                                        style={{ fontSize: 11, color: 'var(--red)', marginTop: 4, maxWidth: 320, lineHeight: 1.4 }}
+                                      >
+                                        {nfeError[o.id] || o.nfe_error}
+                                      </div>
                                     )}
                                   </div>
                                   {o.melhor_envio_order_id && (

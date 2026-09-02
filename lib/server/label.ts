@@ -47,6 +47,7 @@ async function fetchOrderForLabel(orderId: string) {
     .from('orders')
     .select(`
       id, total_amount, melhor_envio_service_id,
+      buyer_name, buyer_email, buyer_phone, buyer_cpf_cnpj, buyer_address,
       customer:customers(name, email, phone, cpf_cnpj, address),
       items:order_items(quantity, unit_price, product_name, product_variant_id)
     `)
@@ -125,11 +126,17 @@ export async function purchaseShippingLabel(orderId: string): Promise<void> {
   const customerRaw = (Array.isArray(rawOrder.customer) ? rawOrder.customer[0] : rawOrder.customer) as CustomerRaw | null
   if (!customerRaw) throw new Error('Cliente não encontrado')
 
-  const customerAddress = customerRaw.address as {
+  // O destino da etiqueta é o endereço congelado no pedido, não o cadastro atual
+  // do cliente: quem mudou de casa depois da compra não pode fazer o pacote deste
+  // pedido mudar de rota. Pedidos anteriores ao snapshot caem no cadastro.
+  type EnderecoRaw = {
     street: string; number: string; complement: string | null
     neighborhood: string; city: string; state: string; zip: string
   } | null
-  if (!customerAddress) throw new Error('Endereço do cliente não cadastrado')
+
+  const customerAddress =
+    (rawOrder.buyer_address as EnderecoRaw) ?? (customerRaw.address as EnderecoRaw)
+  if (!customerAddress) throw new Error('Pedido sem endereço de entrega')
 
   const orderItems = rawOrder.items as unknown as OrderItemForShipping[]
   const { products, volumes } = await buildCartPayload(orderItems)
@@ -137,10 +144,10 @@ export async function purchaseShippingLabel(orderId: string): Promise<void> {
   if (products.length === 0) throw new Error('Nenhum produto com dimensões para gerar etiqueta')
 
   const to: MEAddress = {
-    name: customerRaw.name,
-    phone: onlyDigits(customerRaw.phone),
-    email: customerRaw.email ?? '',
-    ...meDocumentFields(customerRaw.cpf_cnpj),
+    name: (rawOrder.buyer_name as string | null) ?? customerRaw.name,
+    phone: onlyDigits((rawOrder.buyer_phone as string | null) ?? customerRaw.phone),
+    email: ((rawOrder.buyer_email as string | null) ?? customerRaw.email) ?? '',
+    ...meDocumentFields((rawOrder.buyer_cpf_cnpj as string | null) ?? customerRaw.cpf_cnpj),
     address: customerAddress.street,
     number: customerAddress.number,
     complement: customerAddress.complement ?? '',

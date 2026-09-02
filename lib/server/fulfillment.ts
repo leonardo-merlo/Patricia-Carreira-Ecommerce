@@ -71,8 +71,13 @@ export async function fulfillPaidOrder(orderId: string): Promise<FulfillResult> 
 
   try {
     await purchaseShippingLabel(orderId)
+    await supabase.from('orders').update({ shipping_error: null }).eq('id', orderId)
   } catch (err) {
-    console.error('[fulfillPaidOrder] erro ao comprar etiqueta ME:', err)
+    const message = err instanceof Error ? err.message : 'Erro desconhecido ao comprar etiqueta'
+    console.error('[fulfillPaidOrder] erro ao comprar etiqueta ME:', message)
+    // Sem isto o painel mostrava "Sem etiqueta" e nada mais: nem o Henrique nem
+    // eu conseguíamos saber se foi token expirado, endereço recusado ou saldo.
+    await supabase.from('orders').update({ shipping_error: message }).eq('id', orderId)
   }
 
   if (settings === null || settings.auto_nfe_retail) {

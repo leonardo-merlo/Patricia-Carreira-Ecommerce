@@ -127,7 +127,7 @@ export async function getAdminNotifications(): Promise<AdminNotification[]> {
     wantOrders
       ? supabase
           .from('orders')
-          .select('id, type, total_amount, created_at, customer:customers(name)')
+          .select('id, type, total_amount, created_at, buyer_name, customer:customers(name)')
           .gte('created_at', `${addDays(today, -NEW_ORDER_WINDOW_DAYS)}T00:00:00Z`)
           .order('created_at', { ascending: false })
           .limit(50)
@@ -174,6 +174,7 @@ export async function getAdminNotifications(): Promise<AdminNotification[]> {
   // ── Pedidos novos ─────────────────────────────────────────────────────────
   type OrderRaw = {
     id: string; type: string; total_amount: number; created_at: string
+    buyer_name: string | null
     customer: { name: string } | { name: string }[] | null
   }
   for (const o of ((ordersRes.data ?? []) as unknown as OrderRaw[])) {
@@ -183,7 +184,7 @@ export async function getAdminNotifications(): Promise<AdminNotification[]> {
       kind: 'new_order',
       refId: o.id,
       title: `Novo pedido ${o.type === 'wholesale' ? 'atacado' : 'varejo'} ${o.type === 'wholesale' ? 'A' : 'V'}-${shortId}`,
-      detail: `${customer?.name ?? 'Cliente'} · ${formatBrl(Number(o.total_amount))}`,
+      detail: `${(o.buyer_name as string | null) ?? customer?.name ?? 'Cliente'} · ${formatBrl(Number(o.total_amount))}`,
       href: '/admin/pedidos',
       at: o.created_at,
       urgent: false,

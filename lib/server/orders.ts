@@ -46,6 +46,37 @@ type SaveOrderInput = {
   paymentStatus?: 'pending' | 'failed'
 }
 
+/**
+ * Espelha nome, CPF e telefone no perfil da conta.
+ *
+ * `customers` e `user_profiles` guardam os mesmos tres campos, e ate aqui a
+ * sincronia so ia num sentido: editar em /conta atualizava o checkout, mas
+ * comprar com outro nome nao atualizava /conta. O resultado era a mesma pessoa
+ * aparecendo com um nome no painel do admin e outro na propria conta.
+ *
+ * Falha aqui nao derruba a compra: o pedido ja esta gravado com o dado certo, e
+ * perder a venda por causa de um espelho e troca ruim.
+ */
+async function espelharNoPerfil(
+  supabase: ReturnType<typeof createServiceClient>,
+  userId: string,
+  formData: OrderFormData
+): Promise<void> {
+  const nome = formData.name.trim()
+  if (!nome) return
+
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({
+      name: nome,
+      cpf: formData.cpf || null,
+      phone: formData.phone || null,
+    })
+    .eq('id', userId)
+
+  if (error) console.error('[saveOrder] espelho no perfil falhou:', error.message)
+}
+
 export async function saveOrder(
   input: SaveOrderInput
 ): Promise<{ ok: true; orderId: string } | { ok: false; error: string }> {
@@ -94,6 +125,8 @@ export async function saveOrder(
       }
       customerId = created.id
     }
+
+    await espelharNoPerfil(supabase, input.userId, input.formData)
   } else {
     // Convidado: procura por email sem exigir que o cadastro seja de convidado.
     // Antes filtrava por user_id IS NULL, então quem já tinha conta e comprava
@@ -155,6 +188,15 @@ export async function saveOrder(
     .from('orders')
     .insert({
       customer_id: customerId,
+      // Comprador congelado. customers.name muda a cada checkout — quem renomeia
+      // o cadastro reescrevia o nome de todos os pedidos antigos, inclusive os
+      // que ja tinham nota emitida com o nome anterior. Mesmo principio do preco
+      // em order_items: o pedido guarda o que valia no momento da compra.
+      buyer_name: input.formData.name,
+      buyer_email: input.formData.email || null,
+      buyer_phone: input.formData.phone || null,
+      buyer_cpf_cnpj: input.formData.cpf || null,
+      buyer_address: input.formData.address,
       type: 'retail',
       status: paymentStatus === 'failed' ? 'cancelled' : 'pending',
       total_amount: input.totalAmount,

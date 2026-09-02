@@ -106,7 +106,7 @@ export async function getDashboardRecentOrders(limit = 7): Promise<DashboardOrde
 
   const { data, error } = await supabase
     .from('orders')
-    .select('id, created_at, type, total_amount, status, customer:customers(name)')
+    .select('id, created_at, type, total_amount, status, buyer_name, customer:customers(name)')
     .order('created_at', { ascending: false })
     .limit(limit)
 
@@ -121,7 +121,12 @@ export async function getDashboardRecentOrders(limit = 7): Promise<DashboardOrde
       id: o.id as string,
       date: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`,
       time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
-      customer_name: (o.customer as unknown as { name: string } | null)?.name ?? 'Cliente',
+      // buyer_name primeiro: é o nome de quem comprou naquele dia. O cadastro do
+      // cliente muda a cada checkout e reescreveria o histórico.
+      customer_name:
+        (o.buyer_name as string | null) ??
+        (o.customer as unknown as { name: string } | null)?.name ??
+        'Cliente',
       type: (o.type as string) === 'retail' ? 'Varejo' : 'Atacado',
       total: Number(o.total_amount),
       status: o.status as string,
@@ -207,6 +212,10 @@ export type RetailOrderRow = {
   nfe_number: string | null
   nfe_status: string
   nfe_access_key: string | null
+  /** por que a NF-e falhou — mostrado no card do pedido; null quando não falhou */
+  nfe_error: string | null
+  /** por que a etiqueta não foi comprada */
+  shipping_error: string | null
   items: RetailOrderItemRow[]
   address: {
     street: string
@@ -226,7 +235,9 @@ export async function getRetailOrders(limit = 50): Promise<RetailOrderRow[]> {
     .from('orders')
     .select(`
       id, created_at, total_amount, status, payment_status, payment_method, tracking_code, melhor_envio_order_id, nfe_url, nfe_number, nfe_status, nfe_access_key,
+      nfe_error, shipping_error,
       customer_id, cancellation_reason, cancellation_notes,
+      buyer_name, buyer_address,
       customer:customers(name, address),
       items:order_items(
         id, quantity, unit_price,
@@ -251,7 +262,9 @@ export async function getRetailOrders(limit = 50): Promise<RetailOrderRow[]> {
 
     type CustomerRaw = { name: string; address: Record<string, string> | null } | null
     const customer = o.customer as unknown as CustomerRaw
-    const address = customer?.address as RetailOrderRow['address'] | null
+    // Congelados no pedido; o cadastro é só a rede para pedidos antigos.
+    const address =
+      ((o.buyer_address ?? customer?.address) as RetailOrderRow['address'] | null) ?? null
 
     type ItemVariant = {
       sku: string; size: string | null; color: string | null
@@ -285,7 +298,7 @@ export async function getRetailOrders(limit = 50): Promise<RetailOrderRow[]> {
       time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
       created_at: o.created_at as string,
       customer_id: (o.customer_id as string | null) ?? null,
-      customer_name: customer?.name ?? 'Cliente',
+      customer_name: (o.buyer_name as string | null) ?? customer?.name ?? 'Cliente',
       customer_location: location,
       cancellation_reason: (o.cancellation_reason as string | null) ?? null,
       cancellation_notes: (o.cancellation_notes as string | null) ?? null,
@@ -300,6 +313,8 @@ export async function getRetailOrders(limit = 50): Promise<RetailOrderRow[]> {
       nfe_number: (o.nfe_number as string | null) ?? null,
       nfe_status: (o.nfe_status as string) ?? 'pending',
       nfe_access_key: (o.nfe_access_key as string | null) ?? null,
+      nfe_error: (o.nfe_error as string | null) ?? null,
+      shipping_error: (o.shipping_error as string | null) ?? null,
       items,
       address,
     }
@@ -668,7 +683,7 @@ export async function getProductionOrders(limit = 50): Promise<ProductionOrderRo
       id, order_id, product_variant_id, quantity_requested, quantity_produced,
       materials_sufficient, missing_materials, material_checks,
       status, notes, created_by, created_at,
-      order:orders(customer:customers(name)),
+      order:orders(buyer_name, customer:customers(name)),
       variant:product_variants(sku, size, color, product:products(name))
     `)
     .not('status', 'eq', 'cancelled')
@@ -692,7 +707,7 @@ export async function getProductionOrders(limit = 50): Promise<ProductionOrderRo
     missing_materials: MissingMaterialEntry[] | null
     material_checks: Record<string, boolean> | null
     status: string; notes: string | null; created_by: string; created_at: string
-    order: { customer: { name: string } | null } | null
+    order: { buyer_name: string | null; customer: { name: string } | null } | null
     variant: VariantRaw
   }
 
@@ -733,7 +748,7 @@ export async function getProductionOrders(limit = 50): Promise<ProductionOrderRo
     return {
       id: o.id,
       order_id: o.order_id,
-      customer_name: o.order?.customer?.name ?? null,
+      customer_name: o.order?.buyer_name ?? o.order?.customer?.name ?? null,
       product_variant_id: o.product_variant_id,
       variant_sku: v?.sku ?? null,
       variant_label: variantLabel,
@@ -788,6 +803,7 @@ export async function getWholesaleOrders(limit = 50): Promise<WholesaleOrderRow[
     .select(`
       id, created_at, total_amount, status, payment_status, nfe_status, notes,
       customer_id, cancellation_reason, cancellation_notes,
+      buyer_name, buyer_cpf_cnpj,
       customer:customers(name, cpf_cnpj),
       items:order_items(
         id, quantity, unit_price,
@@ -817,6 +833,7 @@ export async function getWholesaleOrders(limit = 50): Promise<WholesaleOrderRow[
     status: string; payment_status: string | null; nfe_status: string | null; notes: string | null
     customer_id: string | null
     cancellation_reason: string | null; cancellation_notes: string | null
+    buyer_name: string | null; buyer_cpf_cnpj: string | null
     customer: { name: string; cpf_cnpj: string | null } | null
     items: ItemRaw[]
   }
@@ -844,8 +861,8 @@ export async function getWholesaleOrders(limit = 50): Promise<WholesaleOrderRow[
       display_num: `A-${shortId}`,
       date: dateStr,
       customer_id: o.customer_id ?? null,
-      customer_name: o.customer?.name ?? '—',
-      customer_cnpj: o.customer?.cpf_cnpj ?? null,
+      customer_name: o.buyer_name ?? o.customer?.name ?? '—',
+      customer_cnpj: o.buyer_cpf_cnpj ?? o.customer?.cpf_cnpj ?? null,
       cancellation_reason: o.cancellation_reason ?? null,
       cancellation_notes: o.cancellation_notes ?? null,
       item_count: items.length,

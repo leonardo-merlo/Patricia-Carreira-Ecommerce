@@ -73,8 +73,8 @@ export async function emitirNfe(orderId: string): Promise<NfeActionResult> {
   if (!order.customer) {
     return { success: false, error: 'Pedido sem cliente vinculado — impossível emitir NF-e' }
   }
-  if (!order.customer.address) {
-    return { success: false, error: 'Cliente sem endereço cadastrado — impossível emitir NF-e' }
+  if (!order.buyer_address && !order.customer.address) {
+    return { success: false, error: 'Pedido sem endereço de entrega — impossível emitir NF-e' }
   }
 
   // 5. Validar itens carregados
@@ -104,8 +104,19 @@ export async function emitirNfe(orderId: string): Promise<NfeActionResult> {
     // "CNPJ do emitente não autorizado" que não diz qual dado está errado.
     const emitente = await getEmitente()
 
-    // order.customer is guaranteed non-null — checked at step 4 above
-    const payload = buildNfePayload(order as unknown as Order, order.items, order.customer!, emitente)
+    // O comprador vem do pedido, não do cadastro atual: a nota tem que sair com
+    // o nome, o CPF e o endereço que valiam quando a compra foi feita. Pedidos
+    // anteriores ao snapshot caem no cadastro, que é o que existe para eles.
+    const comprador: Customer = {
+      ...order.customer!,
+      name: order.buyer_name ?? order.customer!.name,
+      email: order.buyer_email ?? order.customer!.email,
+      phone: order.buyer_phone ?? order.customer!.phone,
+      cpf_cnpj: order.buyer_cpf_cnpj ?? order.customer!.cpf_cnpj,
+      address: order.buyer_address ?? order.customer!.address,
+    }
+
+    const payload = buildNfePayload(order as unknown as Order, order.items, comprador, emitente)
 
     // 8. Chamar a API Focus NFe
     const response: FocusNfeResponse = await emitirNfeFocus(orderId, payload)
@@ -120,6 +131,7 @@ export async function emitirNfe(orderId: string): Promise<NfeActionResult> {
           nfe_number: response.numero,
           nfe_url: response.caminho_danfe,
           nfe_access_key: response.chave_nfe,
+          nfe_error: null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', orderId)
@@ -127,13 +139,17 @@ export async function emitirNfe(orderId: string): Promise<NfeActionResult> {
       // 9b. Resposta assíncrona normal — webhook vai atualizar
       await supabase
         .from('orders')
-        .update({ nfe_status: 'processando', updated_at: new Date().toISOString() })
+        .update({ nfe_status: 'processando', nfe_error: null, updated_at: new Date().toISOString() })
         .eq('id', orderId)
     } else {
       // 9c. Denegado ou erro direto na chamada
       await supabase
         .from('orders')
-        .update({ nfe_status: 'erro', updated_at: new Date().toISOString() })
+        .update({
+          nfe_status: mappedStatus,
+          nfe_error: response.mensagem_sefaz ?? `A Focus respondeu status "${response.status}" sem mensagem.`,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', orderId)
     }
 
@@ -142,9 +158,12 @@ export async function emitirNfe(orderId: string): Promise<NfeActionResult> {
     const message = err instanceof Error ? err.message : 'Erro desconhecido ao emitir NF-e'
     console.error('[emitirNfe] Erro ao emitir NF-e para pedido', orderId, ':', message)
 
+    // A mensagem vai para o pedido, não só para o log. Ela nomeia o campo fiscal
+    // que falta ou repete o que a Focus respondeu — jogar fora essa frase deixava
+    // a tela mostrando "erro" sem que ninguém pudesse descobrir o motivo.
     await supabase
       .from('orders')
-      .update({ nfe_status: 'erro', updated_at: new Date().toISOString() })
+      .update({ nfe_status: 'erro', nfe_error: message, updated_at: new Date().toISOString() })
       .eq('id', orderId)
 
     return { success: false, error: message }
@@ -228,6 +247,10 @@ export async function atualizarStatusNfe(
     updateFields['nfe_number'] = data.numero
     updateFields['nfe_url'] = data.caminho_danfe
     updateFields['nfe_access_key'] = data.chave_nfe
+    updateFields['nfe_error'] = null
+  } else if (mappedStatus === 'erro' || mappedStatus === 'denegado') {
+    updateFields['nfe_error'] =
+      data.mensagem_sefaz ?? `A SEFAZ recusou com status "${data.status}" e sem mensagem.`
   }
 
   // 2. Persistir no banco
@@ -246,7 +269,7 @@ export async function atualizarStatusNfe(
     try {
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
-        .select('id, customer:customers(name, email)')
+        .select('id, buyer_name, buyer_email, customer:customers(name, email)')
         .eq('id', ref)
         .single()
 
@@ -255,11 +278,17 @@ export async function atualizarStatusNfe(
         return
       }
 
-      type OrderWithCustomer = { id: string; customer: { name: string; email: string | null } | null }
+      type OrderWithCustomer = {
+        id: string
+        buyer_name: string | null
+        buyer_email: string | null
+        customer: { name: string; email: string | null } | null
+      }
       const typedOrder = orderData as unknown as OrderWithCustomer
 
-      const customerEmail = typedOrder.customer?.email
-      const customerName = typedOrder.customer?.name ?? 'Cliente'
+      // A DANFE vai para quem comprou, não para o e-mail atual do cadastro.
+      const customerEmail = typedOrder.buyer_email ?? typedOrder.customer?.email
+      const customerName = typedOrder.buyer_name ?? typedOrder.customer?.name ?? 'Cliente'
       const danfeUrl = data.caminho_danfe
 
       const nfeSettings = await getStoreSettings().catch(() => null)

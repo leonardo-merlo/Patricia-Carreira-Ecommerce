@@ -308,6 +308,21 @@ export type Order = {
   nfe_url: string | null; // URL do DANFE para download
   nfe_status: NfeStatus; // status de processamento da NF-e
   nfe_access_key: string | null; // chave de acesso da NF-e
+  /** por que a última emissão falhou — texto para pessoa ler; null quando autorizada */
+  nfe_error: string | null;
+  /** por que a compra da etiqueta falhou; null quando deu certo */
+  shipping_error: string | null;
+
+  // Comprador congelado no momento da compra — imutável.
+  // customers.* muda a cada checkout, e seguir aquele cadastro reescrevia o nome
+  // de pedidos antigos, inclusive os que já tinham nota emitida com o nome
+  // anterior. Mesma regra do preço em order_items.
+  buyer_name: string | null;
+  buyer_email: string | null;
+  buyer_phone: string | null;
+  buyer_cpf_cnpj: string | null;
+  buyer_address: CustomerAddress | null;
+
   notes: string | null;
   created_at: string;
   updated_at: string;
