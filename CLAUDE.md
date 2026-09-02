@@ -534,8 +534,15 @@ arquivo lê `STORE_*` para montar endereço.
 
 `origin_same_as_fiscal` ligado faz a origem acompanhar o endereço fiscal — um
 endereço só para manter. Ele existe para impedir a falha por omissão: corrigir o
-fiscal e esquecer o de frete. Para esta loja ele está **desligado**, porque já se
-sabe que os dois diferem.
+fiscal e esquecer o de frete. Para esta loja ele está **ligado**: a mercadoria sai
+de Muriaé, o mesmo endereço da empresa. A loja de Arraial d'Ajuda não despacha.
+
+> ⚠️ **Despachar de dois lugares não é configuração, é funcionalidade.** O frete é
+> cotado no carrinho, antes de existir pedido, então o sistema precisaria saber ali
+> de onde cada peça sai — e `product_variants.stock_quantity` é um número só, sem
+> local. Um pedido com peças de dois lugares vira duas entregas, dois fretes e duas
+> etiquetas, com um preço só na tela do cliente; e a NF-e declara um local de
+> retirada, não dois. Exige estoque por local antes de qualquer coisa.
 
 **As variáveis `STORE_*` viraram rede de segurança.** Não alimentam mais a NF-e.
 Podem sair da Vercel quando `/admin/diagnostico` mostrar "Fonte do endereço:
@@ -812,7 +819,7 @@ Para que o OpenClaw funcione de forma confiável, o painel admin deve:
 | Portal atacado           | ✅ Tudo via admin | Sem portal próprio para atacadistas      |
 | Pedido mínimo atacado    | ❓ Pendente       | Alinhar com Henrique                     |
 | Endereço fiscal (cartão CNPJ) | ✅ Preenchido | Rua Desembargador Canedo, 215 B — Centro, **Muriaé/MG**, 36880-078. CNPJ 38.142.237/0001-80, IE 0042608620043 (13 dígitos, formato MG — bate com a UF), razão social H M T CARREIRA MODAS. A origem do frete continua em Arraial d'Ajuda/BA |
-| Local de retirada na NF-e | ⚠️ Pendente | Confirmado que se aplica: emitente em Muriaé/MG e mercadoria saindo de Arraial d'Ajuda/BA. A nota provavelmente precisa declarar o local de retirada (grupo G do layout) — o payload ainda não monta esse grupo. Confirmar com o contador antes da primeira nota real |
+| Local de retirada na NF-e | ✅ Não se aplica | O Henrique confirmou que a mercadoria sai de Muriaé, o mesmo endereço fiscal. `origin_same_as_fiscal` ligado, e o bloco de origem antigo (Arraial) limpo. Nota e frete saem do mesmo lugar, então não há local de retirada a declarar. Se um dia passar a sair de dois lugares, ver a nota abaixo |
 | DIFAL nas vendas interestaduais | ❓ Pendente | Com o emitente em MG, toda venda para a BA virou 6102. Empresa do Simples Nacional em tese não recolhe DIFAL como remetente, mas é confirmação do contador, não do sistema |
 | Melhor Envio produção    | ⚠️ Sandbox ativo  | Ao migrar para a conta real: trocar `MELHOR_ENVIO_TOKEN`/`MELHOR_ENVIO_BASE_URL` e recadastrar a URL do webhook `/api/webhooks/shipping?token=<MELHOR_ENVIO_WEBHOOK_SECRET>` no painel ME de produção (config do sandbox não migra) |
 | Notificações WhatsApp    | ❓ Pendente       | Fase 2 — Z-API ou Evolution API          |
