@@ -127,15 +127,24 @@ export function SidebarPopover({
     </div>
   )
 
-  // Portal para o body, e não render no lugar onde o componente é chamado.
+  // Portal para o `.admin-root`, e não para o lugar onde o componente é chamado.
   //
-  // `.sidebar` é `position: sticky`, e sticky cria um contexto de empilhamento
-  // SEMPRE, com ou sem z-index. Dentro dele, o `z-index: 60` do cartão só valia
-  // contra os irmãos da própria barra: a barra inteira entrava na página com
-  // z-index automático, e qualquer coisa do conteúdo desenhada depois passava
-  // por cima. Era o card de "Vencidas" do dashboard cobrindo as notificações.
+  // Por que sair do lugar: `.sidebar` é `position: sticky`, e sticky cria um
+  // contexto de empilhamento SEMPRE, com ou sem z-index. Dentro dele, o
+  // `z-index: 60` do cartão só valia contra os irmãos da própria barra; a barra
+  // inteira entrava na página com z-index automático, então qualquer conteúdo
+  // desenhado depois passava por cima. Era o card de "Vencidas" do dashboard
+  // cobrindo as notificações.
   //
-  // No body o cartão volta a disputar no contexto raiz: acima da topbar (10) e
-  // abaixo dos modais (100), como o CSS sempre pretendeu.
-  return createPortal(card, document.body)
+  // Por que `.admin-root` e não o `body`: todo o CSS do painel é escopado em
+  // `.admin-root .alguma-coisa`. No body o cartão sai desse escopo e perde o
+  // estilo inteiro de uma vez, virando texto solto no fim da página. Já
+  // `.admin-root` é só `display: grid`, sem position, transform ou filter, então
+  // não cria contexto de empilhamento: serve de destino sem recriar o problema.
+  const host =
+    document.getElementById(labelledBy)?.closest('.admin-root') ??
+    document.querySelector('.admin-root') ??
+    document.body
+
+  return createPortal(card, host)
 }
