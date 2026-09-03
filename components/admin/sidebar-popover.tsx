@@ -6,13 +6,15 @@ const GAP = 8
 const EDGE = 12
 
 /**
- * Cartão ancorado ao item que o abriu: nasce à direita da barra lateral, com a
- * base na mesma linha do botão, e cresce para cima.
+ * Cartão do rodapé da barra lateral. Duas ancoragens, escolhidas por tela:
  *
- * A posição é medida do botão real (via `labelledBy`, que já é o id dele) em vez
- * de fixada no canto da tela. Antes era `left: 12px; bottom: 12px`, então o
- * cartão de Configurações abria no rodapé esquerdo, longe do botão, e tapava
- * Diagnóstico e Notificações.
+ * `anchor="button"` (Configurações) mede o botão real via `labelledBy`, que já é
+ * o id dele, e nasce à direita da barra com a base na linha do botão. Antes era
+ * canto fixo, e o cartão abria longe do que o chamou.
+ *
+ * `anchor="corner"` (Notificações) fica no canto inferior esquerdo. A lista é
+ * longa e tem abas: encostada no canto ela tem altura inteira e não fica
+ * pendurada no meio da tela.
  *
  * Fecha ao clicar fora, ao apertar Escape e ao escolher um item.
  */
@@ -20,11 +22,13 @@ export function SidebarPopover({
   open,
   onClose,
   labelledBy,
+  anchor = 'button',
   children,
 }: {
   open: boolean
   onClose: () => void
   labelledBy: string
+  anchor?: 'button' | 'corner'
   children: React.ReactNode
 }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -56,7 +60,7 @@ export function SidebarPopover({
   // Layout effect para a medição acontecer antes da pintura: com useEffect o
   // cartão aparecia um quadro no canto errado e pulava para o lugar.
   useLayoutEffect(() => {
-    if (!open) {
+    if (!open || anchor === 'corner') {
       setPos(null)
       return
     }
@@ -94,7 +98,7 @@ export function SidebarPopover({
       window.removeEventListener('resize', place)
       window.removeEventListener('scroll', place, true)
     }
-  }, [open, labelledBy])
+  }, [open, labelledBy, anchor])
 
   if (!open) return null
 
@@ -106,11 +110,13 @@ export function SidebarPopover({
       aria-labelledby={labelledBy}
       data-testid="sidebar-popover"
       style={
-        pos
-          ? { left: pos.left, bottom: pos.bottom }
-          : // Primeiro quadro, antes da medição: existe para ter tamanho, mas
-            // não pisca no lugar errado.
-            { left: 0, bottom: 0, visibility: 'hidden' }
+        anchor === 'corner'
+          ? { left: EDGE, bottom: EDGE }
+          : pos
+            ? { left: pos.left, bottom: pos.bottom }
+            : // Primeiro quadro, antes da medição: existe para ter tamanho, mas
+              // não pisca no lugar errado.
+              { left: 0, bottom: 0, visibility: 'hidden' }
       }
     >
       {children}

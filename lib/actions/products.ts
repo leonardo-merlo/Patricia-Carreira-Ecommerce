@@ -17,6 +17,26 @@ export async function toggleProductStatus(productId: string, isActive: boolean):
   revalidatePath('/admin/estoque')
 }
 
+/**
+ * Liga e desliga o destaque direto da lista.
+ *
+ * Existe porque marcar a vitrine da home é trabalho de lote: são dez ou doze
+ * produtos de uma vez, e abrir o modal de cada um para chegar no mesmo switch
+ * fazia a tarefa custar dez modais.
+ */
+export async function toggleProductFeatured(productId: string, isFeatured: boolean): Promise<void> {
+  await requireAdmin()
+  const supabase = createServiceClient()
+  const { error } = await supabase
+    .from('products')
+    .update({ is_featured: isFeatured })
+    .eq('id', productId)
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/estoque')
+  // A home e a vitrine /destaques leem esta coluna.
+  revalidatePath('/', 'layout')
+}
+
 // ─── Excluir produto ──────────────────────────────────────────────────────────
 
 export type DeleteProductResult =

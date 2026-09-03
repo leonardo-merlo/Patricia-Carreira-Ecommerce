@@ -49,7 +49,7 @@ const SLIDES: Slide[] = [
 ]
 
 /** Precisa acompanhar a duração de .animate-carousel-crossfade em globals.css. */
-const CROSSFADE_MS = 1100
+const CROSSFADE_MS = 650
 
 export function HeroCarousel() {
   const [current, setCurrent] = useState(0)

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
-import { getProductsByCategory } from "@/lib/supabase/products"
+import { getProductsByCategory, getFeaturedProducts } from "@/lib/supabase/products"
 import { CategoryPageContent } from "@/components/store/category-page-content"
 import { getStoreSettings } from "@/lib/server/store-settings"
 import type { Product } from "@/lib/types"
@@ -113,6 +113,13 @@ export default async function CategoriaPage({ params }: PageProps) {
   if (categoria === "vestuario") {
     products = await getProductsByCategory("vestuario")
     subcategories = VESTUARIO_SUBCATEGORIES
+  } else if (categoria === "destaques") {
+    // A MESMA função da home, de propósito. Ela tem um fallback: sem nenhum
+    // produto marcado como destaque, completa com os mais recentes para a
+    // vitrine não ficar vazia. Se esta página consultasse is_featured direto,
+    // a home apareceria cheia e /destaques vazia no mesmo instante, que foi
+    // exatamente o que aconteceu quando as duas liam fontes diferentes.
+    products = await getFeaturedProducts(12)
   } else if (categoria === "lancamentos") {
     products = await getProductsByCategory("lancamentos")
   } else {

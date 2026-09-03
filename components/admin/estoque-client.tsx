@@ -4,7 +4,7 @@ import { Fragment, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AdminIcon } from '@/components/admin/admin-icon'
 import { formatPrice } from '@/lib/utils'
-import { toggleProductStatus, deleteProduct } from '@/lib/actions/products'
+import { toggleProductStatus, toggleProductFeatured, deleteProduct } from '@/lib/actions/products'
 import { ProdutoModal, AdjustStockModal, type AdjustStockTarget } from '@/components/admin/produto-modal'
 import { CsvImportModal } from '@/components/admin/csv-import-modal'
 import { toCsv, downloadCsv } from '@/lib/csv'
@@ -107,6 +107,7 @@ export function EstoqueClient({
 
   // Status toggle optimistic
   const [statusOverrides, setStatusOverrides] = useState<Map<string, boolean>>(new Map())
+  const [featuredOverrides, setFeaturedOverrides] = useState<Map<string, boolean>>(new Map())
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -128,8 +129,11 @@ export function EstoqueClient({
     const isActive = statusOverrides.has(p.id) ? statusOverrides.get(p.id)! : p.is_active
     if (statusFilter === 'active' && !isActive) return false
     if (statusFilter === 'inactive' && isActive) return false
-    if (featuredFilter === 'yes' && !p.is_featured) return false
-    if (featuredFilter === 'no' && p.is_featured) return false
+    // Lê o override otimista, senão o filtro "Sem destaque" faria a linha sumir
+    // no instante em que ela é marcada, antes mesmo do servidor confirmar.
+    const isFeatured = featuredOverrides.has(p.id) ? featuredOverrides.get(p.id)! : p.is_featured
+    if (featuredFilter === 'yes' && !isFeatured) return false
+    if (featuredFilter === 'no' && isFeatured) return false
     if (affFilter === 'yes' && !p.is_affiliate_promo) return false
     if (affFilter === 'no' && p.is_affiliate_promo) return false
     if (search.trim()) {
@@ -167,6 +171,17 @@ export function EstoqueClient({
       router.refresh()
     } catch {
       setStatusOverrides((m) => { const n = new Map(m); n.delete(productId); return n })
+    }
+  }
+
+  async function handleToggleFeatured(productId: string, current: boolean) {
+    const next = !current
+    setFeaturedOverrides((m) => new Map(m).set(productId, next))
+    try {
+      await toggleProductFeatured(productId, next)
+      router.refresh()
+    } catch {
+      setFeaturedOverrides((m) => { const n = new Map(m); n.delete(productId); return n })
     }
   }
 
@@ -321,6 +336,7 @@ export function EstoqueClient({
                   <th style={{ width: 100 }}>Estoque</th>
                   <th style={{ width: 110 }}>Preço varejo</th>
                   <th style={{ width: 110 }}>Atacado</th>
+                  <th style={{ width: 80 }}>Destaque</th>
                   <th style={{ width: 80 }}>Status</th>
                   <th style={{ width: 80 }}>Ações</th>
                 </tr>
@@ -328,12 +344,13 @@ export function EstoqueClient({
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-3)' }}>
+                    <td colSpan={9} style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-3)' }}>
                       Nenhum produto encontrado.
                     </td>
                   </tr>
                 ) : filtered.map((p) => {
                   const isActive = statusOverrides.has(p.id) ? statusOverrides.get(p.id)! : p.is_active
+                  const isFeatured = featuredOverrides.has(p.id) ? featuredOverrides.get(p.id)! : p.is_featured
                   const totalStock = p.variants.reduce((a, v) => a + v.stock_quantity, 0)
                   const { cls, icon } = getThumb(p.category)
                   const isExpanded = expanded.has(p.id)
@@ -375,6 +392,17 @@ export function EstoqueClient({
                         </td>
                         <td className="num">{formatPrice(p.base_price)}</td>
                         <td className="num subtle">{p.wholesale_price ? formatPrice(p.wholesale_price) : '—'}</td>
+                        <td>
+                          <button
+                            type="button"
+                            id={`btn-destaque-${p.id}`}
+                            data-testid="btn-destaque"
+                            onClick={(e) => { e.stopPropagation(); handleToggleFeatured(p.id, isFeatured) }}
+                            className={`switch ${isFeatured ? 'on' : ''}`}
+                            title={isFeatured ? 'Na vitrine da home — clique para tirar' : 'Fora da vitrine — clique para destacar'}
+                            aria-label={isFeatured ? `Tirar ${p.name} dos destaques` : `Destacar ${p.name} na home`}
+                          />
+                        </td>
                         <td>
                           <button
                             type="button"

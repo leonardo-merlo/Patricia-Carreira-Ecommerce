@@ -130,7 +130,9 @@ export function NotificationsMenu({
         {count > 0 && <span className="nav-badge alert">{count > 99 ? '99+' : count}</span>}
       </button>
 
-      <SidebarPopover open={open} onClose={() => setOpen(false)} labelledBy="sidebar-nav-notificacoes">
+      {/* Canto, não ancorado ao botão: a lista é longa e tem abas, e no canto
+          ela usa a altura inteira em vez de ficar pendurada no meio da tela. */}
+      <SidebarPopover open={open} onClose={() => setOpen(false)} labelledBy="sidebar-nav-notificacoes" anchor="corner">
         <div className="row between" style={{ padding: '8px 10px 6px', gap: 8 }}>
           <span className="sidebar-popover-title" style={{ padding: 0 }}>
             Notificações{count > 0 ? ` · ${count}` : ''}
