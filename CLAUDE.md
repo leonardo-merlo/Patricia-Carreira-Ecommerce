@@ -169,11 +169,13 @@ products (
   name            text NOT NULL,
   slug            text UNIQUE NOT NULL,
   description     text,
-  category        text NOT NULL,          -- 'bolsas' | 'roupas' | 'acessorios'
+  category        text NOT NULL,          -- CHECK: 'bolsas' | 'roupas' | 'acessorios'
+                                          -- | 'almofadas' | 'bazar'
   subcategory     text,                   -- 'vestidos' | 'batas' | null
   base_price      numeric(10,2) NOT NULL,
   wholesale_price numeric(10,2),          -- null = não disponível no atacado
   is_active       boolean DEFAULT true,
+  is_kids         boolean NOT NULL DEFAULT false,  -- peça infantil (migration 047)
   images          text[],                 -- array de URLs (Supabase Storage)
   -- Dados para frete (obrigatório antes da Fase 3)
   weight_grams    integer,                -- peso em gramas
@@ -195,6 +197,21 @@ product_variants (
   created_at      timestamptz DEFAULT now()
 )
 ```
+
+> ⚠️ **Infantil é marcação, Almofadas é categoria** (migration 047). Uma bata
+> infantil continua sendo `category = 'roupas'`, `subcategory = 'batas'`: ela
+> precisa aparecer em Vestuário, no filtro de batas E na vitrine /infantil, e
+> `category` é coluna única. Por isso a vitrine infantil filtra por `is_kids`, e
+> só ela. Almofada, ao contrário, não cabe em nenhuma categoria existente e
+> entrou no CHECK.
+>
+> Até esta migration `/infantil` e `/almofadas` estavam linkadas na home e na
+> hero mas devolviam lista vazia por código (`products = []` fixo na rota), e o
+> cadastro não tinha onde marcar nem uma coisa nem a outra. Quem acrescentar uma
+> categoria precisa mexer em cinco lugares: o CHECK, `ProductCategoryOption` no
+> produto-modal, o `CATEGORIES` do import de CSV (que existe em duplicata em
+> `lib/actions/products.ts` e `components/admin/csv-import-modal.tsx`), o filtro
+> de `/admin/estoque` e o branch de `getProductsByCategory`.
 
 > ⚠️ REGRA CRÍTICA: `product_variants.stock_quantity` é a fonte de verdade do estoque
 > de produto acabado. Toda venda decrementa este campo via Server Action atômica.
