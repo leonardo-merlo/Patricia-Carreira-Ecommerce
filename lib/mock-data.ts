@@ -152,7 +152,7 @@ const BOLSAS: Product[] = [
     wholesale_price: 359,
     is_active: false,
     images: [
-      img("bolsa_flora_cáqui_0.jpeg"),
+      img("bolsa_flora_caqui_0.jpeg"),
       img("bolsa_flora_marinho_0.jpeg"),
       img("bolsa_flora_mostarda_0.jpeg"),
     ],
@@ -217,7 +217,7 @@ const BOLSAS: Product[] = [
     wholesale_price: 281,
     is_active: false,
     images: [
-      img("bolsa_lyra_cáqui_0.jpeg"),
+      img("bolsa_lyra_caqui_0.jpeg"),
       img("bolsa_lyra_marinho_0.jpeg"),
       img("bolsa_lyra_mostarda_0.jpeg"),
     ],
@@ -349,8 +349,8 @@ const BOLSAS: Product[] = [
     wholesale_price: 299,
     is_active: false,
     images: [
-      img("produto_pagina_38_sempre_à_mão_0.png"),
-      img("produto_pagina_38_sempre_à_mão_1.jpeg"),
+      img("produto_pagina_38_sempre_a_mao_0.png"),
+      img("produto_pagina_38_sempre_a_mao_1.jpeg"),
     ],
     weight_grams: 580,
     length_cm: 32,
@@ -586,8 +586,8 @@ const VESTIDOS: Product[] = [
     wholesale_price: 281,
     is_active: false,
     images: [
-      img("produto_pagina_63_vestido_mônaco_0.jpeg"),
-      img("produto_pagina_64_vestido_mônaco_0.jpeg"),
+      img("produto_pagina_63_vestido_monaco_0.jpeg"),
+      img("produto_pagina_64_vestido_monaco_0.jpeg"),
     ],
     weight_grams: 290,
     length_cm: 33,
@@ -695,9 +695,9 @@ const VESTIDOS: Product[] = [
     wholesale_price: 293,
     is_active: false,
     images: [
-      img("produto_pagina_72_vestido_cancún_0.jpeg"),
-      img("produto_pagina_73_vestido_cancún_0.jpeg"),
-      img("produto_pagina_74_vestido_cancún_0.jpeg"),
+      img("produto_pagina_72_vestido_cancun_0.jpeg"),
+      img("produto_pagina_73_vestido_cancun_0.jpeg"),
+      img("produto_pagina_74_vestido_cancun_0.jpeg"),
     ],
     weight_grams: 270,
     length_cm: 32,
@@ -897,9 +897,9 @@ const BATAS: Product[] = [
     wholesale_price: 215,
     is_active: false,
     images: [
-      img("produto_pagina_89_bata_helô_0.jpeg"),
-      img("produto_pagina_90_bata_helô_0.jpeg"),
-      img("produto_pagina_91_bata_helô_0.jpeg"),
+      img("produto_pagina_89_bata_helo_0.jpeg"),
+      img("produto_pagina_90_bata_helo_0.jpeg"),
+      img("produto_pagina_91_bata_helo_0.jpeg"),
     ],
     weight_grams: 240,
     length_cm: 31,
@@ -910,9 +910,9 @@ const BATAS: Product[] = [
     cfop: null,
     created_at: daysAgo(14),
     variants: bataVariants(304, [
-      { id: 3031, sku: "BAT-HELO-V1-UNICO", imgFile: "produto_pagina_89_bata_helô_0.jpeg", stock: 4 },
-      { id: 3032, sku: "BAT-HELO-V2-UNICO", imgFile: "produto_pagina_90_bata_helô_0.jpeg", stock: 3 },
-      { id: 3033, sku: "BAT-HELO-V3-UNICO", imgFile: "produto_pagina_91_bata_helô_0.jpeg", stock: 2 },
+      { id: 3031, sku: "BAT-HELO-V1-UNICO", imgFile: "produto_pagina_89_bata_helo_0.jpeg", stock: 4 },
+      { id: 3032, sku: "BAT-HELO-V2-UNICO", imgFile: "produto_pagina_90_bata_helo_0.jpeg", stock: 3 },
+      { id: 3033, sku: "BAT-HELO-V3-UNICO", imgFile: "produto_pagina_91_bata_helo_0.jpeg", stock: 2 },
     ]),
   },
 
@@ -989,8 +989,8 @@ const BATAS: Product[] = [
     wholesale_price: 173,
     is_active: false,
     images: [
-      img("produto_pagina_96_bata_jú_0.jpeg"),
-      img("produto_pagina_97_bata_jú_0.jpeg"),
+      img("produto_pagina_96_bata_ju_0.jpeg"),
+      img("produto_pagina_97_bata_ju_0.jpeg"),
     ],
     weight_grams: 220,
     length_cm: 30,
@@ -1001,8 +1001,8 @@ const BATAS: Product[] = [
     cfop: null,
     created_at: daysAgo(25),
     variants: bataVariants(307, [
-      { id: 3061, sku: "BAT-JU-V1-UNICO", imgFile: "produto_pagina_96_bata_jú_0.jpeg", stock: 5 },
-      { id: 3062, sku: "BAT-JU-V2-UNICO", imgFile: "produto_pagina_97_bata_jú_0.jpeg", stock: 3 },
+      { id: 3061, sku: "BAT-JU-V1-UNICO", imgFile: "produto_pagina_96_bata_ju_0.jpeg", stock: 5 },
+      { id: 3062, sku: "BAT-JU-V2-UNICO", imgFile: "produto_pagina_97_bata_ju_0.jpeg", stock: 3 },
     ]),
   },
 

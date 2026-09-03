@@ -1,6 +1,7 @@
 "use client" // popover com clique-fora, Escape e posição ancorada no botão
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 const GAP = 8
 const EDGE = 12
@@ -100,9 +101,12 @@ export function SidebarPopover({
     }
   }, [open, labelledBy, anchor])
 
-  if (!open) return null
+  // O `document` não existe na renderização do servidor. Na prática `open`
+  // sempre começa falso e a guarda acima já bastaria, mas o portal não pode
+  // depender disso continuar verdade.
+  if (!open || typeof document === 'undefined') return null
 
-  return (
+  const card = (
     <div
       ref={ref}
       className="sidebar-popover"
@@ -122,4 +126,16 @@ export function SidebarPopover({
       {children}
     </div>
   )
+
+  // Portal para o body, e não render no lugar onde o componente é chamado.
+  //
+  // `.sidebar` é `position: sticky`, e sticky cria um contexto de empilhamento
+  // SEMPRE, com ou sem z-index. Dentro dele, o `z-index: 60` do cartão só valia
+  // contra os irmãos da própria barra: a barra inteira entrava na página com
+  // z-index automático, e qualquer coisa do conteúdo desenhada depois passava
+  // por cima. Era o card de "Vencidas" do dashboard cobrindo as notificações.
+  //
+  // No body o cartão volta a disputar no contexto raiz: acima da topbar (10) e
+  // abaixo dos modais (100), como o CSS sempre pretendeu.
+  return createPortal(card, document.body)
 }
