@@ -70,14 +70,27 @@ export async function cotarEtiqueta(
   }
 }
 
+export type GerarEtiquetaResult =
+  | { ok: true; tracking: string | null }
+  /** Nem pronta nem falha: o Melhor Envio ainda está na fila. */
+  | { ok: true; tracking: null; aguardando: true; aviso: string }
+  | { ok: false; error: string }
+
 // Called from admin panel when generate was deferred (e.g. sandbox approval delay)
 export async function generateShippingLabel(
   orderId: string,
   meOrderId: string
-): Promise<{ ok: true; tracking: string | null } | { ok: false; error: string }> {
+): Promise<GerarEtiquetaResult> {
   await requireAdmin()
   try {
-    await generateLabel([meOrderId])
+    const resultado = await generateLabel([meOrderId])
+
+    // Fila do ME não é erro. Devolver como falha pintava de vermelho, no card,
+    // um estado que só pede alguns minutos — ao lado de erros de verdade.
+    if (!resultado.pronta) {
+      return { ok: true, tracking: null, aguardando: true, aviso: resultado.aviso }
+    }
+
     await new Promise((r) => setTimeout(r, 2000))
 
     const tracking = await getTrackingCode(meOrderId)

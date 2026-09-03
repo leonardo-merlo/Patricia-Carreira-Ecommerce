@@ -369,11 +369,14 @@ export async function purchaseShippingLabel(
 
   // 4. Try to generate label right away (works in production; sandbox needs ~5 min approval)
   try {
-    await generateLabel([meOrderId])
-    await new Promise((r) => setTimeout(r, 2000))
-    const tracking = await getTrackingCode(meOrderId)
-    if (tracking) {
-      await supabase.from('orders').update({ tracking_code: tracking }).eq('id', orderId)
+    const geracao = await generateLabel([meOrderId])
+    // Em preparo não tem rastreio para buscar ainda; o painel gera depois.
+    if (geracao.pronta) {
+      await new Promise((r) => setTimeout(r, 2000))
+      const tracking = await getTrackingCode(meOrderId)
+      if (tracking) {
+        await supabase.from('orders').update({ tracking_code: tracking }).eq('id', orderId)
+      }
     }
   } catch {
     // Sandbox: checkout ainda não aprovado (aprovação automática em ~5 min)

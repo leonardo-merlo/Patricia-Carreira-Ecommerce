@@ -182,7 +182,23 @@ export async function checkoutCart(meOrderIds: string[]): Promise<void> {
   }
 }
 
-export async function generateLabel(meOrderIds: string[]): Promise<void> {
+/** A etiqueta já existe, ou o ME ainda está preparando — que não é falha. */
+export type ResultadoGeracao =
+  | { pronta: true }
+  | { pronta: false; aviso: string }
+
+/** Já gerada: falso negativo do ME, para nós é sucesso. */
+const JA_GERADA = /j[áa] est[áa] gerad/i
+
+/**
+ * Ainda em preparo. O ME responde "O envio já está sendo processado. Aguarde,
+ * seu envio será gerado em instantes" — que é uma fila andando, não uma recusa.
+ * Tratar isso como erro pintava de vermelho no painel um estado normal, ao lado
+ * de falhas de verdade, e não havia como distinguir os dois olhando a tela.
+ */
+const EM_PREPARO = /sendo processad|aguarde|em instantes/i
+
+export async function generateLabel(meOrderIds: string[]): Promise<ResultadoGeracao> {
   const res = await fetch(`${baseUrl()}/me/shipment/generate`, {
     method: 'POST',
     headers: authHeaders(),
@@ -196,21 +212,35 @@ export async function generateLabel(meOrderIds: string[]): Promise<void> {
 
   // O ME responde 200 mesmo quando não gerou nada: cada envio volta com um
   // status booleano e a explicação. Sem olhar isso, uma recusa real passaria
-  // por sucesso. "Já está gerado" é o único caso de falso negativo — para nós
-  // significa que a etiqueta existe, que é o que queríamos.
+  // por sucesso.
   const data = await lerJson<Record<string, { status?: boolean; message?: string }>>(
     res,
     'geração de etiqueta'
   )
 
-  const falhas = Object.values(data).filter(
-    (r) => r?.status === false && !/j[áa] est[áa] gerad/i.test(r.message ?? '')
+  const naoGeradas = Object.values(data).filter(
+    (r) => r?.status === false && !JA_GERADA.test(r.message ?? '')
   )
+
+  if (naoGeradas.length === 0) return { pronta: true }
+
+  const emPreparo = naoGeradas.filter((r) => EM_PREPARO.test(r.message ?? ''))
+
+  // Só é falha o que não é fila. Uma recusa de verdade no meio continua sendo
+  // erro, mesmo que outro envio do lote esteja apenas esperando.
+  const falhas = naoGeradas.filter((r) => !EM_PREPARO.test(r.message ?? ''))
 
   if (falhas.length > 0) {
     throw new Error(
       `Melhor Envio: etiqueta não gerada — ${falhas.map((f) => f.message ?? 'motivo não informado').join('; ')}`
     )
+  }
+
+  return {
+    pronta: false,
+    aviso:
+      emPreparo[0]?.message?.trim() ||
+      'O Melhor Envio ainda está preparando o envio.',
   }
 }
 

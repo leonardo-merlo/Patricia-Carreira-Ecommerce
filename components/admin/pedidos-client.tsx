@@ -210,6 +210,9 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
   // a cada pedido aberto na tela.
   const [labelOptions, setLabelOptions] = useState<Record<string, OpcaoFretePedido[]>>({})
   const [labelQuoting, setLabelQuoting] = useState<string | null>(null)
+  // Aviso neutro, separado de labelError: "o envio está sendo preparado" é fila
+  // andando, e em vermelho ao lado do erro da NF-e parecia uma segunda falha.
+  const [labelNotice, setLabelNotice] = useState<Record<string, string>>({})
   const [nfeLoading, setNfeLoading] = useState<string | null>(null) // orderId em processamento
   const [nfeError, setNfeError] = useState<Record<string, string>>({}) // orderId → mensagem de erro
   const [opCreated, setOpCreated] = useState(false)
@@ -841,10 +844,18 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                                           onClick={async () => {
                                             setLabelLoading(o.id)
                                             setLabelError((prev) => ({ ...prev, [o.id]: '' }))
+                                            setLabelNotice((prev) => ({ ...prev, [o.id]: '' }))
                                             const res = await generateShippingLabel(o.id, o.melhor_envio_order_id!)
                                             setLabelLoading(null)
                                             if (!res.ok) {
                                               setLabelError((prev) => ({ ...prev, [o.id]: res.error }))
+                                            } else if ('aguardando' in res) {
+                                              // Recarregar aqui apagaria o aviso e a tela ficaria
+                                              // igual, como se o clique não tivesse feito nada.
+                                              setLabelNotice((prev) => ({
+                                                ...prev,
+                                                [o.id]: `${res.aviso} Clique de novo em alguns minutos.`,
+                                              }))
                                             } else {
                                               window.location.reload()
                                             }
@@ -853,6 +864,14 @@ export function PedidosClient({ varejo, atacado, wholesaleCustomers, wholesaleVa
                                           <AdminIcon name="truck" size={11} />
                                           {labelLoading === o.id ? 'Gerando...' : 'Gerar Etiqueta'}
                                         </button>
+                                      )}
+                                      {labelNotice[o.id] && (
+                                        <div
+                                          data-testid="aviso-etiqueta-em-preparo"
+                                          style={{ fontSize: 11, color: 'var(--text-2)', maxWidth: 320, lineHeight: 1.4 }}
+                                        >
+                                          {labelNotice[o.id]}
+                                        </div>
                                       )}
                                       <button
                                         className="btn"
