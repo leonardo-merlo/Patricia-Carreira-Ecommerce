@@ -139,7 +139,7 @@ export function SignupPopup() {
             {/* Form area */}
             <div className="px-6 py-6">
               <p className="mb-5 text-center font-body-md text-body-md text-on-surface-variant">
-                Cadastre-se para ter uma experiência mais completa e acesso a benefícios exclusivos.
+                Cadastre-se para receber o cupom e acompanhar seus pedidos.
               </p>
 
               <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -236,7 +236,7 @@ export function SignupPopup() {
               Bem-vinda{successName ? `, ${successName}` : ""}!
             </h2>
             <p className="mt-2 font-body-md text-body-md text-on-surface-variant">
-              Seu cupom exclusivo está ativo:
+              Seu cupom está pronto:
             </p>
 
             <div className="my-5 rounded-lg border-2 border-dashed border-primary bg-primary/5 px-4 py-3">

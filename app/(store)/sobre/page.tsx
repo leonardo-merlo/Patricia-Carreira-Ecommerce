@@ -5,13 +5,13 @@ import { Separator } from "@/components/ui/separator"
 export const metadata: Metadata = {
   title: "Nossa História | Patrícia Carreira",
   description:
-    "Conheça a história por trás de cada peça: moda artesanal feita à mão em Minas Gerais e presente em todo o Brasil.",
+    "Bordado à mão há mais de 20 anos. A marca nasceu em Minas, tem loja em Arraial d'Ajuda desde 2005 e envia para todo o Brasil.",
 }
 
 const VALUES = [
   {
     title: "Design autoral",
-    body: "Cada coleção nasce de desenhos exclusivos criados pela Patrícia: bordados, estampas e formas que carregam identidade e não se repetem em lugar nenhum.",
+    body: "Os desenhos são da Patrícia. Bordado de Minas com pegada asiática e traços de arte tribal, riscados antes de virar peça.",
   },
   {
     title: "Materiais naturais",
@@ -19,7 +19,7 @@ const VALUES = [
   },
   {
     title: "Peças únicas",
-    body: "O bordado nunca sai igual. A trama do linho muda de peça para peça. Isso não é defeito, é a assinatura do artesanato.",
+    body: "O bordado nunca sai igual. Duas bolsas da mesma cor têm diferenças de milímetros. Quem repara nisso costuma ser quem mais gosta.",
   },
 ]
 
@@ -33,14 +33,13 @@ export default function SobrePage() {
             Nossa História
           </p>
           <h1 className="mt-3 font-display-lg text-display-lg-mobile text-on-surface md:text-display-lg">
-            Cada peça,{" "}
-            <span className="italic text-primary">uma história.</span>
+            Feito à mão,{" "}
+            <span className="italic text-primary">uma de cada vez.</span>
           </h1>
           <p className="mx-auto mt-5 max-w-2xl font-body-lg text-body-lg text-on-surface-variant">
-            Bordamos à mão, peça por peça, há mais de 20 anos. Nenhuma sai igual
-            à outra, e é essa a graça: você veste uma cor que ninguém mais tem.
-            A marca nasceu em Minas, ganhou casa em Arraial d&apos;Ajuda e hoje
-            chega ao Brasil inteiro.
+            Bordamos à mão, peça por peça, há mais de 20 anos. É trabalho lento e
+            colorido, e dá gosto de ver pronto. A marca nasceu em Minas, ganhou
+            casa em Arraial d&apos;Ajuda e hoje chega ao Brasil inteiro.
           </p>
         </div>
       </section>
@@ -52,40 +51,37 @@ export default function SobrePage() {
         <div className="grid grid-cols-1 gap-12 md:grid-cols-2 md:items-center">
           <div>
             <h2 className="font-headline-md text-headline-md font-bold uppercase text-on-surface">
-              Nossa Essência
+              Como começou
             </h2>
             <div className="mt-4 space-y-4 font-body-lg text-body-lg text-on-surface-variant">
               <p>
-                Mais do que vestir, acreditamos em criar peças com história.
+                Começou por acaso. A Patrícia era dentista e costurava por gosto, nas horas vagas. O hobby foi tomando espaço até não caber mais como hobby.
               </p>
               <p>
-                Tudo começou por acaso, quando a dentista Patrícia se viu presa por sua alma de estilista. O que começou como um hobby, aos poucos foi se transformando numa marca cheia de arte e personalidade.
+                Do desenho ao último ponto do bordado, a peça passa por mão humana em todas as etapas.
               </p>
               <p>
-                Cada peça nasce da mistura entre matéria-prima selecionada, desenhos autorais e o cuidado artesanal presente em cada detalhe.
+                Nossas criações remetem aos bordados de Minas com uma pegada asiática e inspirações em artes tribais. Sai colorido, e sai diferente do resto.
               </p>
               <p>
-                Nossas criações remetem aos bordados de Minas com uma pegada asiática e inspirações em artes tribais, trazendo um estilo leve, colorido e cheio de identidade.
+                São mais de 20 anos fazendo assim, à mão, no tempo que a peça pede.
               </p>
               <p>
-                Há mais de 20 anos desenvolvemos peças que valorizam o feito à mão, o tempo do processo e a beleza das imperfeições que tornam cada criação única e especial.
-              </p>
-              <p>
-                Tudo aqui é feito com amor, inspiração e boas energias. Acreditamos que quando colocamos alma em cada criação, isso se transforma em algo que vai muito além do visual: transmite sentimento, conexão e autenticidade.
+                Não dá para fazer isso com pressa, e a gente não tenta.
               </p>
               <p className="font-semibold text-on-surface">
-                Mais que peças, entregamos energia, arte e essência.
+                Se a peça chegar na sua casa e você quiser usar no mesmo dia, a gente fez certo.
               </p>
             </div>
             <div className="mt-6 flex flex-wrap gap-3">
               <span className="rounded-full border border-primary px-4 py-1.5 font-label-md text-label-md uppercase tracking-wider text-primary">
-                Feito com Amor
+                Bordado à mão
               </span>
               <span className="rounded-full border border-primary px-4 py-1.5 font-label-md text-label-md uppercase tracking-wider text-primary">
-                Arte que Conecta
+                Desenho da Patrícia
               </span>
               <span className="rounded-full border border-primary px-4 py-1.5 font-label-md text-label-md uppercase tracking-wider text-primary">
-                Energia que Transforma
+                Mais de 20 anos
               </span>
             </div>
             <p className="mt-6 font-body-lg text-body-lg italic text-on-surface-variant">
@@ -149,19 +145,18 @@ export default function SobrePage() {
           <div className="mx-auto mt-6 max-w-2xl space-y-4 font-body-lg text-body-lg text-on-surface-variant">
             <p><strong>Desde 2005, Arraial d&apos;Ajuda - BA faz parte da nossa história.</strong></p>
             <p>
-              Foi entre ruas coloridas, arte, natureza e encontros especiais com pessoas de
-              diferentes culturas que <strong>nossa identidade ganhou forma.</strong>
+              Foi entre as ruas coloridas e a gente de todo canto que passa por aqui
+              que <strong>a marca ganhou o jeito que tem hoje.</strong>
             </p>
             <p>
-              Arraial é <strong>um lugar mágico</strong>, repleto de pessoas incríveis, liberdade, inspiração e
-              uma energia leve, criativa e cheia de vida.
+              Arraial é assim: <strong>gente do mundo todo</strong>, muita cor e pouca pressa.
             </p>
             <p>
-              Durante mais de 10 anos, nossa marca também esteve presente em Búzios - RJ, levando
-              essa mesma essência para diferentes destinos e{" "}
-              <strong>conectando nossas criações a mulheres do mundo inteiro.</strong>
+              Por mais de 10 anos a marca também teve presença em Búzios, no Rio. Hoje,
+              quem não passa por Arraial compra pelo site, e{" "}
+              <strong>a gente manda para todo o Brasil.</strong>
             </p>
-            <p><strong>Mais do que moda, criamos peças que carregam história, identidade e conexão.</strong></p>
+            <p><strong>É de Arraial que vem o jeito da marca: cor sem medo e bordado à mão.</strong></p>
           </div>
         </div>
 

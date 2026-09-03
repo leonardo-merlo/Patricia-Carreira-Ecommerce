@@ -15,6 +15,7 @@ type Categoria =
   | "lancamentos"
   | "infantil"
   | "almofadas"
+  | "destaques"
 
 const CATEGORY_META: Record<Categoria, { title: string; description: string }> = {
   bazar: {
@@ -30,7 +31,7 @@ const CATEGORY_META: Record<Categoria, { title: string; description: string }> =
   vestidos: {
     title: "Vestidos",
     description:
-      "Vestidos em linho e algodão com bordados manuais. Cada peça é única.",
+      "Vestidos em linho e algodão, com bordado autoral aplicado à mão.",
   },
   batas: {
     title: "Batas",
@@ -40,7 +41,7 @@ const CATEGORY_META: Record<Categoria, { title: string; description: string }> =
   acessorios: {
     title: "Acessórios",
     description:
-      "Colares, brincos e cintos artesanais que completam qualquer look.",
+      "Colares, brincos e cintos feitos à mão, com o mesmo desenho das bolsas.",
   },
   vestuario: {
     title: "Vestuário",
@@ -50,17 +51,22 @@ const CATEGORY_META: Record<Categoria, { title: string; description: string }> =
   lancamentos: {
     title: "Lançamentos",
     description:
-      "As novidades mais recentes da Patrícia Carreira. Peças exclusivas em quantidade limitada.",
+      "As peças que chegaram por último na loja. Quantidade limitada.",
   },
   infantil: {
     title: "Infantil",
     description:
-      "Peças artesanais especialmente criadas para os pequenos.",
+      "Batas e vestidos infantis em algodão, com o mesmo bordado das peças adultas.",
   },
   almofadas: {
     title: "Almofadas",
     description:
-      "Almofadas artesanais com bordados manuais. Beleza e conforto para o seu lar.",
+      "Almofadas com bordado autoral, feitas à mão uma a uma.",
+  },
+  destaques: {
+    title: "Destaques",
+    description:
+      "As peças escolhidas pela loja para a vitrine da home.",
   },
 }
 

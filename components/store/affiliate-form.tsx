@@ -13,6 +13,11 @@ function formatPhone(value: string): string {
   return `(${d.slice(0, 2)}) ${d.slice(2, 3)} ${d.slice(3, 7)}-${d.slice(7)}`
 }
 
+// Mesmo número do botão flutuante do site. Quem falha no envio precisa de uma
+// saída de verdade, e não da palavra "WhatsApp" solta no meio da frase.
+const WHATSAPP_HREF =
+  "https://wa.me/5522988223993?text=Olá!%20Tentei%20enviar%20o%20cadastro%20de%20afiliada%20pelo%20site%20e%20deu%20erro."
+
 const inputClass =
   "w-full rounded border border-outline-variant bg-white px-4 py-3 font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
 
@@ -59,9 +64,10 @@ export function AffiliateForm() {
           Cadastro recebido!
         </p>
         <p className="mt-3 font-body-lg text-body-lg text-on-surface-variant">
-          Entraremos em contato pelo seu WhatsApp em breve.
+          Recebemos seus dados. A gente chama no seu WhatsApp para explicar as
+          condições da parceria.
           <br />
-          Obrigada por fazer parte!
+          Obrigada pelo interesse!
         </p>
       </div>
     )
@@ -122,7 +128,7 @@ export function AffiliateForm() {
           type="tel"
           required
           disabled={isPending}
-          placeholder="(22) 9 9999-9999"
+          placeholder="(73) 9 9999-9999"
           value={phone}
           onChange={(e) => setPhone(formatPhone(e.target.value))}
           className={inputClass}
@@ -202,7 +208,7 @@ export function AffiliateForm() {
           id="campo-mensagem"
           name="mensagem"
           disabled={isPending}
-          placeholder="Compartilhe sua história..."
+          placeholder="Ex: uso as bolsas há dois anos e sempre me perguntam onde comprei"
           maxLength={500}
           rows={4}
           value={message}
@@ -219,7 +225,17 @@ export function AffiliateForm() {
           role="alert"
           className="rounded bg-error-container px-4 py-3 font-body-md text-body-md text-on-error-container"
         >
-          Algo deu errado. Tente novamente ou entre em contato pelo WhatsApp.
+          Não conseguimos enviar seu cadastro. Tente de novo em alguns segundos.
+          Se continuar dando erro,{" "}
+          <a
+            href={WHATSAPP_HREF}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold underline underline-offset-2"
+          >
+            chame a gente no WhatsApp
+          </a>
+          .
         </p>
       )}
 
@@ -255,7 +271,7 @@ export function AffiliateForm() {
           </>
         ) : (
           <>
-            Enviar Cadastro
+            Enviar meu cadastro
             <ArrowRight className="h-4 w-4" />
           </>
         )}

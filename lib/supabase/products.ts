@@ -38,6 +38,12 @@ export async function getProductsByCategory(
     query = query.eq('category', 'roupas').eq('subcategory', 'vestidos')
   } else if (category === 'batas') {
     query = query.eq('category', 'roupas').eq('subcategory', 'batas')
+  } else if (category === 'destaques') {
+    // A vitrine inteira do que o Henrique marcou como destaque. Sem o
+    // preenchimento com produtos recentes que getFeaturedProducts faz para não
+    // deixar buraco na grade da home: aqui a página é sobre a marcação, então
+    // completar com peça não marcada seria mentira.
+    query = query.eq('is_featured', true)
   } else if (category === 'infantil') {
     // Infantil é marcação, não categoria: a peça continua na categoria dela e
     // aparece aqui também. Ver migration 047.

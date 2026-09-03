@@ -35,7 +35,8 @@ export async function Footer() {
               Patrícia Carreira
             </p>
             <p className="mt-2 max-w-xs font-body-md text-body-md text-on-surface-variant">
-              Arte em movimento. Cada peça é única.
+              Bolsas e roupas com bordado autoral. Loja em Arraial d&apos;Ajuda,
+              envio para todo o Brasil.
             </p>
             <div className="mt-6 flex items-center gap-4">
               <a

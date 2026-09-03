@@ -28,7 +28,7 @@ export function CitySection() {
           Entregamos em todo o país
         </h2>
         <p className="mx-auto mt-4 max-w-md font-body-lg text-body-lg text-on-surface-variant">
-          Peças nascidas em Minas Gerais, ganhando vida por todo o Brasil.
+          Começou em Minas, cresceu em Arraial d&apos;Ajuda e hoje chega em todo o Brasil.
         </p>
       </div>
 

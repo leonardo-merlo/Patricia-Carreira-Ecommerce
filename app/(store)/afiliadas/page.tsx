@@ -11,7 +11,7 @@ import { AffiliateForm } from "@/components/store/affiliate-form"
 export const metadata: Metadata = {
   title: "Clube de Afiliadas | Patrícia Carreira",
   description:
-    "Compartilhe peças que você ama e transforme sua conexão com a marca em benefícios, experiências e comissões. Faça parte do Clube de Afiliadas Patrícia Carreira.",
+    "Você recebe um cupom e um link exclusivos, divulga as peças do seu jeito e ganha comissão pelas vendas. A gente cuida de estoque, embalagem e envio. Cadastre-se no Clube de Afiliadas Patrícia Carreira.",
 }
 
 function OrnamentalDivider({ light = false }: { light?: boolean }) {
@@ -31,7 +31,7 @@ const STEPS: { num: string; text: ReactNode }[] = [
     num: "01",
     text: (
       <>
-        Você recebe seu <strong>cupom e link exclusivo</strong> para divulgar as peças.
+        Você recebe seu <strong>cupom e seu link exclusivos</strong> para divulgar as peças.
       </>
     ),
   },
@@ -39,8 +39,8 @@ const STEPS: { num: string; text: ReactNode }[] = [
     num: "02",
     text: (
       <>
-        <strong>Compartilha do seu jeito</strong>, mostrando as produções, criando conteúdo e
-        conectando as peças ao seu estilo e à sua rotina.
+        <strong>Divulga do seu jeito:</strong> nos stories, no feed, no grupo das amigas
+        ou pessoalmente.
       </>
     ),
   },
@@ -48,8 +48,8 @@ const STEPS: { num: string; text: ReactNode }[] = [
     num: "03",
     text: (
       <>
-        Quando alguém comprar através do seu cupom ou link,{" "}
-        <strong>a venda fica vinculada a você.</strong>
+        Quando alguém compra usando seu cupom ou link,{" "}
+        <strong>a venda fica registrada no seu nome.</strong>
       </>
     ),
   },
@@ -57,9 +57,8 @@ const STEPS: { num: string; text: ReactNode }[] = [
     num: "04",
     text: (
       <>
-        Enquanto você foca em criar, divulgar e se conectar com as clientes,{" "}
-        <strong>nós cuidamos de todo o restante:</strong> estoque, embalagem, envio e
-        atendimento.
+        Você só divulga. <strong>Estoque, embalagem, envio e atendimento são com a
+        gente.</strong>
       </>
     ),
   },
@@ -67,8 +66,8 @@ const STEPS: { num: string; text: ReactNode }[] = [
     num: "05",
     text: (
       <>
-        Você recebe <strong>comissão</strong> pelas vendas realizadas e, conforme a parceria
-        cresce, <strong>novos benefícios são desbloqueados.</strong>
+        Você recebe <strong>comissão</strong> por cada venda registrada no seu cupom ou
+        link. O valor a gente combina no WhatsApp, antes de você começar.
       </>
     ),
   },
@@ -105,17 +104,17 @@ export default function AfiliadasPage() {
               {/* Título */}
               <h1 className="font-display-lg text-on-surface">
                 <span className="block text-4xl font-bold uppercase leading-tight tracking-wide text-white md:text-6xl">
-                  CONEXÃO QUE GERA
+                  VOCÊ INDICA,
                 </span>
                 <span className="block text-3xl italic font-medium leading-tight text-white/90 md:text-5xl">
-                  oportunidades
+                  a gente cuida do resto
                 </span>
               </h1>
 
               {/* Parágrafo */}
               <p className="mx-auto mt-6 max-w-lg font-body-lg text-body-lg text-white/80 md:mx-0">
-                Quando você compartilha algo que faz sentido, as conexões acontecem naturalmente.
-                E cada conexão pode se transformar em oportunidade.
+                Você recebe um cupom e um link só seus. Toda compra feita por eles fica
+                registrada no seu nome e vira comissão.
               </p>
 
               {/* CTA */}
@@ -124,7 +123,7 @@ export default function AfiliadasPage() {
                   href="#cadastro"
                   className="inline-flex items-center rounded bg-primary px-8 py-4 font-label-md text-label-md uppercase tracking-wider text-white transition-opacity hover:opacity-90"
                 >
-                  Quero fazer parte
+                  Preencher meu cadastro
                 </Link>
               </div>
             </div>
@@ -146,8 +145,7 @@ export default function AfiliadasPage() {
                 Como funciona
               </h2>
               <p className="mt-4 max-w-lg font-body-lg text-body-lg text-on-surface-variant">
-                Uma forma leve, prática e natural de transformar sua conexão com a nossa marca
-                em oportunidade.
+                São cinco passos, do cadastro à primeira comissão.
               </p>
 
               <div className="mt-10">
@@ -208,14 +206,14 @@ export default function AfiliadasPage() {
             <ul className="mt-10 space-y-4" aria-label="Lista de benefícios">
               {(
                 [
-                  <><strong>Comissão</strong> sobre vendas</>,
-                  <><strong>Cupom</strong> personalizado</>,
+                  <><strong>Comissão</strong> sobre cada venda sua</>,
+                  <><strong>Cupom</strong> com o seu nome</>,
                   <><strong>Link exclusivo</strong> de divulgação</>,
                   <><strong>Acesso antecipado</strong> às coleções</>,
-                  <>Possibilidade de <strong>participar de campanhas</strong></>,
+                  <>Convite para <strong>participar das campanhas</strong></>,
                   <><strong>Reposts</strong> nas redes da marca</>,
-                  <><strong>Suporte</strong> da equipe</>,
-                  <>A marca cuida de <strong>toda a logística</strong></>,
+                  <><strong>Suporte da equipe</strong> sempre que precisar</>,
+                  <><strong>Estoque, embalagem e envio</strong> por nossa conta</>,
                 ] as ReactNode[]
               ).map((benefit, i) => (
                 <li key={i} className="flex items-start gap-3">
@@ -240,7 +238,7 @@ export default function AfiliadasPage() {
               <Leaf className="mb-5 h-7 w-7 text-[#8b5e3c]" aria-hidden="true" />
 
               <p className="font-label-md text-label-md uppercase tracking-widest text-[#8b5e3c]">
-                Junte-se a nós
+                Cadastro
               </p>
               <h2 className="mt-3 font-headline-md text-headline-md font-bold text-on-surface">
                 Faça parte do{" "}
@@ -248,9 +246,9 @@ export default function AfiliadasPage() {
               </h2>
 
               <p className="mt-5 font-body-lg text-body-lg text-on-surface-variant">
-                Transforme sua conexão com a marca em uma parceria cheia de{" "}
-                <strong>arte</strong>, <strong>identidade</strong> e{" "}
-                <strong>possibilidades.</strong>
+                A Patrícia costura à mão há mais de 20 anos, de Minas Gerais até a loja em
+                Arraial d&apos;Ajuda. Se você já mostra as peças para as suas amigas,{" "}
+                <strong>o cupom é o próximo passo.</strong>
               </p>
 
               <OrnamentalDivider light />
@@ -266,8 +264,8 @@ export default function AfiliadasPage() {
                   <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
                 </svg>
                 <p className="font-body-md text-body-md text-on-surface-variant">
-                  Após o cadastro, entraremos em contato pelo WhatsApp com todas as informações
-                  e condições da parceria.
+                  Depois do cadastro, a gente chama no seu WhatsApp e explica as condições
+                  da parceria.
                 </p>
               </div>
             </div>
