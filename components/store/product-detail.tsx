@@ -157,7 +157,7 @@ export function ProductDetail({
                     {!imageErrors[i] && (
                       <Image
                         src={img}
-                        alt={`${product.name} — imagem ${i + 1}`}
+                        alt={`${product.name}, imagem ${i + 1}`}
                         fill
                         className="object-cover"
                         sizes="64px"
@@ -196,7 +196,7 @@ export function ProductDetail({
                   Cor
                   {selectedVariant?.color && (
                     <span className="ml-2 font-body-md text-body-md text-on-surface normal-case tracking-normal">
-                      — {selectedVariant.color}
+                      : {selectedVariant.color}
                     </span>
                   )}
                 </p>
@@ -262,7 +262,7 @@ export function ProductDetail({
                 <p className="mb-3 font-label-md text-label-md text-on-surface-variant">
                   Tamanho
                   {selectedVariant?.size && (
-                    <span className="ml-2 text-on-surface">— {selectedVariant.size}</span>
+                    <span className="ml-2 text-on-surface">: {selectedVariant.size}</span>
                   )}
                 </p>
                 <div className="flex flex-wrap gap-2">

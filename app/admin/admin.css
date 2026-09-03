@@ -545,13 +545,13 @@
   color: var(--green);
 }
 
-/* Popover do rodapé da barra lateral (Configurações e Notificações). Fica preso
-   ao canto inferior esquerdo da janela, e não à barra, para não ser cortado
-   quando a barra está recolhida. */
+/* Popover do rodapé da barra lateral (Configurações e Notificações).
+   `position: fixed` para não ser cortado quando a barra está recolhida, mas as
+   coordenadas vêm do componente, medidas do botão que o abriu: o cartão nasce à
+   direita da barra, com a base na linha do botão. Antes eram left/bottom fixos
+   aqui, e o cartão abria no canto da tela, longe do que o chamou. */
 .admin-root .sidebar-popover {
   position: fixed;
-  left: 12px;
-  bottom: 12px;
   z-index: 60;
   width: 290px;
   max-width: calc(100vw - 24px);
@@ -588,6 +588,59 @@
 .admin-root .sidebar-popover-item:hover { background: var(--surface-2); }
 .admin-root .sidebar-popover-item svg { flex-shrink: 0; margin-top: 2px; }
 .admin-root .sidebar-popover-label { display: block; font-weight: 500; }
+
+/* Abas Não lidas / Lidas do menu de notificações. */
+.admin-root .popover-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 10px 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.admin-root .popover-tab {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: var(--text-3);
+}
+.admin-root .popover-tab:hover { background: var(--surface-2); }
+.admin-root .popover-tab.active {
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Linha de notificação: o item ocupa a largura e a ação (marcar lida / desfazer)
+   fica na ponta. O botão fica sempre visível, nunca só no hover: o painel é
+   operado também por automação, que não passa o mouse antes de clicar. */
+.admin-root .sidebar-popover-row {
+  display: flex;
+  align-items: stretch;
+  border-radius: 6px;
+}
+.admin-root .sidebar-popover-row:hover { background: var(--surface-2); }
+.admin-root .sidebar-popover-row .sidebar-popover-item { flex: 1; min-width: 0; }
+.admin-root .sidebar-popover-row .sidebar-popover-item:hover { background: none; }
+.admin-root .popover-row-action {
+  flex-shrink: 0;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-right: 4px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.admin-root .popover-row-action:hover { background: var(--surface); color: var(--text); }
+.admin-root .popover-row-action:disabled { opacity: 0.5; cursor: default; }
 /* Ponto vermelho no que é urgente: conta vencida, produto esgotado. */
 .admin-root .notif-dot {
   display: inline-block;

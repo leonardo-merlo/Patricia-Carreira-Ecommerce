@@ -48,33 +48,73 @@ const SLIDES: Slide[] = [
   },
 ]
 
+/** Precisa acompanhar a duração de .animate-carousel-crossfade em globals.css. */
+const CROSSFADE_MS = 1100
+
 export function HeroCarousel() {
   const [current, setCurrent] = useState(0)
+  // O slide que está saindo. Fica montado, opaco, EMBAIXO do que entra.
+  //
+  // Antes o anterior era desmontado no mesmo quadro em que o novo começava em
+  // opacidade zero. Durante quase um segundo não havia foto nenhuma, só o
+  // gradiente branco do texto sobre o fundo claro da página: era esse o clarão.
+  const [previous, setPrevious] = useState<number | null>(null)
   const [paused, setPaused] = useState(false)
 
+  const goTo = useCallback(
+    (index: number) => {
+      if (index === current) return
+      setPrevious(current)
+      setCurrent(index)
+    },
+    [current],
+  )
+
   const prev = useCallback(() => {
-    setCurrent((c) => (c === 0 ? SLIDES.length - 1 : c - 1))
-  }, [])
+    goTo((current - 1 + SLIDES.length) % SLIDES.length)
+  }, [current, goTo])
 
   const next = useCallback(() => {
-    setCurrent((c) => (c === SLIDES.length - 1 ? 0 : c + 1))
-  }, [])
+    goTo((current + 1) % SLIDES.length)
+  }, [current, goTo])
 
+  // setTimeout e não setInterval: o relógio reinicia a cada troca, então clicar
+  // na seta não deixa o próximo salto acontecer meio segundo depois.
   useEffect(() => {
     if (paused) return
-    const id = setInterval(next, 8000)
-    return () => clearInterval(id)
+    const id = setTimeout(next, 8000)
+    return () => clearTimeout(id)
   }, [next, paused])
 
+  // Desmonta o slide antigo só depois que o novo terminou de cobrir.
+  useEffect(() => {
+    if (previous === null) return
+    const id = setTimeout(() => setPrevious(null), CROSSFADE_MS)
+    return () => clearTimeout(id)
+  }, [previous, current])
+
   const slide = SLIDES[current]
+  const leaving = previous === null ? null : SLIDES[previous]
 
   return (
     <section onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
 
       {/* ─── Mobile layout: texto sobreposto à imagem, centralizado ─── */}
       <div className="md:hidden">
-        <div className="relative h-[390px] overflow-hidden">
-          <div key={`bg-mobile-${slide.id}`} className="absolute inset-0 animate-carousel-fade">
+        <div className="relative h-[390px] overflow-hidden bg-[#3d1f0e]">
+          {leaving && (
+            <div key={`bg-mobile-prev-${leaving.id}`} className="absolute inset-0">
+              <Image
+                src={leaving.image}
+                alt=""
+                fill
+                className="scale-110 object-cover"
+                style={{ objectPosition: leaving.imagePosition ?? "center" }}
+                aria-hidden
+              />
+            </div>
+          )}
+          <div key={`bg-mobile-${slide.id}`} className="absolute inset-0 animate-carousel-crossfade">
             <Image
               src={slide.image}
               alt=""
@@ -128,7 +168,7 @@ export function HeroCarousel() {
             {SLIDES.map((s, i) => (
               <button
                 key={s.id}
-                onClick={() => setCurrent(i)}
+                onClick={() => goTo(i)}
                 aria-label={`Ir para slide ${i + 1}`}
                 className={`h-2 rounded-full transition-all duration-300 ${
                   i === current
@@ -168,9 +208,24 @@ export function HeroCarousel() {
       </div>
 
       {/* ─── Desktop layout: imagem de fundo com texto sobreposto (original) ─── */}
-      <div className="relative hidden flex-col justify-center overflow-hidden md:flex md:min-h-[560px] lg:min-h-[640px] xl:min-h-[740px]">
+      <div className="relative hidden flex-col justify-center overflow-hidden bg-[#3d1f0e] md:flex md:min-h-[560px] lg:min-h-[640px] xl:min-h-[740px]">
+        {/* Slide que está saindo: fica embaixo, opaco, até o novo cobrir. */}
+        {leaving && (
+          <div key={`bg-prev-${leaving.id}`} className="absolute inset-0">
+            <Image
+              src={leaving.image}
+              alt=""
+              fill
+              className="object-cover"
+              style={{ objectPosition: leaving.imagePosition ?? "center" }}
+              aria-hidden
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-white/60 via-white/20 to-transparent" />
+          </div>
+        )}
+
         {/* Imagem de fundo */}
-        <div key={`bg-${slide.id}`} className="absolute inset-0 animate-carousel-fade">
+        <div key={`bg-${slide.id}`} className="absolute inset-0 animate-carousel-crossfade">
           <Image
             src={slide.image}
             alt=""
@@ -218,7 +273,7 @@ export function HeroCarousel() {
           {SLIDES.map((s, i) => (
             <button
               key={s.id}
-              onClick={() => setCurrent(i)}
+              onClick={() => goTo(i)}
               aria-label={`Ir para slide ${i + 1}`}
               className={`h-2 rounded-full transition-all duration-300 ${
                 i === current

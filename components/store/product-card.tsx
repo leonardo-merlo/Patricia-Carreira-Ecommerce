@@ -89,8 +89,11 @@ export function ProductCard({ product, className, compact = false, showLowStockW
     >
       <div
         className={cn(
+          // A foto é o argumento de venda, então ela é sempre 3:4. O `compact`
+          // hoje muda só o tamanho do texto: a grade de Destaques passou de 5
+          // para 4 colunas e o card ficou largo o bastante para a foto alta.
           "relative w-full overflow-hidden rounded-lg bg-surface-container-high",
-          compact ? "aspect-[4/5]" : "aspect-[3/4]"
+          "aspect-[3/4]"
         )}
       >
         {firstImage && (
@@ -166,26 +169,26 @@ export function ProductCard({ product, className, compact = false, showLowStockW
       <div className="mt-3 space-y-1 px-1 text-center">
         <p className={cn(
           "line-clamp-2 font-medium leading-tight text-on-surface transition-colors group-hover:text-primary",
-          compact ? "text-[13px] md:text-[15px]" : "text-[17px] md:text-[19px]"
+          compact ? "text-[13px] md:text-[17px]" : "text-[17px] md:text-[19px]"
         )}>
           {product.name}
         </p>
         {isOutOfStock ? (
           <p className={cn(
             "text-on-surface-variant",
-            compact ? "text-[13px] md:text-[14px]" : "text-[16px] md:text-[18px]"
+            compact ? "text-[13px] md:text-[16px]" : "text-[16px] md:text-[18px]"
           )}>Esgotado</p>
         ) : (
           <>
             <p className={cn(
               "font-semibold text-on-surface",
-              compact ? "text-[14px] md:text-[16px]" : "text-[19px] md:text-[22px]"
+              compact ? "text-[14px] md:text-[20px]" : "text-[19px] md:text-[22px]"
             )}>
               {formatPrice(product.base_price)}
             </p>
             <p className={cn(
               "text-on-surface-variant",
-              compact ? "text-[11px] md:text-[12px]" : "text-[13px] md:text-[15px]"
+              compact ? "text-[11px] md:text-[13px]" : "text-[13px] md:text-[15px]"
             )}>
               6x de {formatPrice(installmentValue)} sem juros
             </p>

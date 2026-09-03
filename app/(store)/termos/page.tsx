@@ -109,9 +109,9 @@ export default function TermosPage() {
             Meios de pagamento aceitos:
           </p>
           <ul className="ml-5 mt-2 list-disc space-y-1">
-            <li><strong className="text-on-surface">PIX</strong> — aprovação imediata</li>
-            <li><strong className="text-on-surface">Cartão de crédito</strong> — parcelamento em até 6x sem juros</li>
-            <li><strong className="text-on-surface">Boleto bancário</strong> — vencimento em 3 dias úteis; pedido processado após compensação</li>
+            <li><strong className="text-on-surface">PIX</strong>: aprovação imediata</li>
+            <li><strong className="text-on-surface">Cartão de crédito</strong>: parcelamento em até 6x sem juros</li>
+            <li><strong className="text-on-surface">Boleto bancário</strong>: vencimento em 3 dias úteis; pedido processado após compensação</li>
           </ul>
           <p className="mt-3">
             O processamento dos pagamentos é realizado pelo <strong className="text-on-surface">Mercado Pago</strong>.
@@ -177,8 +177,8 @@ export default function TermosPage() {
             7. Propriedade intelectual
           </h2>
           <p>
-            Todo o conteúdo do site — incluindo fotografias, vídeos, textos, logotipos, designs
-            e identidade visual — é propriedade exclusiva da{" "}
+            Todo o conteúdo do site (fotografias, vídeos, textos, logotipos, designs
+            e identidade visual) é propriedade exclusiva da{" "}
             <strong className="text-on-surface">Patrícia Carreira</strong> e está protegido
             pela legislação brasileira de direitos autorais e propriedade intelectual.
           </p>

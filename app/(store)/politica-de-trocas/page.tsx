@@ -90,7 +90,7 @@ export default function PoliticaDeTrocasPage() {
             </li>
             <li>
               Envie a peça ao endereço indicado. O prazo de 7 dias é válido
-              para o contato inicial — o envio pode ocorrer após esse prazo,
+              para o contato inicial. O envio pode ocorrer após esse prazo,
               desde que a solicitação tenha sido feita dentro do período.
             </li>
           </ol>
@@ -139,7 +139,7 @@ export default function PoliticaDeTrocasPage() {
         {/* Exceções */}
         <section>
           <h2 className="mb-4 font-headline-sm text-headline-sm text-on-surface">
-            6. Exceções — itens sem troca
+            6. Exceções: itens sem troca
           </h2>
           <p className="mb-3">
             Por questões de higiene e natureza do produto, os itens abaixo não são elegíveis

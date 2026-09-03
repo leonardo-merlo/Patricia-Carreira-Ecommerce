@@ -841,7 +841,7 @@ export default function CheckoutPage() {
 
                 {method === "boleto" && (
                   <p className="mt-4 font-body-md text-body-md text-on-surface-variant">
-                    O boleto será gerado após confirmar o pedido. Vence em 3 dias úteis — o pedido só é processado após confirmação do pagamento.
+                    O boleto será gerado após confirmar o pedido. Vence em 3 dias úteis. O pedido só é processado após confirmação do pagamento.
                   </p>
                 )}
               </section>

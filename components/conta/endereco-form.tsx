@@ -133,7 +133,7 @@ export function EnderecoForm({ currentAddress }: { currentAddress: Endereco | nu
         {temEndereco && currentAddress ? (
           <address className="mt-5 font-body-md text-body-md not-italic text-on-surface">
             {currentAddress.street}, {currentAddress.number}
-            {currentAddress.complement ? ` — ${currentAddress.complement}` : ""}
+            {currentAddress.complement ? `, ${currentAddress.complement}` : ""}
             <br />
             {currentAddress.neighborhood} · {currentAddress.city}/{currentAddress.state}
             <br />

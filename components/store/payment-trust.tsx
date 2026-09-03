@@ -117,7 +117,7 @@ export function PaymentTrust() {
           <path d="M8 10V7a4 4 0 1 1 8 0v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         </svg>
         <span>
-          Pagamento processado pelo Mercado Pago — os dados do cartão não passam nem ficam guardados nesta loja.
+          Pagamento processado pelo Mercado Pago. Os dados do cartão não passam por esta loja nem ficam guardados aqui.
         </span>
       </div>
     </div>

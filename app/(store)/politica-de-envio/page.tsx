@@ -120,7 +120,7 @@ export default function PoliticaDeEnvioPage() {
           <p>
             Cada peça é preparada e embalada com cuidado antes do envio.
             O prazo de processamento é de <strong className="text-on-surface">1 a 2 dias úteis</strong> após
-            a confirmação do pagamento — este tempo não está incluído no prazo de entrega
+            a confirmação do pagamento. Esse tempo não está incluído no prazo de entrega
             informado pela transportadora.
           </p>
           <p className="mt-3">
@@ -160,7 +160,7 @@ export default function PoliticaDeEnvioPage() {
           </p>
           <p className="mt-3">
             Caso precise alterar o endereço após a confirmação do pedido, entre em contato
-            o mais rápido possível — alterações só são possíveis antes da postagem.
+            o mais rápido possível. Alterações só são possíveis antes da postagem.
           </p>
         </section>
 

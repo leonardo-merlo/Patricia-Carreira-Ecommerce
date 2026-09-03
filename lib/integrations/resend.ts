@@ -82,7 +82,7 @@ export async function sendOrderConfirmation(input: OrderConfirmationInput): Prom
   await resend.emails.send({
     from,
     to: input.to,
-    subject: `Pedido #${shortId} confirmado — Patrícia Carreira`,
+    subject: `Pedido #${shortId} confirmado | Patrícia Carreira`,
     html: `
       <!DOCTYPE html>
       <html lang="pt-BR">
@@ -150,7 +150,7 @@ export async function sendOrderShipped(input: OrderShippedInput): Promise<void> 
   await resend.emails.send({
     from,
     to: input.to,
-    subject: `Seu pedido #${shortId} foi enviado! — Patrícia Carreira`,
+    subject: `Seu pedido #${shortId} foi enviado! | Patrícia Carreira`,
     html: `
       <!DOCTYPE html>
       <html lang="pt-BR">
@@ -208,7 +208,7 @@ export async function sendOrderDelivered(input: OrderDeliveredInput): Promise<vo
   await resend.emails.send({
     from,
     to: input.to,
-    subject: `Pedido #${shortId} entregue — Patrícia Carreira`,
+    subject: `Pedido #${shortId} entregue | Patrícia Carreira`,
     html: `
       <!DOCTYPE html>
       <html lang="pt-BR">
@@ -259,7 +259,7 @@ export async function sendOrderCancelled(input: OrderCancelledInput): Promise<vo
   await resend.emails.send({
     from,
     to: input.to,
-    subject: `Pedido #${shortId} cancelado — Patrícia Carreira`,
+    subject: `Pedido #${shortId} cancelado | Patrícia Carreira`,
     html: `
       <!DOCTYPE html>
       <html lang="pt-BR">
@@ -301,7 +301,7 @@ export async function sendNfeEmail(input: NfeEmailInput): Promise<void> {
   await resend.emails.send({
     from,
     to: input.to,
-    subject: `Sua Nota Fiscal — Pedido #${shortId} — Patrícia Carreira`,
+    subject: `Nota fiscal do pedido #${shortId} | Patrícia Carreira`,
     html: `
       <!DOCTYPE html>
       <html lang="pt-BR">

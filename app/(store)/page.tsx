@@ -54,7 +54,9 @@ const CATEGORIES = [
 
 export default async function HomePage() {
   const [FEATURED, settings] = await Promise.all([
-    getFeaturedProducts(),
+    // Oito, e não quinze: a grade tem 4 colunas, então qualquer número fora da
+    // tabuada de 4 deixa buraco na última linha.
+    getFeaturedProducts(8),
     getStoreSettings().catch(() => null),
   ])
   const showLowStockWarning = settings?.show_low_stock_warning ?? false
@@ -87,16 +89,16 @@ export default async function HomePage() {
               <div className={`absolute inset-0 ${overlay}`} />
               {/* Gradient at bottom to make text pop */}
               <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/70 to-transparent" />
-              <div className="relative z-10 mt-auto p-3 text-left md:p-4">
-                <p className="text-sm font-semibold uppercase tracking-wider text-white md:text-base">{name}</p>
-                <p className="mt-0.5 text-sm text-white/80 md:text-base">{description}</p>
+              <div className="relative z-10 mt-auto p-3 text-left md:p-6">
+                <p className="text-sm font-semibold uppercase tracking-wider text-white md:text-2xl">{name}</p>
+                <p className="mt-0.5 text-sm text-white/85 md:mt-1.5 md:text-lg">{description}</p>
               </div>
             </Link>
           ))}
         </div>
       </section>
 
-      {/* Destaques — 3 colunas × 5 linhas */}
+      {/* Destaques — 2 colunas no celular, 4 no desktop */}
       <section className="mx-auto max-w-container px-margin-mobile pb-20 md:px-margin-desktop">
         <div className="mb-8 flex items-end justify-between">
           <div>
@@ -107,7 +109,7 @@ export default async function HomePage() {
             <Link href="/bolsas">Ver tudo</Link>
           </Button>
         </div>
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-6">
           {FEATURED.map((product) => (
             <ProductCard key={product.id} product={product} compact showLowStockWarning={showLowStockWarning} />
           ))}

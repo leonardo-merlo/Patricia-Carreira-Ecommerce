@@ -390,7 +390,9 @@ export function MateriasClient({
         <div className="card">
           <div className="card-header" style={{ gap: 12 }}>
             <h3 className="ttl">Insumos</h3>
-            <div className="row" style={{ flex: 1, gap: 8, justifyContent: 'flex-end' }}>
+            {/* Busca e filtro logo depois do título, à esquerda. O contador é
+                resultado, não controle: fica na ponta oposta. */}
+            <div className="row" style={{ flex: 1, gap: 8 }}>
               <div className="search-input" style={{ width: 220 }}>
                 <AdminIcon name="search" size={13} />
                 <input
@@ -403,7 +405,7 @@ export function MateriasClient({
                 <option value="all">Todas as categorias</option>
                 {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
-              <span className="chip">{filteredMaterials.length} insumo{filteredMaterials.length !== 1 ? 's' : ''}</span>
+              <span className="chip" style={{ marginLeft: 'auto' }}>{filteredMaterials.length} insumo{filteredMaterials.length !== 1 ? 's' : ''}</span>
             </div>
           </div>
           <div className="card-body flush">

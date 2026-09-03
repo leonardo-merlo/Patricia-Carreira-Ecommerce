@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 const VALUES = [
   {
     title: "Design autoral",
-    body: "Cada coleção nasce de desenhos exclusivos criados pela Patrícia — bordados, estampas e formas que carregam identidade e não se repetem em lugar nenhum.",
+    body: "Cada coleção nasce de desenhos exclusivos criados pela Patrícia: bordados, estampas e formas que carregam identidade e não se repetem em lugar nenhum.",
   },
   {
     title: "Materiais naturais",
@@ -19,7 +19,7 @@ const VALUES = [
   },
   {
     title: "Peças únicas",
-    body: "O bordado nunca sai igual. A trama do linho muda de peça para peça. Isso não é defeito — é a assinatura do artesanato.",
+    body: "O bordado nunca sai igual. A trama do linho muda de peça para peça. Isso não é defeito, é a assinatura do artesanato.",
   },
 ]
 
@@ -37,9 +37,10 @@ export default function SobrePage() {
             <span className="italic text-primary">uma história.</span>
           </h1>
           <p className="mx-auto mt-5 max-w-2xl font-body-lg text-body-lg text-on-surface-variant">
-            Patrícia Carreira nasceu da vontade de unir técnica e alma em cada ponto.
-            Uma marca de moda artesanal criada em Minas Gerais — onde as mãos habilidosas
-            e a tradição do bordado mineiro inspiram cada coleção.
+            Bordamos à mão, peça por peça, há mais de 20 anos. Nenhuma sai igual
+            à outra, e é essa a graça: você veste uma cor que ninguém mais tem.
+            A marca nasceu em Minas, ganhou casa em Arraial d&apos;Ajuda e hoje
+            chega ao Brasil inteiro.
           </p>
         </div>
       </section>
@@ -95,7 +96,7 @@ export default function SobrePage() {
           <div className="relative aspect-[4/3] overflow-hidden rounded-xl">
             <Image
               src="/images/refs/otoquedotempoimage.png"
-              alt="Nossa Essência — Patrícia Carreira"
+              alt="Peças bordadas à mão da Patrícia Carreira"
               fill
               className="object-cover"
             />

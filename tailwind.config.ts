@@ -68,9 +68,18 @@ const config: Config = {
         'on-tertiary-container':    '#ffe3bd',
 
         // Surfaces — fundos e containers
-        'background':               '#fff8ef',
-        'surface':                  '#fff8ef',
-        'surface-bright':           '#fff8ef',
+        //
+        // O chão da loja é BRANCO, não o creme. O creme continua existindo, mas
+        // como faixa deliberada: rodapé, "Entregamos em todo o país", as seções
+        // da página de afiliadas. Enquanto ele era o fundo de tudo, a foto do
+        // produto competia com a página; no branco a peça é a única cor da tela,
+        // que é como Farm, Cantão e Osklen tratam a vitrine.
+        //
+        // Quem quiser a faixa creme usa surface-container-low (#fbf3e4). Ela não
+        // mudou: só deixou de ser o padrão.
+        'background':               '#ffffff',
+        'surface':                  '#ffffff',
+        'surface-bright':           '#ffffff',
         'surface-dim':              '#e1d9cb',
         'surface-variant':          '#e9e2d3',
         'surface-container-lowest': '#ffffff',

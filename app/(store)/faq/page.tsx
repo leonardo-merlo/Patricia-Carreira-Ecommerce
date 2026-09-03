@@ -61,7 +61,7 @@ const FAQ_ITEMS = [
       },
       {
         q: "O PIX tem algum desconto?",
-        a: "No momento não oferecemos desconto adicional para pagamentos via PIX, mas o processamento é imediato — assim que o pagamento é confirmado, seu pedido já entra em separação.",
+        a: "No momento não oferecemos desconto adicional para pagamentos via PIX, mas o processamento é imediato: assim que o pagamento é confirmado, seu pedido já entra em separação.",
       },
     ],
   },
@@ -70,7 +70,7 @@ const FAQ_ITEMS = [
     questions: [
       {
         q: "As peças são realmente feitas à mão?",
-        a: "Sim, absolutamente. Cada peça é produzida manualmente por Patrícia e sua equipe em Minas Gerais. Bordados, costuras e acabamentos são feitos com tempo e atenção — por isso, pequenas variações entre peças são normais e fazem parte da identidade artesanal da marca.",
+        a: "Sim, absolutamente. Cada peça é produzida manualmente por Patrícia e sua equipe em Minas Gerais. Bordados, costuras e acabamentos são feitos com tempo e atenção. Por isso, pequenas variações entre peças são normais e fazem parte da identidade artesanal da marca.",
       },
       {
         q: "Como sei qual o meu tamanho?",

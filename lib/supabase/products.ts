@@ -38,7 +38,11 @@ export async function getProductsByCategory(
     query = query.eq('category', 'roupas').eq('subcategory', 'vestidos')
   } else if (category === 'batas') {
     query = query.eq('category', 'roupas').eq('subcategory', 'batas')
-  } else if (['bolsas', 'acessorios', 'bazar'].includes(category)) {
+  } else if (category === 'infantil') {
+    // Infantil é marcação, não categoria: a peça continua na categoria dela e
+    // aparece aqui também. Ver migration 047.
+    query = query.eq('is_kids', true)
+  } else if (['bolsas', 'acessorios', 'bazar', 'almofadas'].includes(category)) {
     query = query.eq('category', category)
   } else {
     return []

@@ -39,7 +39,7 @@ const STEPS: { num: string; text: ReactNode }[] = [
     num: "02",
     text: (
       <>
-        <strong>Compartilha do seu jeito</strong> — mostrando as produções, criando conteúdo e
+        <strong>Compartilha do seu jeito</strong>, mostrando as produções, criando conteúdo e
         conectando as peças ao seu estilo e à sua rotina.
       </>
     ),

@@ -121,7 +121,10 @@ export function EstoqueClient({
   // ─── Filtering ──────────────────────────────────────────────────────────────
 
   const filtered = products.filter((p) => {
-    if (catFilter !== 'all' && p.category !== catFilter) return false
+    // 'infantil' não é categoria e sim marcação, então filtra por outra coluna.
+    if (catFilter === 'infantil') {
+      if (!p.is_kids) return false
+    } else if (catFilter !== 'all' && p.category !== catFilter) return false
     const isActive = statusOverrides.has(p.id) ? statusOverrides.get(p.id)! : p.is_active
     if (statusFilter === 'active' && !isActive) return false
     if (statusFilter === 'inactive' && isActive) return false
@@ -283,7 +286,9 @@ export function EstoqueClient({
               <option value="bolsas">Bolsas</option>
               <option value="roupas">Roupas</option>
               <option value="acessorios">Acessórios</option>
+              <option value="almofadas">Almofadas</option>
               <option value="bazar">Bazar</option>
+              <option value="infantil">Peças infantis</option>
             </select>
             <select className="select" style={{ width: 'auto' }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="all">Todos os status</option>

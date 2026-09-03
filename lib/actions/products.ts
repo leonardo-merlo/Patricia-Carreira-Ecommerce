@@ -231,6 +231,7 @@ export type UpdateProductData = {
   is_active: boolean
   is_featured: boolean
   is_affiliate_promo: boolean
+  is_kids: boolean
   weight_grams: number | null
   length_cm: number | null
   width_cm: number | null
@@ -258,6 +259,7 @@ export async function updateProduct(productId: string, data: UpdateProductData):
       is_active: data.is_active,
       is_featured: data.is_featured,
       is_affiliate_promo: data.is_affiliate_promo,
+      is_kids: data.is_kids,
       weight_grams: data.weight_grams,
       length_cm: data.length_cm,
       width_cm: data.width_cm,
@@ -320,6 +322,7 @@ export type CreateProductInput = {
   is_active: boolean
   is_featured: boolean
   is_affiliate_promo: boolean
+  is_kids: boolean
   weight_grams: number | null
   length_cm: number | null
   width_cm: number | null
@@ -358,6 +361,7 @@ export async function createProduct(data: CreateProductInput): Promise<string> {
       is_active: data.is_active,
       is_featured: data.is_featured,
       is_affiliate_promo: data.is_affiliate_promo,
+      is_kids: data.is_kids,
       weight_grams: data.weight_grams,
       length_cm: data.length_cm,
       width_cm: data.width_cm,
@@ -469,7 +473,7 @@ export async function adjustVariantStock(
 // Import só ATUALIZA SKUs existentes — nunca cria produto/variante novos.
 // Fotos, dados fiscais (NCM/CFOP) e BOM ficam de fora: exigem o modal.
 
-const CATEGORIES = new Set(['bolsas', 'roupas', 'acessorios', 'bazar'])
+const CATEGORIES = new Set(['bolsas', 'roupas', 'acessorios', 'almofadas', 'bazar'])
 const SUBCATEGORIES = new Set(['vestidos', 'batas'])
 
 export type CsvImportRow = {

@@ -38,6 +38,13 @@ function slugifyShort(text: string): string {
     .join('-')
 }
 
+/**
+ * As categorias que o cadastro oferece. Espelha o CHECK de products.category
+ * (migration 047). Infantil não está aqui de propósito: é marcação, não
+ * categoria, e vive no switch "Peça infantil".
+ */
+type ProductCategoryOption = 'bolsas' | 'roupas' | 'acessorios' | 'almofadas' | 'bazar'
+
 function buildSku(name: string, color: string, size: string): string {
   const base = slugifyShort(name)
   const c = (color || 'X').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '').slice(0, 3).toUpperCase()
@@ -120,13 +127,14 @@ export function ProdutoModal({
   const [description, setDescription] = useState(product?.description ?? '')
   const [basePrice, setBasePrice] = useState(product ? String(product.base_price) : '')
   const [wholesalePrice, setWholesalePrice] = useState(product?.wholesale_price ? String(product.wholesale_price) : '')
-  const [category, setCategory] = useState<'bolsas' | 'roupas' | 'acessorios' | 'bazar'>(
-    (product?.category as 'bolsas' | 'roupas' | 'acessorios' | 'bazar') ?? 'bolsas',
+  const [category, setCategory] = useState<ProductCategoryOption>(
+    (product?.category as ProductCategoryOption) ?? 'bolsas',
   )
   const [subcategory, setSubcategory] = useState(product?.subcategory ?? '')
   const [isActive, setIsActive] = useState(product?.is_active ?? true)
   const [isFeatured, setIsFeatured] = useState(product?.is_featured ?? false)
   const [isAffiliatePromo, setIsAffiliatePromo] = useState(product?.is_affiliate_promo ?? false)
+  const [isKids, setIsKids] = useState(product?.is_kids ?? false)
   const [tags, setTags] = useState<string[]>(product?.tags ?? [])
 
   const [weightGrams, setWeightGrams] = useState(product?.weight_grams != null ? String(product.weight_grams) : '')
@@ -386,6 +394,7 @@ export function ProdutoModal({
         is_active: isActive,
         is_featured: isFeatured,
         is_affiliate_promo: isAffiliatePromo,
+        is_kids: isKids,
         weight_grams: weightGrams ? parseInt(weightGrams) : null,
         length_cm: lengthCm ? parseInt(lengthCm) : null,
         width_cm: widthCm ? parseInt(widthCm) : null,
@@ -448,10 +457,11 @@ export function ProdutoModal({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div className="field">
                 <label>Categoria *</label>
-                <select className="select" value={category} onChange={(e) => { setCategory(e.target.value as 'bolsas' | 'roupas' | 'acessorios' | 'bazar'); setSubcategory('') }}>
+                <select className="select" value={category} onChange={(e) => { setCategory(e.target.value as ProductCategoryOption); setSubcategory('') }}>
                   <option value="bolsas">Bolsas</option>
                   <option value="roupas">Roupas</option>
                   <option value="acessorios">Acessórios</option>
+                  <option value="almofadas">Almofadas</option>
                   <option value="bazar">Bazar</option>
                 </select>
               </div>
@@ -466,13 +476,22 @@ export function ProdutoModal({
                 </div>
               )}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+            {/* auto-fit em vez de três colunas fixas: com o switch de infantil
+                são quatro, e em tela estreita eles quebram em vez de espremer. */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8 }}>
                 <div>
                   <div style={{ fontWeight: 500, fontSize: 12.5 }}>Ativo no e-commerce</div>
                   <div className="cust-meta">Visível na loja online</div>
                 </div>
                 <button type="button" onClick={() => setIsActive((v) => !v)} className={`switch ${isActive ? 'on' : ''}`} style={{ cursor: 'pointer' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 500, fontSize: 12.5 }}>Peça infantil</div>
+                  <div className="cust-meta">Aparece também em Infantil</div>
+                </div>
+                <button type="button" id="checkbox-infantil" data-testid="checkbox-infantil" onClick={() => setIsKids((v) => !v)} className={`switch ${isKids ? 'on' : ''}`} style={{ cursor: 'pointer' }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8 }}>
                 <div>

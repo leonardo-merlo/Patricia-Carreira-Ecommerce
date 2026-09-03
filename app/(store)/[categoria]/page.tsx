@@ -20,7 +20,7 @@ const CATEGORY_META: Record<Categoria, { title: string; description: string }> =
   bazar: {
     title: "Bazar",
     description:
-      "Peças especiais de coleções anteriores com preços únicos. Quantidade limitada — quando acabar, não repõe.",
+      "Peças especiais de coleções anteriores com preços únicos. Quantidade limitada. Quando acaba, não repõe.",
   },
   bolsas: {
     title: "Bolsas",
@@ -35,7 +35,7 @@ const CATEGORY_META: Record<Categoria, { title: string; description: string }> =
   batas: {
     title: "Batas",
     description:
-      "Batas soltas e confortáveis com bordado artesanal — perfeitas para o verão.",
+      "Batas soltas e confortáveis com bordado artesanal. Boas para o calor.",
   },
   acessorios: {
     title: "Acessórios",
@@ -45,7 +45,7 @@ const CATEGORY_META: Record<Categoria, { title: string; description: string }> =
   vestuario: {
     title: "Vestuário",
     description:
-      "Vestidos, batas, macacões, shorts, saias e muito mais — confeccionados à mão com tecidos naturais.",
+      "Vestidos, batas, macacões, shorts, saias e camisas, confeccionados à mão com tecidos naturais.",
   },
   lancamentos: {
     title: "Lançamentos",
@@ -109,8 +109,6 @@ export default async function CategoriaPage({ params }: PageProps) {
     subcategories = VESTUARIO_SUBCATEGORIES
   } else if (categoria === "lancamentos") {
     products = await getProductsByCategory("lancamentos")
-  } else if (categoria === "infantil" || categoria === "almofadas") {
-    products = []
   } else {
     products = await getProductsByCategory(categoria)
   }

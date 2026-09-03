@@ -1,10 +1,17 @@
-"use client" // popover com estado de aberto e marcação de lido
+"use client" // popover com estado de aberto, aba de lidas e marcação de lido
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { AdminIcon } from './admin-icon'
 import { SidebarPopover } from './sidebar-popover'
-import { markRead, markAllRead, type AdminNotification, type NotificationKind } from '@/lib/actions/notifications'
+import {
+  markRead,
+  markUnread,
+  markAllRead,
+  listReadNotifications,
+  type AdminNotification,
+  type NotificationKind,
+} from '@/lib/actions/notifications'
 
 const KIND_ICON: Record<NotificationKind, 'wallet' | 'bag' | 'box' | 'layers'> = {
   account_due: 'wallet',
@@ -22,6 +29,12 @@ const KIND_GROUP: Record<NotificationKind, string> = {
 
 const GROUP_ORDER: NotificationKind[] = ['account_due', 'new_order', 'low_stock', 'low_material']
 
+function groupBy(list: AdminNotification[]) {
+  return GROUP_ORDER
+    .map((kind) => ({ kind, items: list.filter((n) => n.kind === kind) }))
+    .filter((g) => g.items.length > 0)
+}
+
 export function NotificationsMenu({
   notifications,
   collapsed,
@@ -33,9 +46,36 @@ export function NotificationsMenu({
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [tab, setTab] = useState<'unread' | 'read'>('unread')
   const [isPending, startTransition] = useTransition()
 
-  const count = notifications.length
+  // O servidor só manda as não lidas. As lidas são buscadas sob demanda, ao
+  // abrir a aba: é uma tela de desfazer, não vale carregar em toda navegação.
+  const [readItems, setReadItems] = useState<AdminNotification[] | null>(null)
+  const [loadingRead, setLoadingRead] = useState(false)
+
+  // Sai da lista na hora do clique. O revalidate do servidor vem depois e
+  // confirma; sem isso o item fica visível esperando o round-trip.
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set())
+
+  const key = (n: AdminNotification) => `${n.kind}:${n.refId}`
+
+  const unread = notifications.filter((n) => !dismissed.has(key(n)))
+  const count = unread.length
+
+  async function refreshRead() {
+    setLoadingRead(true)
+    try {
+      setReadItems(await listReadNotifications())
+    } finally {
+      setLoadingRead(false)
+    }
+  }
+
+  function switchTab(next: 'unread' | 'read') {
+    setTab(next)
+    if (next === 'read') void refreshRead()
+  }
 
   function openNotification(n: AdminNotification) {
     setOpen(false)
@@ -48,9 +88,29 @@ export function NotificationsMenu({
     router.push(n.href)
   }
 
-  const groups = GROUP_ORDER
-    .map((kind) => ({ kind, items: notifications.filter((n) => n.kind === kind) }))
-    .filter((g) => g.items.length > 0)
+  function dismiss(n: AdminNotification) {
+    setDismissed((prev) => new Set(prev).add(key(n)))
+    startTransition(async () => {
+      await markRead(n.kind, n.refId)
+      router.refresh()
+    })
+  }
+
+  function restore(n: AdminNotification) {
+    setReadItems((prev) => (prev ?? []).filter((r) => key(r) !== key(n)))
+    setDismissed((prev) => {
+      const next = new Set(prev)
+      next.delete(key(n))
+      return next
+    })
+    startTransition(async () => {
+      await markUnread(n.kind, n.refId)
+      router.refresh()
+    })
+  }
+
+  const list = tab === 'unread' ? unread : (readItems ?? [])
+  const groups = groupBy(list)
 
   return (
     <>
@@ -75,7 +135,7 @@ export function NotificationsMenu({
           <span className="sidebar-popover-title" style={{ padding: 0 }}>
             Notificações{count > 0 ? ` · ${count}` : ''}
           </span>
-          {count > 0 && (
+          {tab === 'unread' && count > 0 && (
             <button
               className="linkish"
               style={{ fontSize: 11.5 }}
@@ -94,32 +154,85 @@ export function NotificationsMenu({
           )}
         </div>
 
-        {count === 0 ? (
+        <div className="popover-tabs" role="tablist" aria-label="Filtro de notificações">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'unread'}
+            className={`popover-tab ${tab === 'unread' ? 'active' : ''}`}
+            data-testid="tab-notificacoes-nao-lidas"
+            onClick={() => switchTab('unread')}
+          >
+            Não lidas
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'read'}
+            className={`popover-tab ${tab === 'read' ? 'active' : ''}`}
+            data-testid="tab-notificacoes-lidas"
+            onClick={() => switchTab('read')}
+          >
+            Lidas
+          </button>
+        </div>
+
+        {tab === 'read' && loadingRead && readItems === null ? (
+          <div className="cust-meta" style={{ padding: '10px' }}>Carregando…</div>
+        ) : list.length === 0 ? (
           <div className="cust-meta" style={{ padding: '10px', lineHeight: 1.6 }}>
-            Nada por aqui. Contas a vencer, pedidos novos e estoque baixo aparecem
-            neste espaço.
+            {tab === 'unread'
+              ? 'Nada por aqui. Contas a vencer, pedidos novos e estoque baixo aparecem neste espaço.'
+              : 'Nenhuma marcada como lida hoje. As de conta a vencer e estoque baixo voltam sozinhas amanhã.'}
           </div>
         ) : (
           groups.map((group) => (
             <div key={group.kind}>
               <div className="sidebar-popover-title">{KIND_GROUP[group.kind]}</div>
               {group.items.map((n) => (
-                <button
-                  key={`${n.kind}:${n.refId}`}
-                  type="button"
-                  className="sidebar-popover-item"
-                  data-testid="item-notificacao"
-                  onClick={() => openNotification(n)}
-                >
-                  <AdminIcon name={KIND_ICON[n.kind]} size={14} />
-                  <span>
-                    <span className="sidebar-popover-label">
-                      {n.urgent && <span className="notif-dot" aria-hidden="true" />}
-                      {n.title}
+                <div key={key(n)} className="sidebar-popover-row">
+                  <button
+                    type="button"
+                    className="sidebar-popover-item"
+                    data-testid="item-notificacao"
+                    onClick={() => openNotification(n)}
+                  >
+                    <AdminIcon name={KIND_ICON[n.kind]} size={14} />
+                    <span>
+                      <span className="sidebar-popover-label">
+                        {n.urgent && tab === 'unread' && <span className="notif-dot" aria-hidden="true" />}
+                        {n.title}
+                      </span>
+                      <span className="sidebar-popover-desc">{n.detail}</span>
                     </span>
-                    <span className="sidebar-popover-desc">{n.detail}</span>
-                  </span>
-                </button>
+                  </button>
+
+                  {tab === 'unread' ? (
+                    <button
+                      type="button"
+                      className="popover-row-action"
+                      title="Marcar como lida"
+                      aria-label={`Marcar como lida: ${n.title}`}
+                      data-testid="btn-marcar-lida"
+                      disabled={isPending}
+                      onClick={() => dismiss(n)}
+                    >
+                      <AdminIcon name="x" size={13} />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="popover-row-action"
+                      title="Marcar como não lida"
+                      aria-label={`Marcar como não lida: ${n.title}`}
+                      data-testid="btn-marcar-nao-lida"
+                      disabled={isPending}
+                      onClick={() => restore(n)}
+                    >
+                      <AdminIcon name="history" size={13} />
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           ))

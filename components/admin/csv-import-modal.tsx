@@ -59,7 +59,7 @@ function toTagsOrNull(v: string | undefined): string[] | null {
   return v.split('|').map((t) => t.trim()).filter(Boolean)
 }
 
-const CATEGORIES = new Set(['bolsas', 'roupas', 'acessorios', 'bazar'])
+const CATEGORIES = new Set(['bolsas', 'roupas', 'acessorios', 'almofadas', 'bazar'])
 const SUBCATEGORIES = new Set(['vestidos', 'batas'])
 
 function validateRow(row: CsvImportRow): string | null {

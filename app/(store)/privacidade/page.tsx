@@ -43,7 +43,7 @@ export default function PrivacidadePage() {
             comércio eletrônico em todo o Brasil. Para os fins desta política, somos o
             <strong className="text-on-surface"> controlador dos dados</strong> coletados neste
             site, em conformidade com a
-            <strong className="text-on-surface"> Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018)</strong>.
+            <strong className="text-on-surface"> Lei Geral de Proteção de Dados (LGPD, Lei nº 13.709/2018)</strong>.
           </p>
         </section>
 
@@ -58,11 +58,11 @@ export default function PrivacidadePage() {
           <div className="space-y-4">
             <div className="rounded-xl border border-outline-variant bg-surface-container-low p-5">
               <p className="font-semibold text-on-surface">Dados de identificação</p>
-              <p className="mt-1">Nome completo, CPF/CNPJ, e-mail e telefone — coletados no checkout ou ao criar uma conta.</p>
+              <p className="mt-1">Nome completo, CPF/CNPJ, e-mail e telefone, coletados no checkout ou ao criar uma conta.</p>
             </div>
             <div className="rounded-xl border border-outline-variant bg-surface-container-low p-5">
               <p className="font-semibold text-on-surface">Dados de endereço</p>
-              <p className="mt-1">CEP, logradouro, número, complemento, bairro, cidade e estado — necessários para calcular frete e entregar o pedido.</p>
+              <p className="mt-1">CEP, logradouro, número, complemento, bairro, cidade e estado, necessários para calcular frete e entregar o pedido.</p>
             </div>
             <div className="rounded-xl border border-outline-variant bg-surface-container-low p-5">
               <p className="font-semibold text-on-surface">Dados de pagamento</p>
@@ -70,7 +70,7 @@ export default function PrivacidadePage() {
             </div>
             <div className="rounded-xl border border-outline-variant bg-surface-container-low p-5">
               <p className="font-semibold text-on-surface">Dados de navegação</p>
-              <p className="mt-1">Informações técnicas como endereço IP, tipo de navegador e páginas acessadas — coletados de forma anônima para melhorar o site.</p>
+              <p className="mt-1">Informações técnicas como endereço IP, tipo de navegador e páginas acessadas, coletados de forma anônima para melhorar o site.</p>
             </div>
           </div>
         </section>
@@ -121,7 +121,7 @@ export default function PrivacidadePage() {
           </h2>
           <p>
             Mantemos seus dados pelo tempo necessário para cumprir as finalidades
-            descritas nesta política e as obrigações legais aplicáveis —
+            descritas nesta política e as obrigações legais aplicáveis,
             especialmente fiscais e contábeis, que exigem retenção por até
             <strong className="text-on-surface"> 5 anos</strong>.
           </p>

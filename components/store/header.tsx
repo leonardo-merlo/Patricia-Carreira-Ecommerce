@@ -29,7 +29,7 @@ export function Header() {
         <Link
           href="/"
           className="flex items-center transition-opacity hover:opacity-80"
-          aria-label="Patrícia Carreira — página inicial"
+          aria-label="Patrícia Carreira, página inicial"
         >
           <Image
             src="/images/logo/logo-v2.png"

@@ -103,7 +103,11 @@ function summarizeOrList<T>({
   }))
 }
 
-export async function getAdminNotifications(): Promise<AdminNotification[]> {
+/**
+ * Todas as notificações derivadas dos dados de hoje, lidas e não lidas juntas.
+ * Separar uma coisa da outra é responsabilidade de quem chama.
+ */
+async function deriveNotifications(): Promise<AdminNotification[]> {
   const supabase = createServiceClient()
   const settings = await getStoreSettings()
 
@@ -243,24 +247,49 @@ export async function getAdminNotifications(): Promise<AdminNotification[]> {
     }),
   )
 
-  if (notifications.length === 0) return []
+  return notifications
+}
 
-  // ── Tira o que já foi lido ────────────────────────────────────────────────
-  const { data: reads } = await supabase
+/** Urgente primeiro, depois do mais recente para o mais antigo. */
+function sortNotifications(list: AdminNotification[]): AdminNotification[] {
+  return [...list].sort((a, b) => {
+    if (a.urgent !== b.urgent) return a.urgent ? -1 : 1
+    return b.at.localeCompare(a.at)
+  })
+}
+
+/** Quais dessas notificações já estão marcadas como lidas. */
+async function readKeysOf(notifications: AdminNotification[]): Promise<Set<string>> {
+  if (notifications.length === 0) return new Set()
+
+  const supabase = createServiceClient()
+  const { data } = await supabase
     .from('notification_reads')
     .select('kind, ref_id')
     .in('ref_id', notifications.map((n) => n.refId))
 
-  const readKeys = new Set(
-    ((reads ?? []) as Array<{ kind: string; ref_id: string }>).map((r) => `${r.kind}|${r.ref_id}`),
+  return new Set(
+    ((data ?? []) as Array<{ kind: string; ref_id: string }>).map((r) => `${r.kind}|${r.ref_id}`),
   )
+}
 
-  return notifications
-    .filter((n) => !readKeys.has(`${n.kind}|${n.refId}`))
-    .sort((a, b) => {
-      if (a.urgent !== b.urgent) return a.urgent ? -1 : 1
-      return b.at.localeCompare(a.at)
-    })
+export async function getAdminNotifications(): Promise<AdminNotification[]> {
+  const all = await deriveNotifications()
+  const read = await readKeysOf(all)
+  return sortNotifications(all.filter((n) => !read.has(`${n.kind}|${n.refId}`)))
+}
+
+/**
+ * As que já foram marcadas como lidas e que ainda são verdade hoje.
+ *
+ * Existe só para desfazer. Notificação de condição (conta a vencer, estoque
+ * baixo) usa chave "id:data", então esta lista se esvazia sozinha na virada do
+ * dia: amanhã o aviso volta por conta própria e não há o que desfazer.
+ */
+export async function getReadAdminNotifications(): Promise<AdminNotification[]> {
+  const all = await deriveNotifications()
+  const read = await readKeysOf(all)
+  return sortNotifications(all.filter((n) => read.has(`${n.kind}|${n.refId}`)))
 }
 
 export async function markNotificationRead(kind: NotificationKind, refId: string): Promise<void> {
@@ -270,6 +299,12 @@ export async function markNotificationRead(kind: NotificationKind, refId: string
   await supabase
     .from('notification_reads')
     .upsert({ kind, ref_id: refId, read_at: now }, { onConflict: 'kind,ref_id' })
+}
+
+/** Desfaz a marcação. Apagar a linha é o que devolve o aviso para a lista. */
+export async function markNotificationUnread(kind: NotificationKind, refId: string): Promise<void> {
+  const supabase = createServiceClient()
+  await supabase.from('notification_reads').delete().eq('kind', kind).eq('ref_id', refId)
 }
 
 export async function markAllNotificationsRead(): Promise<void> {

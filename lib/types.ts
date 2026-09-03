@@ -35,7 +35,7 @@ export type UserProfile = {
 // CATÁLOGO — Produtos e Variantes
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type ProductCategory = "bolsas" | "roupas" | "acessorios" | "bazar";
+export type ProductCategory = "bolsas" | "roupas" | "acessorios" | "bazar" | "almofadas";
 export type ProductSubcategory = "vestidos" | "batas" | null;
 
 /** Tabela de medidas para roupas — exibida na página do produto */
@@ -77,6 +77,11 @@ export type Product = {
   is_active: boolean;
   is_featured: boolean; // exibido na seção "Destaques" da home
   is_affiliate_promo: boolean; // disponível pra afiliadas divulgarem no portal
+  /**
+   * Peça infantil. Marcação transversal, não categoria: a bata infantil
+   * continua sendo roupa/bata e aparece tanto em Vestuário quanto em /infantil.
+   */
+  is_kids: boolean;
   /** @deprecated fotos vivem em ProductVariant.images — campo mantido só por compatibilidade de schema */
   images: string[];
   tags?: string[]; // tags manuais (Lançamento, Promoção, Bazar...) — controladas pelo admin
