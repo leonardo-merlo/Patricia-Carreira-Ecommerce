@@ -2,8 +2,46 @@ import { NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
 export async function middleware(request: NextRequest) {
-  const { supabaseResponse, user, supabase } = await updateSession(request)
   const { pathname } = request.nextUrl
+
+  // Fachada "site em construção" — um cliente real encontrou a loja com preços
+  // ainda fictícios (dados de teste, site não está valendo). Bloqueia a
+  // vitrine pública até o lançamento; admin/conta/afiliada/auth continuam
+  // liberados para o Henrique e para quem está construindo testar.
+  // Desligar: variável MAINTENANCE_MODE=false na Vercel. Sem ela, fica ligado.
+  const maintenanceActive = process.env.MAINTENANCE_MODE !== 'false'
+  const isInternalRoute =
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/conta') ||
+    pathname.startsWith('/afiliada') ||
+    pathname.startsWith('/auth') ||
+    pathname === '/em-construcao'
+
+  if (maintenanceActive && !isInternalRoute) {
+    const bypassToken = process.env.MAINTENANCE_BYPASS_TOKEN
+    const bypassParam = request.nextUrl.searchParams.get('preview')
+
+    if (bypassToken && bypassParam === bypassToken) {
+      const url = request.nextUrl.clone()
+      url.searchParams.delete('preview')
+      const response = NextResponse.redirect(url)
+      response.cookies.set('preview-ativo', bypassToken, {
+        maxAge: 60 * 60 * 24 * 7,
+        httpOnly: true,
+        sameSite: 'lax',
+      })
+      return response
+    }
+
+    const hasBypassCookie =
+      !!bypassToken && request.cookies.get('preview-ativo')?.value === bypassToken
+
+    if (!hasBypassCookie) {
+      return NextResponse.rewrite(new URL('/em-construcao', request.url))
+    }
+  }
+
+  const { supabaseResponse, user, supabase } = await updateSession(request)
 
   // /admin — exige role = 'admin'
   if (pathname.startsWith('/admin')) {
