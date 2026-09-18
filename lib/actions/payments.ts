@@ -12,6 +12,8 @@ import { fulfillPaidOrder } from '@/lib/server/fulfillment'
 import { validateCoupon } from '@/lib/actions/coupons'
 import { computeCouponDiscount } from '@/lib/supabase/coupons'
 import { getShippingOptions } from '@/lib/actions/shipping'
+import { parseOptionId } from '@/lib/shipping/option-id'
+import type { CarrierId } from '@/lib/shipping/types'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getStoreSettings } from '@/lib/server/store-settings'
@@ -34,7 +36,9 @@ export type CreatePaymentInput = {
     formData: OrderFormData
     items: CheckoutItem[]
     couponCode: string | null
-    shipping: { serviceId: number; destCep: string } | null
+    // `optionId` é o id composto que a cotação emitiu ("correios:03298"). O
+    // navegador diz qual opção, nunca por quanto — o preço é recalculado aqui.
+    shipping: { optionId: string; destCep: string } | null
     // Total exibido ao cliente — usado apenas para detectar preços defasados,
     // nunca como valor cobrado. O valor cobrado é recalculado no servidor.
     expectedTotal: number
@@ -53,6 +57,8 @@ type PricedOrder = {
   discountAmount: number
   shippingAmount: number
   shippingMethod: string | null
+  shippingCarrier: CarrierId | null
+  shippingServiceCode: string | null
   total: number
   couponId: string | null
 }
@@ -134,9 +140,11 @@ async function priceOrder(
     couponId = coupon.id
   }
 
-  // Frete: recotiza no Melhor Envio e aplica a regra de frete grátis do servidor
+  // Frete: recotiza na transportadora e aplica a regra de frete grátis do servidor
   let shippingAmount = 0
   let shippingMethod: string | null = null
+  let shippingCarrier: CarrierId | null = null
+  let shippingServiceCode: string | null = null
   if (orderData.shipping) {
     const quote = await getShippingOptions(
       orderData.shipping.destCep,
@@ -146,8 +154,16 @@ async function priceOrder(
       return { ok: false, error: quote.error }
     }
 
-    const option = quote.options.find((o) => o.id === orderData.shipping!.serviceId)
+    const option = quote.options.find((o) => o.id === orderData.shipping!.optionId)
     if (!option) {
+      return { ok: false, error: 'A opção de frete selecionada não está mais disponível. Recalcule o frete.' }
+    }
+
+    // A transportadora sai do id que a COTAÇÃO devolveu, não do que o navegador
+    // mandou: só chega aqui um id que a cotação de agora emitiu, então quebrá-lo
+    // é ler um dado nosso, não confiar no cliente.
+    const parsed = parseOptionId(option.id)
+    if (!parsed) {
       return { ok: false, error: 'A opção de frete selecionada não está mais disponível. Recalcule o frete.' }
     }
 
@@ -155,13 +171,19 @@ async function priceOrder(
     const isFree = subtotal >= quote.freeShippingThreshold && option.id === cheapest.id
     shippingAmount = isFree ? 0 : option.price
     shippingMethod = option.name
+    shippingCarrier = parsed.carrier
+    shippingServiceCode = parsed.serviceCode
   }
 
   const total = Math.round(Math.max(0, subtotal - discountAmount + shippingAmount) * 100) / 100
 
   return {
     ok: true,
-    priced: { lineItems, subtotal, discountAmount, shippingAmount, shippingMethod, total, couponId },
+    priced: {
+      lineItems, subtotal, discountAmount,
+      shippingAmount, shippingMethod, shippingCarrier, shippingServiceCode,
+      total, couponId,
+    },
   }
 }
 
@@ -254,7 +276,8 @@ export async function createPayment(
       totalAmount: priced.total,
       shippingAmount: priced.shippingAmount,
       shippingMethod: priced.shippingMethod,
-      melhorEnvioServiceId: input.orderData.shipping?.serviceId ?? null,
+      shippingCarrier: priced.shippingCarrier,
+      shippingServiceCode: priced.shippingServiceCode,
       discountAmount: priced.discountAmount,
       couponId: priced.couponId,
       userId,

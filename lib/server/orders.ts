@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/service'
+import type { CarrierId } from '@/lib/shipping/types'
 import type { PaymentMethod } from '@/lib/types'
 
 export type OrderFormData = {
@@ -35,7 +36,9 @@ type SaveOrderInput = {
   shippingAmount: number
   discountAmount: number
   shippingMethod: string | null
-  melhorEnvioServiceId: number | null
+  /** quem vai despachar, e por qual serviço — já na forma neutra */
+  shippingCarrier: CarrierId | null
+  shippingServiceCode: string | null
   couponId: string | null
   userId: string | null
   /**
@@ -203,7 +206,15 @@ export async function saveOrder(
       discount_amount: input.discountAmount,
       shipping_amount: input.shippingAmount,
       shipping_method: input.shippingMethod,
-      melhor_envio_service_id: input.melhorEnvioServiceId,
+      shipping_carrier: input.shippingCarrier,
+      shipping_service_code: input.shippingServiceCode,
+      // A coluna antiga continua sendo escrita para pedido do Melhor Envio: é por
+      // ela que `purchaseShippingLabel` sabe qual serviço comprar, e o painel liga
+      // os botões de etiqueta. Ela para de ser a única verdade, não de existir.
+      melhor_envio_service_id:
+        input.shippingCarrier === 'melhor-envio' && input.shippingServiceCode
+          ? Number(input.shippingServiceCode)
+          : null,
       payment_status: paymentStatus,
       payment_id: input.paymentId,
       payment_method: input.paymentMethod,

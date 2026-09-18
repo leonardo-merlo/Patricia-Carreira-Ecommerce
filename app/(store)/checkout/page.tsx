@@ -397,7 +397,7 @@ export default function CheckoutPage() {
           })),
           couponCode: cart.coupon?.code ?? null,
           shipping: selectedShipping
-            ? { serviceId: selectedShipping.id, destCep: address.cep }
+            ? { optionId: selectedShipping.id, destCep: address.cep }
             : null,
           expectedTotal: cart.total,
         },

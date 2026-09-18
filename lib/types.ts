@@ -506,9 +506,17 @@ export type FilterState = {
   sort: "relevance" | "price_asc" | "price_desc" | "newest";
 };
 
-/** Opção de frete retornada pela Melhor Envio */
+/**
+ * Opção de frete mostrada no carrinho.
+ *
+ * `id` é composto — "correios:03298", "melhor-envio:1" — porque ele atravessa o
+ * navegador e volta no payload do checkout, onde é revalidado contra uma cotação
+ * nova. Com duas transportadoras, o serviço 1 do Melhor Envio e um serviço 1 dos
+ * Correios seriam o mesmo número para coisas diferentes, e a revalidação casaria
+ * com a errada sem ruído nenhum. Monte e leia por `lib/shipping/option-id.ts`.
+ */
 export type ShippingOption = {
-  id: number;               // service ID do Melhor Envio
+  id: string;               // "<transportadora>:<código do serviço>"
   name: string;             // ex: "SEDEX", "PAC", "Jadlog .Package"
   company: string;          // ex: "Correios", "Jadlog"
   price: number;
@@ -560,7 +568,7 @@ export type MaterialCheckResult = {
   }>;
 };
 
-/** Resultado do cálculo de frete (Melhor Envio) */
+/** Resultado do cálculo de frete */
 export type ShippingQuote = {
   options: ShippingOption[];
   origin_zip: string;

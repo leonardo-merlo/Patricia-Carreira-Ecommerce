@@ -1,9 +1,12 @@
 'use server'
 
 import { createServiceClient } from '@/lib/supabase/service'
-import { calculateShipping, type MEShippingItem, type MEQuoteResult } from '@/lib/integrations/melhor-envio'
 import { getShippingOrigin } from '@/lib/server/store-identity'
 import { getStoreSettings } from '@/lib/server/store-settings'
+import { formatOptionId } from '@/lib/shipping/option-id'
+import { consolidatePackage } from '@/lib/shipping/package'
+import { getShippingCarriers } from '@/lib/shipping/registry'
+import type { CarrierQuote, ShippingPackageItem } from '@/lib/shipping/types'
 import type { ShippingOption } from '@/lib/types'
 
 export type ShippingResult =
@@ -27,12 +30,16 @@ export async function getFreeShippingThreshold(): Promise<number> {
  * (grafia espanhola) e o ME devolve "Correios", então PAC e SEDEX eram
  * descartados em silêncio; e a de Jadlog casava só pela empresa, então ".Com"
  * passava sem estar habilitado.
+ *
+ * Vale para qualquer transportadora: o adaptador dos Correios emite o mesmo
+ * vocabulário ("Correios", "PAC"), então o que já está salvo continua valendo
+ * sem migration de dado.
  */
-function matchesEnabledCarrier(quote: MEQuoteResult, enabledCarriers: string[]): boolean {
+function matchesEnabledCarrier(quote: CarrierQuote, enabledCarriers: string[]): boolean {
   if (enabledCarriers.length === 0) return true
 
-  const empresa = (quote.company?.name ?? '').trim().toLowerCase()
-  const servico = (quote.name ?? '').trim().toLowerCase()
+  const empresa = quote.company.trim().toLowerCase()
+  const servico = quote.name.trim().toLowerCase()
 
   return enabledCarriers.some((rotulo) => {
     const match = rotulo.trim().toLowerCase().match(/^([^(]+?)\s*(?:\(([^)]*)\))?$/)
@@ -73,7 +80,7 @@ export async function getShippingOptions(
 
     if (error) throw new Error('Erro ao buscar dados dos produtos')
 
-    const items: MEShippingItem[] = []
+    const items: ShippingPackageItem[] = []
     const missingDimensions: string[] = []
 
     for (const cartItem of cartItems) {
@@ -92,10 +99,10 @@ export async function getShippingOptions(
       }
 
       items.push({
-        weight: product.weight_grams / 1000,
-        width: product.width_cm ?? 10,
-        height: product.height_cm ?? 5,
-        length: product.length_cm ?? 20,
+        weightKg: product.weight_grams / 1000,
+        widthCm: product.width_cm ?? 10,
+        heightCm: product.height_cm ?? 5,
+        lengthCm: product.length_cm ?? 20,
         quantity: cartItem.quantity,
       })
     }
@@ -112,18 +119,44 @@ export async function getShippingOptions(
       return { ok: false, error: 'Nenhum item no carrinho' }
     }
 
-    const quotes = await calculateShipping(destCep, items, originCep)
+    const carriers = getShippingCarriers()
+    if (carriers.length === 0) {
+      return { ok: false, error: 'Nenhuma transportadora configurada' }
+    }
 
-    const options: ShippingOption[] = quotes
-      .filter((q) => !q.error && q.price != null)
+    const request = {
+      originZip: originCep,
+      destinationZip: destCep.replace(/\D/g, ''),
+      items,
+      parcel: consolidatePackage(items),
+      declaredValue: 0,
+    }
+
+    // allSettled e não all: uma transportadora fora do ar não pode levar as
+    // outras junto. Parar de vender é pior que vender com menos opções — a
+    // mesma regra que a origem do frete já segue.
+    const respostas = await Promise.allSettled(carriers.map((c) => c.quote(request)))
+
+    const cotacoes: CarrierQuote[] = []
+    for (let i = 0; i < respostas.length; i++) {
+      const r = respostas[i]
+      if (r.status === 'fulfilled') {
+        cotacoes.push(...r.value)
+      } else {
+        console.error(`[getShippingOptions] ${carriers[i].label} não cotou:`, r.reason)
+      }
+    }
+
+    const options: ShippingOption[] = cotacoes
+      .filter((q) => q.price > 0)
       .filter((q) => matchesEnabledCarrier(q, enabledCarriers))
       .map((q) => ({
-        id: q.id,
+        id: formatOptionId(q.carrier, q.serviceCode),
         name: q.name,
-        company: q.company.name,
-        price: Number(String(q.price!).replace(',', '.')),
-        delivery_days_min: q.delivery_range.min + extraDays,
-        delivery_days_max: q.delivery_range.max + extraDays,
+        company: q.company,
+        price: q.price,
+        delivery_days_min: q.deliveryDaysMin + extraDays,
+        delivery_days_max: q.deliveryDaysMax + extraDays,
       }))
       .sort((a, b) => a.price - b.price)
 
