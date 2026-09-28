@@ -81,7 +81,7 @@ async function fetchOrderForLabel(orderId: string) {
   const { data: rawOrder } = await supabase
     .from('orders')
     .select(`
-      id, total_amount, melhor_envio_service_id,
+      id, total_amount, melhor_envio_service_id, shipping_carrier,
       buyer_name, buyer_email, buyer_phone, buyer_cpf_cnpj, buyer_address,
       customer:customers(name, email, phone, cpf_cnpj, address),
       items:order_items(quantity, unit_price, product_name, product_variant_id)
@@ -194,6 +194,7 @@ type EnderecoRaw = {
 
 type ContextoEtiqueta = {
   serviceIdDoPedido: number | null
+  transportadoraDoPedido: string | null
   totalValue: number
   to: MEAddress
   destinoLegivel: string
@@ -245,6 +246,7 @@ async function montarContextoEtiqueta(orderId: string): Promise<ContextoEtiqueta
 
   return {
     serviceIdDoPedido: (rawOrder.melhor_envio_service_id as number | null) ?? null,
+    transportadoraDoPedido: (rawOrder.shipping_carrier as string | null) ?? null,
     totalValue: Number(rawOrder.total_amount),
     to,
     destinoLegivel: `${customerAddress.city}/${customerAddress.state.trim().toUpperCase()}`,
@@ -308,6 +310,18 @@ export async function purchaseShippingLabel(
   const supabase = createServiceClient()
   const ctx = await montarContextoEtiqueta(orderId)
 
+  // Pedido cotado direto nos Correios não tem etiqueta no Melhor Envio para
+  // comprar. A pré-postagem automática ainda não existe, e um pedido pago que
+  // aparece "Sem etiqueta" sem uma linha de explicação é mercadoria que não sai:
+  // nem o Henrique nem eu conseguiríamos saber se foi falha ou se é para postar
+  // na mão. A frase é a instrução.
+  if (ctx.transportadoraDoPedido === 'correios' && !serviceIdEscolhido) {
+    throw new Error(
+      'Frete pelos Correios: a pré-postagem automática ainda não está ligada. ' +
+        'Poste na agência pelo contrato e cole o código de rastreio no pedido.'
+    )
+  }
+
   const serviceId = serviceIdEscolhido ?? ctx.serviceIdDoPedido
   if (!serviceId) {
     return
@@ -354,10 +368,19 @@ export async function purchaseShippingLabel(
     .from('orders')
     .update({
       melhor_envio_order_id: meOrderId,
+      shipment_id: meOrderId,
       // Trocou de transportadora: o pedido passa a dizer por qual o pacote saiu.
       // shipping_amount não muda — é o que o cliente pagou, e a diferença é da loja.
       ...(serviceIdEscolhido
-        ? { melhor_envio_service_id: serviceIdEscolhido, shipping_method: nomeDoServicoEscolhido }
+        ? {
+            melhor_envio_service_id: serviceIdEscolhido,
+            shipping_method: nomeDoServicoEscolhido,
+            // A troca manual compra no ME. Sem atualizar estas duas, um pedido
+            // despachado pelo ME continuaria dizendo "correios" e a próxima
+            // tentativa bateria na recusa acima, para um envio que já existe.
+            shipping_carrier: 'melhor-envio',
+            shipping_service_code: String(serviceIdEscolhido),
+          }
         : {}),
     })
     .eq('id', orderId)

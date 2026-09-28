@@ -7,6 +7,12 @@
 import { isValidCep, isValidCnpj, meDocumentFields, onlyDigits } from '@/lib/documento'
 import { readEnv, readEnvOption } from '@/lib/env'
 import { resolveShippingOrigin } from '@/lib/server/store-identity'
+import { CORREIOS_SERVICES } from '@/lib/shipping/correios'
+import {
+  correiosContrato,
+  correiosCredenciaisPresentes,
+  getCorreiosDr,
+} from '@/lib/shipping/correios/token'
 import { getStoreSettings, type StoreSettings } from '@/lib/server/store-settings'
 
 export type EnvCheck = {
@@ -174,6 +180,40 @@ async function checkMelhorEnvio(): Promise<ServiceCheck> {
   }
 }
 
+/**
+ * Correios pelo contrato do cliente.
+ *
+ * Autentica e nada mais: a autenticação é a única chamada que prova credencial,
+ * contrato e DR de uma vez, e é a que falha primeiro quando o código de acesso é
+ * regerado no CWS. Cotar de mentira aqui gastaria consulta para responder o que
+ * o token já responde.
+ */
+async function checkCorreios(): Promise<ServiceCheck> {
+  const environment = 'PRODUÇÃO'
+
+  if (!correiosCredenciaisPresentes()) {
+    return {
+      service: 'Correios',
+      ok: false,
+      environment,
+      detail: 'faltam CORREIOS_USUARIO, CORREIOS_CODIGO_ACESSO ou CORREIOS_CONTRATO',
+    }
+  }
+
+  try {
+    const dr = await getCorreiosDr()
+    const servicos = CORREIOS_SERVICES.map((s) => s.name).join(', ')
+    return {
+      service: 'Correios',
+      ok: true,
+      environment,
+      detail: `contrato ${correiosContrato()}${dr !== null ? ` · DR ${dr}` : ''} · ${servicos}`,
+    }
+  } catch (err) {
+    return { service: 'Correios', ok: false, environment, detail: describeError(err) }
+  }
+}
+
 // Exportada para o botão "testar conexão" da tela de Fiscal, que precisa só
 // desta checagem — rodar runDiagnostics inteiro chamaria quatro APIs à toa.
 export async function checkFocusNfe(): Promise<ServiceCheck> {
@@ -306,6 +346,17 @@ function buildGroups(): EnvGroup[] {
         check('MERCADOPAGO_ACCESS_TOKEN', true, 'token do servidor'),
         check('NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY', true, 'usada pelo SDK do checkout para tokenizar o cartão'),
         check('MERCADOPAGO_WEBHOOK_SECRET', true, 'sem ela o webhook devolve 401 em toda notificação'),
+      ],
+    },
+    {
+      title: 'Correios (contrato direto)',
+      vars: [
+        check('CORREIOS_USUARIO', true, 'login do Meu Correios — o CNPJ do titular do contrato'),
+        check('CORREIOS_CODIGO_ACESSO', true, 'gerado no CWS; vai no Authorization: Basic'),
+        check('CORREIOS_CONTRATO', true, 'número do contrato comercial'),
+        check('CORREIOS_BASE_URL', false, 'padrão https://api.correios.com.br'),
+        check('CORREIOS_CNPJ', false, 'titular do contrato — pode diferir do CNPJ que emite a nota'),
+        check('CORREIOS_CARTAO_POSTAGEM', false, 'só a pré-postagem usa; a cotação não'),
       ],
     },
     {
@@ -499,6 +550,7 @@ export async function runDiagnostics(): Promise<Diagnostics> {
 
   const services = await Promise.all([
     checkMercadoPago(),
+    checkCorreios(),
     checkMelhorEnvio(),
     checkFocusNfe(),
     checkResend(),

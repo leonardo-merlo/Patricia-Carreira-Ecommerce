@@ -1,4 +1,5 @@
 import type { ShippingCarrier } from './carrier'
+import { correiosCarrier } from './correios'
 import { melhorEnvioCarrier } from './melhor-envio'
 import type { CarrierId } from './types'
 
@@ -10,9 +11,9 @@ import type { CarrierId } from './types'
 // Leonardo se comportam cada um conforme o que de fato têm.
 //
 // A ordem importa: ela é a precedência quando duas transportadoras oferecem o
-// mesmo serviço. Por ora há uma só — o adaptador dos Correios entra na frente
-// quando a cotação direta ligar.
-const TODAS: readonly ShippingCarrier[] = [melhorEnvioCarrier]
+// mesmo serviço. Correios direto na frente do Melhor Envio, que revende o mesmo
+// PAC mais caro.
+const TODAS: readonly ShippingCarrier[] = [correiosCarrier, melhorEnvioCarrier]
 
 export function getShippingCarriers(): ShippingCarrier[] {
   return TODAS.filter((c) => c.isConfigured())

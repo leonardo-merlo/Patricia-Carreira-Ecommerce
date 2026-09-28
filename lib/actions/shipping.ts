@@ -54,6 +54,37 @@ function matchesEnabledCarrier(quote: CarrierQuote, enabledCarriers: string[]): 
   })
 }
 
+/**
+ * Enquanto as duas transportadoras convivem, a direta vence a revenda.
+ *
+ * O Melhor Envio revende Correios: cotando pelos dois, "Correios PAC" aparece
+ * duas vezes no carrinho, com preços diferentes para o mesmo serviço — e o
+ * cliente escolhe o errado metade das vezes. Pior, o pedido ficaria gravado como
+ * `melhor-envio` num serviço que a loja poderia ter postado direto, pagando o
+ * preço de contrato.
+ *
+ * Regra: quando os Correios responderam, as opções do ME cuja empresa é Correios
+ * saem. Jadlog e o resto do ME continuam — a regra é sobre empresa repetida, não
+ * sobre desligar o ME. Isso é a fase que ainda vem.
+ *
+ * Os Correios fora do ar não acionam nada: sem cotação direta, a revenda do ME é
+ * a única forma de despachar por Correios, e tirá-la deixaria o cliente sem
+ * opção nenhuma.
+ */
+function removerRevendaDuplicada(cotacoes: CarrierQuote[]): CarrierQuote[] {
+  const empresasComCotacaoDireta = new Set(
+    cotacoes.filter((q) => q.carrier === 'correios').map((q) => q.company.trim().toLowerCase())
+  )
+
+  if (empresasComCotacaoDireta.size === 0) return cotacoes
+
+  return cotacoes.filter(
+    (q) =>
+      q.carrier === 'correios' ||
+      !empresasComCotacaoDireta.has(q.company.trim().toLowerCase())
+  )
+}
+
 export async function getShippingOptions(
   destCep: string,
   cartItems: Array<{ variantId: string; quantity: number }>
@@ -147,7 +178,7 @@ export async function getShippingOptions(
       }
     }
 
-    const options: ShippingOption[] = cotacoes
+    const options: ShippingOption[] = removerRevendaDuplicada(cotacoes)
       .filter((q) => q.price > 0)
       .filter((q) => matchesEnabledCarrier(q, enabledCarriers))
       .map((q) => ({

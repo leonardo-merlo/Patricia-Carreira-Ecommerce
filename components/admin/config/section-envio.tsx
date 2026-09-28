@@ -5,7 +5,16 @@ import { useRouter } from 'next/navigation'
 import { updateStoreSettings, type StoreSettings } from '@/lib/actions/settings'
 import { SaveRow, Toggle, useSaveState } from './config-parts'
 
-const ALL_CARRIERS = ['Correios (PAC)', 'Correios (SEDEX)', 'Jadlog (.Package)', 'Total Express']
+// O rótulo é "Empresa (Serviço)" e vale para qualquer transportadora: os
+// Correios pelo contrato direto e o Melhor Envio usam o mesmo vocabulário, então
+// ligar "Correios (PAC)" liga o PAC venha ele de onde vier.
+const ALL_CARRIERS = [
+  'Correios (PAC)',
+  'Correios (SEDEX)',
+  'Correios (Mini Envios)',
+  'Jadlog (.Package)',
+  'Total Express',
+]
 
 export function SectionEnvio({ settings }: { settings: StoreSettings }) {
   const router = useRouter()
